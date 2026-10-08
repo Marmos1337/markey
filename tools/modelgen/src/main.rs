@@ -2,7 +2,14 @@
 //!
 //! Usage: `modelgen <corpus-dir> <output-dir>`
 //!
-//! Every `<lang>_50k.txt` in the corpus directory becomes `<lang>.rkm`.
+//! Every `<lang>_full.txt` (or, failing that, `<lang>_50k.txt`) in the corpus
+//! directory becomes `<lang>.rkm`.
+//!
+//! The full lists matter. Fifty thousand word *forms* is a small vocabulary
+//! for an inflected language — Russian alone spends most of it on the cases of
+//! the commonest nouns — so ordinary words like `напишешь` fell outside it and
+//! were judged on letter shape alone, which is exactly when the detector
+//! declines to act.
 
 use rekey_core::model::Model;
 use std::collections::HashMap;
@@ -16,7 +23,12 @@ const MIN_TRIGRAM_LEN: usize = 2;
 
 /// Entries below this count are overwhelmingly OCR noise and foreign-script
 /// fragments in the OpenSubtitles lists.
-const MIN_COUNT: u64 = 2;
+const MIN_COUNT: u64 = 3;
+
+/// Upper bound on the vocabulary taken from a full list, most frequent first.
+/// Keeps the bundled models to a few megabytes while still covering the long
+/// tail of inflected forms people actually type.
+const MAX_WORDS: usize = 400_000;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -34,7 +46,7 @@ fn main() -> ExitCode {
             .filter(|p| {
                 p.file_name()
                     .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.ends_with("_50k.txt"))
+                    .is_some_and(|n| n.ends_with("_50k.txt") || n.ends_with("_full.txt"))
             })
             .collect(),
         Err(e) => {
@@ -43,9 +55,24 @@ fn main() -> ExitCode {
         }
     };
     files.sort();
+    // One list per language: the full one when it was fetched.
+    let full: Vec<PathBuf> = files
+        .iter()
+        .filter(|p| p.to_string_lossy().ends_with("_full.txt"))
+        .cloned()
+        .collect();
+    files.retain(|p| {
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        match name.strip_suffix("_50k.txt") {
+            Some(lang) => !full.iter().any(|f| {
+                f.file_name().and_then(|n| n.to_str()) == Some(&format!("{lang}_full.txt"))
+            }),
+            None => true,
+        }
+    });
 
     if files.is_empty() {
-        eprintln!("no *_50k.txt files in {}", corpus.display());
+        eprintln!("no *_50k.txt or *_full.txt files in {}", corpus.display());
         return ExitCode::FAILURE;
     }
 
@@ -88,7 +115,8 @@ fn build(path: &Path, lang: &str) -> std::io::Result<Model> {
     let text = std::fs::read_to_string(path)?;
     let mut counts: HashMap<String, u64> = HashMap::new();
 
-    for line in text.lines() {
+    // The lists are sorted by frequency, so the cap keeps the commonest words.
+    for line in text.lines().take(MAX_WORDS * 2) {
         let mut parts = line.split_whitespace();
         let (Some(word), Some(count)) = (parts.next(), parts.next()) else {
             continue;
@@ -109,6 +137,9 @@ fn build(path: &Path, lang: &str) -> std::io::Result<Model> {
             continue;
         }
         *counts.entry(w).or_insert(0) += count;
+        if counts.len() >= MAX_WORDS {
+            break;
+        }
     }
 
     if counts.is_empty() {

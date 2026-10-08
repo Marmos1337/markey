@@ -1,6 +1,9 @@
 //! Debug helper: show exactly why the detector reached its verdict.
 //!
 //! `cargo run --example explain -- <active-layout> <word> [layouts...]`
+//!
+//! Prefix the word with `=` to give the *intended* text instead, e.g.
+//! `explain us =привет` types привет on the US keyboard first.
 
 use rekey_core::config::Config;
 use rekey_core::detect::Detector;
@@ -10,50 +13,42 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() < 2 {
-        eprintln!("usage: explain <active-layout> <word> [layout ...]");
+        eprintln!("usage: explain <active-layout> <word>... ");
         std::process::exit(1);
     }
     let active = args[0].clone();
-    let word = args[1].clone();
-    let mut layouts: Vec<String> = args[2..].to_vec();
-    if layouts.is_empty() {
-        layouts = vec!["us".into(), "ru".into()];
-    }
-    if !layouts.contains(&active) {
-        layouts.push(active.clone());
-    }
-
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/models");
     let models = Models::load_dir(&dir).expect("models");
     let det = Detector::new(
         models,
         Config {
-            layouts: layouts.clone(),
+            layouts: vec!["us".into(), "ru".into()],
             ..Config::default()
         },
     );
-
-    println!("word     {word:?}   active={active}   layouts={layouts:?}");
-
-    let from = rekey_core::layout(&active).expect("active layout");
-    for alt in det.config.alternatives(&active) {
-        let to = rekey_core::layout(alt).unwrap();
-        let conv = rekey_core::convert(&word, from, to);
-        let src_score = det.models.get(from.def.lang).map(|m| m.score(&word));
-        let dst_score = det.models.get(to.def.lang).map(|m| m.score(&conv));
-        println!(
-            "  -> {alt:<3} {conv:<24} src[{}]={:>7}  dst[{}]={:>7}  all-alpha={}  coverage={:.2}",
-            from.def.lang,
-            src_score
-                .map(|s| format!("{s:.2}"))
-                .unwrap_or("none".into()),
-            to.def.lang,
-            dst_score
-                .map(|s| format!("{s:.2}"))
-                .unwrap_or("none".into()),
-            conv.chars().all(|c| c.is_alphabetic()),
-            to.coverage(&conv),
-        );
+    for raw in &args[1..] {
+        let word = match raw.strip_prefix('=') {
+            Some(intended) => {
+                let from = det.source_layout(intended, "ru").unwrap().def.id;
+                let to = if from == "us" { "ru" } else { "us" };
+                rekey_core::convert_by_id(intended, from, to).unwrap()
+            }
+            None => raw.clone(),
+        };
+        let verdict = det.evaluate(&word, &active);
+        match verdict.candidate() {
+            Some(c) => println!(
+                "{word:<14} -> {:<14} {:<10} typed={:>6.2} conv={:>6.2} delta={:>5.2} tk={} sk={} typo={:?}",
+                c.converted,
+                if verdict.is_switch() { "SWITCH" } else { "ambiguous" },
+                c.score_as_typed,
+                c.score_converted,
+                c.delta,
+                c.target_knows_word,
+                c.source_knows_word,
+                c.target_typo_of
+            ),
+            None => println!("{word:<14} -> kept: {verdict:?}"),
+        }
     }
-    println!("verdict  {:?}", det.evaluate(&word, &active));
 }

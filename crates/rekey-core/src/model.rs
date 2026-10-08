@@ -32,6 +32,9 @@ const UNSEEN_TRIGRAM: f32 = -7.0;
 /// dictionary hits clearly ahead of merely-plausible letter sequences.
 const OOV_PENALTY: f32 = -3.0;
 
+/// How many of the most frequent words train the letter-shape model.
+const TRIGRAM_VOCABULARY: usize = 60_000;
+
 /// A trained model for one language.
 #[derive(Debug, Clone)]
 pub struct Model {
@@ -56,8 +59,15 @@ pub fn hash_str(s: &str) -> u32 {
 
 /// Lowercase a word for lookup. Diacritics are deliberately preserved: for
 /// Latin-script pairs they are often the only signal that a layout is wrong.
+///
+/// The one exception is Russian `ё`, which most writing (and most of the
+/// corpus) spells as `е`. Folding it means `ещё` and `еще` are the same word,
+/// instead of the less common spelling looking like an unknown one.
 pub fn normalize(word: &str) -> String {
-    word.to_lowercase()
+    word.chars()
+        .flat_map(char::to_lowercase)
+        .map(|c| if c == 'ё' { 'е' } else { c })
+        .collect()
 }
 
 /// Yield the padded character trigrams of a word, e.g. `abc` ->
@@ -89,20 +99,36 @@ impl Model {
         let total: f64 = counts.values().map(|c| *c as f64).sum();
         let mut words: Vec<(u32, f32)> = Vec::with_capacity(counts.len());
         let mut tri_counts: HashMap<String, f64> = HashMap::new();
+        // Spellings that normalise to the same key (ещё / еще) are one word,
+        // so their counts are summed rather than one silently replacing the
+        // other in the hashed table.
+        let mut merged: HashMap<String, u64> = HashMap::new();
 
         for (word, count) in counts {
             let w = normalize(word);
             if w.is_empty() {
                 continue;
             }
-            let p = (*count as f64) / total;
-            words.push((hash_str(&w), p.log10() as f32));
+            *merged.entry(w).or_insert(0) += *count;
+        }
 
+        for (w, count) in &merged {
+            let p = (*count as f64) / total;
+            words.push((hash_str(w), p.log10() as f32));
+        }
+
+        // Letter statistics come from the common core of the vocabulary only.
+        // The long tail of a full frequency list is where the typos, foreign
+        // fragments and — tellingly — wrong-layout gibberish live, and letting
+        // it vote would teach the model that gibberish looks like the language.
+        let mut by_count: Vec<(&String, &u64)> = merged.iter().collect();
+        by_count.sort_unstable_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        for (w, count) in by_count.into_iter().take(TRIGRAM_VOCABULARY) {
             // Weight trigrams by word frequency so common spellings dominate,
             // but dampen with a log so a handful of ultra-frequent function
             // words do not define the whole language's letter statistics.
             let weight = (*count as f64).ln().max(1.0);
-            for t in trigrams(&w) {
+            for t in trigrams(w) {
                 *tri_counts.entry(t).or_insert(0.0) += weight;
             }
         }

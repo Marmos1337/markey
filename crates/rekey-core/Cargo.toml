@@ -12,3 +12,4 @@ log = { workspace = true }
 unicode-normalization = "0.1"
 
 [dev-dependencies]
+serde_json = { workspace = true }

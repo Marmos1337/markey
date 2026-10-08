@@ -26,8 +26,14 @@ pub enum Key {
     /// Arrows, Home/End, PageUp/Down — anything that moves the caret.
     Navigation,
     /// A modifier was pressed or released and nothing else happened. Tapping
-    /// one is how the manual "cycle the last word" shortcut is triggered.
+    /// one is how the manual shortcut is triggered.
     ModifiersChanged,
+    /// A mouse click: the caret has moved somewhere unknown.
+    Click,
+    /// The user has probably selected text — a drag, a double click, select
+    /// all. The caret has moved too, and the shortcut should act on the
+    /// selection rather than on what was typed before.
+    Selection,
     Other,
 }
 
@@ -38,6 +44,13 @@ pub struct Modifiers {
     pub alt: bool,
     /// Command on macOS, Windows key on Windows.
     pub meta: bool,
+    /// Which of the held modifiers are the right-hand keys. The right-hand
+    /// Command and Option are almost never used in chords, which makes them the
+    /// best keys on the board to overload with a tap.
+    pub right_shift: bool,
+    pub right_control: bool,
+    pub right_alt: bool,
+    pub right_meta: bool,
 }
 
 impl Modifiers {
@@ -64,6 +77,14 @@ pub struct Context {
 ///
 /// Implemented by each platform's injector, and by a recording fake in tests.
 pub trait TextWriter: Send + Sync {
+    /// Press a word-ending key — space, tab or return — with shift if asked.
+    ///
+    /// Used to re-send a key Rekey held back so that a correction could land
+    /// first. Returns false if the platform cannot.
+    fn boundary(&self, _key: Key, _shift: bool) -> bool {
+        false
+    }
+
     /// Delete `count` characters behind the caret.
     fn backspace(&self, count: usize);
     /// Type `text` as if the user had.
