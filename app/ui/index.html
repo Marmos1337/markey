@@ -1,185 +1,338 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rekey</title>
+  <title>MarKey</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Draggable title area. macOS hides its own title bar here, so this stands
-       in for it; on Windows the system chrome sits above and this is a header. -->
-  <header class="titlebar" data-tauri-drag-region>
-    <span class="titlebar-title" data-tauri-drag-region>Rekey</span>
-  </header>
+  <div class="app">
+    <!-- The sidebar doubles as the window's drag area: macOS draws the traffic
+         lights over its top-left corner. -->
+    <aside class="sidebar" data-tauri-drag-region>
+      <div class="sidebar-top" data-tauri-drag-region></div>
+      <div class="brand" data-tauri-drag-region>
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="8"/><text x="16" y="21.5" text-anchor="middle">Ж</text></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">MarKey</span>
+          <span class="brand-status" id="brand-status"><i></i><span>…</span></span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Разделы">
+        <button class="nav-item" data-page="general" style="--tint:#8e8e93">
+          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M10 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Zm7 4.6v-2.4l-2-.4a5 5 0 0 0-.6-1.5l1.2-1.7-1.7-1.7-1.7 1.2a5 5 0 0 0-1.5-.6L10.4 2H8l-.4 2a5 5 0 0 0-1.5.6L4.4 3.4 2.7 5.1l1.2 1.7a5 5 0 0 0-.6 1.5l-2 .4v2.4l2 .4a5 5 0 0 0 .6 1.5l-1.2 1.7 1.7 1.7 1.7-1.2a5 5 0 0 0 1.5.6l.4 2h2.4l.4-2a5 5 0 0 0 1.5-.6l1.7 1.2 1.7-1.7-1.2-1.7a5 5 0 0 0 .6-1.5Z"/></svg></span>
+          Основное
+        </button>
+        <button class="nav-item" data-page="shortcut" style="--tint:#5e5ce6">
+          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M7 4a3 3 0 1 0-3 3h2v6H4a3 3 0 1 0 3 3v-2h6v2a3 3 0 1 0 3-3h-2V7h2a3 3 0 1 0-3-3v2H7Zm0 3h6v6H7Z" fill-rule="evenodd"/></svg></span>
+          Горячая клавиша
+        </button>
+        <button class="nav-item" data-page="apps" style="--tint:#ff9f0a">
+          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM12.2 12.2l4.6 4.6M16.8 12.2l-4.6 4.6" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></span>
+          Исключения
+        </button>
+        <button class="nav-item" data-page="languages" style="--tint:#0a84ff">
+          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Zm0 0c2 2 3 4.5 3 7.5s-1 5.5-3 7.5m0-15c-2 2-3 4.5-3 7.5s1 5.5 3 7.5M3 10h14" stroke="#fff" stroke-width="1.6" fill="none"/></svg></span>
+          Языки
+        </button>
+        <button class="nav-item" data-page="words" style="--tint:#30d158">
+          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M4 5h12M4 10h8M4 15h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>
+          Слова
+        </button>
+        <button class="nav-item" data-page="advanced" style="--tint:#636366">
+          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M4 6h7m4 0h1M4 14h1m4 0h7M11 6a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm-6 8a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></span>
+          Дополнительно
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <span id="version"></span>
+      </div>
+    </aside>
 
-  <div id="permission" class="banner banner-warn" hidden>
-    <p><strong>Rekey needs Accessibility access</strong> to see what you type
-      and put corrections back.</p>
-    <div class="banner-actions">
-      <button id="grant" class="btn btn-primary">Grant access</button>
-      <button id="open-settings" class="btn">Open System Settings</button>
-    </div>
-    <p class="footnote">Rekey starts correcting the moment you allow it — no
-      restart needed.</p>
+    <main class="content">
+      <header class="content-header" data-tauri-drag-region>
+        <h1 id="page-title" data-tauri-drag-region>Основное</h1>
+      </header>
+
+      <div class="pages">
+        <p id="save-error" class="banner banner-error" role="alert" hidden></p>
+
+        <!-- General -->
+        <section class="page" data-page="general">
+          <div id="permission" class="banner banner-warn" hidden>
+            <div class="banner-icon" aria-hidden="true">!</div>
+            <div class="banner-body">
+              <strong>Разрешите MarKey доступ к клавиатуре</strong>
+              <p>Системные настройки → Конфиденциальность и безопасность → Универсальный доступ → включите MarKey. Перезапуск не нужен — всё заработает само.</p>
+              <div class="banner-actions">
+                <button id="open-settings" class="btn btn-primary">Открыть настройки</button>
+                <button id="grant" class="btn">Запросить доступ</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="no-models" class="banner banner-error" hidden>
+            <div class="banner-icon" aria-hidden="true">!</div>
+            <div class="banner-body">
+              <strong>Не найдены языковые модели</strong>
+              <p>Без них исправление выключено. Переустановите MarKey или соберите модели из репозитория.</p>
+            </div>
+          </div>
+
+          <section class="hero" id="hero">
+            <div class="hero-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="hero-text">
+              <span class="hero-title" id="hero-title">Исправление включено</span>
+              <span class="hero-detail" id="hero-detail"></span>
+            </div>
+            <label class="switch" aria-label="Автоматическое исправление">
+              <input type="checkbox" id="enabled" switch />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </section>
+
+          <div class="stats" id="stats">
+            <div class="stat"><span class="stat-value" id="stat-auto">0</span><span class="stat-label">исправлено автоматически</span></div>
+            <div class="stat"><span class="stat-value" id="stat-manual">0</span><span class="stat-label">переведено клавишей</span></div>
+            <div class="stat"><span class="stat-value" id="stat-undo">0</span><span class="stat-label">отменено</span></div>
+          </div>
+
+          <h2 class="group-header">Как пользоваться</h2>
+          <section class="group how">
+            <div class="row">
+              <span class="how-step">1</span>
+              <div class="row-text">
+                <span class="row-title">Просто печатайте</span>
+                <span class="row-detail">Слово в неправильной раскладке исправится после пробела, а клавиатура переключится сама.</span>
+              </div>
+            </div>
+            <div class="row">
+              <span class="how-step">2</span>
+              <div class="row-text">
+                <span class="row-title">Исправилось зря — нажмите <kbd class="shortcut-name">правый ⌘</kbd></span>
+                <span class="row-detail">Слово вернётся как было, и MarKey запомнит его.</span>
+              </div>
+            </div>
+            <div class="row">
+              <span class="how-step">3</span>
+              <div class="row-text">
+                <span class="row-title">Не исправилось — нажмите <kbd class="shortcut-name">правый ⌘</kbd></span>
+                <span class="row-detail">Переведётся последнее слово вместе со всей фразой, набранной не в той раскладке. Выделили текст — переведётся выделение.</span>
+              </div>
+            </div>
+          </section>
+
+          <h2 class="group-header">Попробуйте</h2>
+          <section class="group">
+            <div class="row row-column">
+              <input id="try-input" type="text" class="field" spellcheck="false" autocomplete="off" placeholder="ghbdtn, rfr ltkf? z nen" />
+              <output id="try-output" class="preview">привет, как дела? я тут</output>
+            </div>
+            <div class="row">
+              <span class="row-title">Набрано в раскладке</span>
+              <select id="try-layout" class="select"></select>
+            </div>
+          </section>
+          <p class="group-footnote">Всё работает только на вашем Mac. Ничего из набранного никуда не отправляется и не записывается.</p>
+        </section>
+
+        <!-- Shortcut -->
+        <section class="page" data-page="shortcut" hidden>
+          <p class="page-intro">Одна клавиша на всё: отменить исправление, перевести то, что не исправилось само, или перевести выделенный текст. Модификаторы сами ничего не печатают, поэтому одиночное нажатие безопасно — сочетания вроде ⌘C его не вызывают.</p>
+
+          <h2 class="group-header">Клавиша</h2>
+          <section class="group">
+            <div class="row row-column">
+              <div class="keycaps" id="keycaps" role="radiogroup" aria-label="Клавиша"></div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Нажатие</span>
+                <span class="row-detail" id="tap-hint"></span>
+              </div>
+              <div class="segmented" id="tap-kind" role="radiogroup" aria-label="Нажатие">
+                <button data-value="tap" role="radio">Одно</button>
+                <button data-value="doubletap" role="radio">Двойное</button>
+              </div>
+            </div>
+          </section>
+
+          <h2 class="group-header">Что делает клавиша</h2>
+          <section class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Отменяет исправление</span>
+                <span class="row-detail">Сразу после автоисправления. Повторное нажатие вернёт его.</span>
+              </div>
+              <span class="badge badge-on">Всегда</span>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Переводит последнее слово и фразу</span>
+                <span class="row-detail">Находит, где началась неправильная раскладка, и переводит всё от этого места до курсора.</span>
+              </div>
+              <span class="badge badge-on">Всегда</span>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Переводит выделенный текст</span>
+                <span class="row-detail">Через буфер обмена. Ваш буфер восстанавливается, а менеджеры буфера эту операцию не запоминают.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="convert-selection" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Переводит слово перед курсором</span>
+                <span class="row-detail">Если вы кликнули в уже набранный текст и MarKey не видел, как его печатали.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="convert-word" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+          </section>
+        </section>
+
+        <!-- Apps -->
+        <section class="page" data-page="apps" hidden>
+          <p class="page-intro">В этих приложениях MarKey ничего не исправляет и не реагирует на клавишу. Поля паролей защищены всегда, независимо от списка. Добавить приложение можно и из меню MarKey в строке меню — пункт «Не исправлять в …».</p>
+          <section class="group app-list-group">
+            <ul id="excluded-apps" class="app-list"></ul>
+            <div class="list-toolbar">
+              <button class="tool-btn" id="add-app" aria-label="Добавить приложение" title="Добавить приложение">+</button>
+              <span class="tool-sep"></span>
+              <button class="tool-btn" id="remove-app" aria-label="Убрать выбранное" title="Убрать выбранное" disabled>−</button>
+              <span class="tool-spacer"></span>
+              <button class="btn btn-small" id="add-app-text">Добавить приложение…</button>
+            </div>
+          </section>
+          <p class="group-footnote" id="apps-footnote"></p>
+        </section>
+
+        <!-- Languages -->
+        <section class="page" data-page="languages" hidden>
+          <p class="page-intro">Отметьте только те языки, на которых пишете. Чем меньше лишних — тем увереннее MarKey.</p>
+          <section class="group">
+            <ul id="layouts" class="layouts"></ul>
+          </section>
+          <p class="group-footnote">«Ограниченно» — латинские раскладки (немецкая, французская, испанская, турецкая) почти совпадают с английской, поэтому ошибки в них видно гораздо реже.</p>
+        </section>
+
+        <!-- Words -->
+        <section class="page" data-page="words" hidden>
+          <p class="page-intro">Слова, которые MarKey никогда не трогает. Сюда автоматически попадает слово, когда вы отменяете его исправление клавишей.</p>
+          <section class="group">
+            <div class="row">
+              <input id="word-input" class="field" placeholder="Добавить слово, например ghbdtn" spellcheck="false" autocomplete="off" />
+              <button class="btn" id="word-add">Добавить</button>
+            </div>
+            <div class="row row-column" id="exceptions-row">
+              <ul id="exceptions" class="chips"></ul>
+              <span class="row-detail" id="exceptions-empty">Пока пусто.</span>
+            </div>
+          </section>
+        </section>
+
+        <!-- Advanced -->
+        <section class="page" data-page="advanced" hidden>
+          <h2 class="group-header">Исправление</h2>
+          <section class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Уверенность</span>
+                <span class="row-detail" id="sensitivity-hint"></span>
+              </div>
+              <div class="segmented" id="sensitivity" role="radiogroup" aria-label="Уверенность">
+                <button data-value="cautious" role="radio">Осторожно</button>
+                <button data-value="balanced" role="radio">Обычно</button>
+                <button data-value="eager" role="radio">Смело</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Переключать раскладку клавиатуры</span>
+                <span class="row-detail">После исправления следующее слово сразу пойдёт в нужной раскладке.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="switch-layout" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Не трогать слова КАПСОМ</span>
+                <span class="row-detail">Аббревиатуры вроде HTTP и SQL. Длинные слова с Caps Lock всё равно исправятся.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="skip-caps" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Звук при исправлении</span>
+                <span class="row-detail">Тихий системный щелчок.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="sound" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+          </section>
+
+          <h2 class="group-header">Система</h2>
+          <section class="group">
+            <div class="row">
+              <span class="row-title">Открывать при входе в систему</span>
+              <label class="switch"><input type="checkbox" id="launch" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Спрашивать Claude о спорных словах</span>
+                <span class="row-detail">Отправляет только отдельные спорные слова — никогда не фразы и ничего из исключённых приложений — и запоминает ответ локально. Нужен свой API-ключ Anthropic.</span>
+                <span class="row-detail" id="ai-status"></span>
+              </div>
+              <label class="switch"><input type="checkbox" id="ai" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row row-column" id="ai-key-row" hidden>
+              <input id="api-key" type="password" class="field mono" spellcheck="false" autocomplete="off" placeholder="sk-ant-…" />
+            </div>
+          </section>
+
+          <h2 class="group-header">Диагностика</h2>
+          <section class="group">
+            <div class="row">
+              <span class="row-title">Режим перехвата</span>
+              <span class="row-value" id="diag-mode"></span>
+            </div>
+            <div class="row">
+              <span class="row-title">Языковые модели</span>
+              <span class="row-value" id="diag-models"></span>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Журнал</span>
+                <span class="row-detail">Только решения и длины слов — сами слова не записываются.</span>
+              </div>
+              <button class="btn" id="open-log">Показать в Finder</button>
+            </div>
+          </section>
+        </section>
+      </div>
+    </main>
   </div>
 
-  <div id="no-models" class="banner banner-error" hidden>
-    <p><strong>No language models found.</strong> Corrections are disabled.
-      Reinstall Rekey, or run the model build from the repository.</p>
-  </div>
-
-  <p id="save-error" class="banner banner-error" hidden></p>
-
-  <main>
-    <p class="group-footnote">Automatic correction runs across apps with accessible editable text fields. Custom editors may be skipped. Password fields and Secure Input are always protected.</p>
-    <section class="group">
-      <div class="row">
-        <div class="row-text">
-          <span class="row-title">Automatic correction — entire Mac</span>
-          <span class="row-detail" id="enabled-detail">Watching for words typed on the wrong layout</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="enabled" switch />
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-    </section>
-
-    <h2 class="group-header">Try it</h2>
-    <section class="group">
-      <div class="row row-column">
-        <input
-          id="try-input"
-          type="text"
-          class="field mono"
-          spellcheck="false"
-          autocomplete="off"
-          placeholder="ghbdtn rfr ltkf" />
-        <output id="try-output" class="preview mono">привет как дела</output>
-      </div>
-      <div class="row">
-        <span class="row-title">Typed with</span>
-        <select id="try-layout" class="select"></select>
-      </div>
-    </section>
-    <p class="group-footnote">Nothing typed here leaves your machine.</p>
-
-    <h2 class="group-header">Languages you type in</h2>
-    <section class="group">
-      <ul id="layouts" class="layouts"></ul>
-    </section>
-    <p class="group-footnote">Rekey compares what you typed against every
-      language selected here. Choosing fewer makes it more certain.</p>
-
-    <h2 class="group-header">Corrections</h2>
-    <section class="group">
-      <div class="row">
-        <div class="row-text">
-          <span class="row-title">How eager</span>
-          <span class="row-detail" id="sensitivity-hint"></span>
-        </div>
-        <select id="sensitivity" class="select" aria-label="How eager">
-          <option value="cautious">Cautious</option>
-          <option value="balanced">Balanced</option>
-          <option value="eager">Eager</option>
-        </select>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <span class="row-title">Fix the last word by hand</span>
-          <span class="row-detail" id="shortcut-hint"></span>
-        </div>
-        <select id="shortcut" class="select">
-          <option value="tap:option">Tap Option</option>
-          <option value="doubletap:option">Double-tap Option</option>
-          <option value="tap:shift">Tap Shift</option>
-          <option value="doubletap:shift">Double-tap Shift</option>
-          <option value="tap:control">Tap Control</option>
-          <option value="doubletap:control">Double-tap Control</option>
-          <option value="tap:command">Tap Command</option>
-          <option value="doubletap:command">Double-tap Command</option>
-          <option value="off">Off</option>
-        </select>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <span class="row-title">Leave ALL CAPS alone</span>
-          <span class="row-detail">Acronyms like HTTP and NASA are usually meant as typed</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="skip-caps" switch />
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-    </section>
-
-    <h2 class="group-header">General</h2>
-    <section class="group">
-      <div class="row">
-        <span class="row-title">Open at login</span>
-        <label class="switch">
-          <input type="checkbox" id="launch" switch />
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-      <div class="row">
-        <div class="row-text">
-          <span class="row-title">Ask Claude about ambiguous words</span>
-          <span class="row-detail">Sends single words — never whole sentences — to
-            Anthropic's API and remembers the answer locally</span>
-          <span class="row-detail" id="ai-status"></span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="ai" switch />
-          <span class="switch-track"><span class="switch-thumb"></span></span>
-        </label>
-      </div>
-      <div class="row row-column" id="ai-key-row" hidden>
-        <input
-          id="api-key"
-          type="password"
-          class="field mono"
-          spellcheck="false"
-          autocomplete="off"
-          placeholder="sk-ant-…" />
-      </div>
-    </section>
-
-    <p class="group-footnote" id="runtime-status" role="status" aria-live="polite"></p>
-    <h2 class="group-header">App exceptions</h2>
-    <section class="group">
-      <div class="row">
-        <span class="row-detail" id="excluded-summary">Automatic correction is off in these apps. Remove an app to enable it again. Password fields remain protected.</span>
-      </div>
-      <ul id="excluded-apps" class="excluded-apps"></ul>
-      <div class="row row-column">
-        <label for="app-choice" class="row-title">Add an app exception</label>
-        <select id="app-choice" class="select"><option value="">Choose a running app…</option></select>
-        <button class="btn" id="refresh-apps" type="button">Refresh app list</button>
-        <label for="app-id" class="row-detail">Or enter its bundle ID</label>
-        <input id="app-id" class="field mono" placeholder="com.example.app" spellcheck="false" autocomplete="off" />
-        <button class="btn" id="add-excluded" type="button">Disable correction in this app</button>
-        <span class="row-detail" id="app-error" role="alert" hidden></span>
-      </div>
-    </section>
-    <details class="group-footnote">
-      <summary>Local diagnostics</summary>
-      <p id="runtime-counts"></p>
-      <p>No typed words are recorded here. A changed field or selection cancels a pending correction; tracking resumes at a verified word boundary.</p>
-    </details>
-
-    <section id="exceptions-section" hidden>
-      <h2 class="group-header">Words you told it to leave alone</h2>
-      <div class="group">
+  <dialog id="app-picker" class="sheet" aria-labelledby="picker-title">
+    <form method="dialog" class="sheet-inner">
+      <h2 id="picker-title">Не исправлять в приложении</h2>
+      <input id="app-search" type="search" class="field" placeholder="Поиск" spellcheck="false" autocomplete="off" />
+      <ul id="picker-list" class="app-list picker-list"></ul>
+      <details class="manual-id">
+        <summary>Указать идентификатор вручную</summary>
         <div class="row">
-          <ul id="exceptions" class="chips"></ul>
+          <input id="app-id" class="field mono" placeholder="com.example.app" spellcheck="false" autocomplete="off" />
+          <button class="btn" id="add-by-id" type="button">Добавить</button>
         </div>
+        <span class="row-detail" id="app-error" role="alert" hidden></span>
+      </details>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" value="close">Готово</button>
       </div>
-    </section>
-
-    <p class="colophon"><span id="stats">No corrections yet</span> · <span id="version"></span></p>
-  </main>
+    </form>
+  </dialog>
 
   <!-- Inert when running inside Tauri; see dev-mock.js. -->
   <script src="dev-mock.js"></script>

@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: rekey-${{ matrix.target }}
+          name: markey-${{ matrix.target }}
           path: |
             target/**/release/bundle/dmg/*.dmg
             target/**/release/bundle/msi/*.msi
@@ -75,7 +75,7 @@ jobs:
           body: |
             ## Installing
 
-            **macOS** — open the `.dmg`, drag Rekey to Applications, then grant
+            **macOS** — open the `.dmg`, drag MarKey to Applications, then grant
             **Accessibility** access (System Settings → Privacy & Security →
             Accessibility) and relaunch. These builds are not notarized yet, so
             the first launch needs right-click → Open.

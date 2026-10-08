@@ -1,180 +1,116 @@
-/* Rekey settings window.
+/* MarKey settings window.
  *
- * One structure, two skins. The layout is the grouped-row shape both platforms
- * use for settings — a label on the left, its control on the right, rows
- * stacked inside a rounded container — and everything that differs between
- * macOS and Windows is expressed as tokens under [data-platform].
- *
- * The platform is reported by the Rust side and stamped on <html>, so the
- * window matches the machine it is actually running on rather than guessing
- * from the user agent.
- *
- * Sizes follow the desktop guidance: 13pt body, nothing below 10pt. The
- * previous design had 9.5px badges, which is under that floor.
+ * Modelled on macOS System Settings: a translucent sidebar with tinted icons,
+ * an opaque content pane, settings in grouped rounded rows. Every colour is a
+ * token defined once for light and once for dark, and the platform-specific
+ * differences (Windows' Fluent look) are overrides of those tokens.
  */
 
-/* -- shared tokens --------------------------------------------------------- */
-
 :root {
-  /* Tells the engine which appearance to draw system controls in. Without it,
-     pop-up buttons and checkboxes render light while the page renders dark —
-     which is how they ended up as pale text on a pale control. */
   color-scheme: light dark;
 
-  /* Generous, concentric radii, matching the current macOS look. An inner
-     radius is the outer one minus the padding between them, so nested corners
-     stay parallel instead of drifting apart. */
-  --radius-group: 12px;
-  --radius-control: 8px;
-  /* Height of the overlaid title bar. The traffic lights are drawn by the
-     system on top of the web content, so the content has to start below them. */
-  --titlebar-height: 44px;
-  --row-min-height: 38px;
+  --sidebar-width: 214px;
+  --titlebar-height: 52px;
+  --radius-group: 10px;
+  --radius-control: 6px;
+  --row-min-height: 40px;
   --row-pad-x: 12px;
   --row-pad-y: 9px;
-  --gutter: 20px;
-  --group-gap: 18px;
+  --gutter: 24px;
 
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
-    sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   --size-body: 13px;
-  --size-detail: 11px;
-  --size-header: 11px;
+  --size-detail: 11.5px;
+  --size-header: 11.5px;
 
-  /* Light appearance. Every colour is defined here and only overridden. */
-  --bg: #ececee;
+  --accent: #0a7aff;
+  --accent-soft: rgba(10, 122, 255, 0.14);
+  --accent-text: #ffffff;
+  --sidebar-bg: #e8e6ea;
+  --content-bg: #f3f2f5;
   --group-bg: #ffffff;
-  --group-border: rgba(0, 0, 0, 0.08);
+  --group-border: rgba(0, 0, 0, 0.07);
   --separator: rgba(0, 0, 0, 0.08);
   --text: #1d1d1f;
   --text-secondary: #6e6e73;
-  --accent: #0a68e1;
-  --accent-text: #ffffff;
+  --text-tertiary: #a1a1a6;
   --control-bg: #ffffff;
-  --control-border: rgba(0, 0, 0, 0.18);
-  --track-off: #d8d8dc;
+  --control-border: rgba(0, 0, 0, 0.16);
+  --control-hover: rgba(0, 0, 0, 0.05);
+  --nav-hover: rgba(0, 0, 0, 0.05);
+  --nav-active: rgba(0, 0, 0, 0.09);
+  --track-off: #dcdce0;
   --field-bg: #ffffff;
-  --preview-bg: #eef2fb;
-  --warn-bg: #fff6e0;
-  --warn-border: #e8c37a;
-  --error-bg: #ffecec;
-  --error-border: #e5a9a9;
-  --shadow-control: 0 1px 1px rgba(0, 0, 0, 0.06);
-  --titlebar-scrolled: rgba(236, 236, 238, 0.72);
+  --preview-bg: #f0f5ff;
+  --ok: #28c840;
+  --warn: #ff9f0a;
+  --danger: #ff3b30;
+  --warn-bg: #fff6e5;
+  --warn-border: #f4c97a;
+  --error-bg: #ffeceb;
+  --error-border: #f1a7a2;
+  --keycap-bg: linear-gradient(#ffffff, #f2f2f4);
+  --keycap-border: rgba(0, 0, 0, 0.14);
+  --keycap-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+  --shadow-control: 0 0.5px 1px rgba(0, 0, 0, 0.12);
+  --sheet-bg: #f6f6f8;
+}
+
+@supports (color: AccentColor) {
+  [data-platform="macos"] {
+    --accent: AccentColor;
+    --accent-soft: color-mix(in srgb, AccentColor 16%, transparent);
+  }
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1c1c1e;
-    --group-bg: #2c2c2e;
-    --group-border: rgba(255, 255, 255, 0.09);
-    --separator: rgba(255, 255, 255, 0.11);
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.22);
+    --sidebar-bg: #262628;
+    --content-bg: #1e1e20;
+    --group-bg: #2a2a2d;
+    --group-border: rgba(255, 255, 255, 0.07);
+    --separator: rgba(255, 255, 255, 0.08);
     --text: #f5f5f7;
-    --text-secondary: #98989e;
-    --accent: #3d8bfd;
-    --accent-text: #ffffff;
-    --control-bg: #3a3a3c;
-    --control-border: rgba(255, 255, 255, 0.16);
-    --track-off: #4b4b4f;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #6e6e73;
+    --control-bg: #3a3a3d;
+    --control-border: rgba(255, 255, 255, 0.12);
+    --control-hover: rgba(255, 255, 255, 0.06);
+    --nav-hover: rgba(255, 255, 255, 0.06);
+    --nav-active: rgba(255, 255, 255, 0.1);
+    --track-off: #48484c;
     --field-bg: #1c1c1e;
-    --preview-bg: #2a3350;
-    --warn-bg: #3a2f1a;
-    --warn-border: #77602c;
-    --error-bg: #3a2020;
-    --error-border: #7a3c3c;
+    --preview-bg: #1d2a40;
+    --warn-bg: #3a2e18;
+    --warn-border: #7a5c25;
+    --error-bg: #3b1f1e;
+    --error-border: #7c3a36;
+    --keycap-bg: linear-gradient(#4a4a4e, #3c3c40);
+    --keycap-border: rgba(255, 255, 255, 0.1);
+    --keycap-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
     --shadow-control: none;
-    --titlebar-scrolled: rgba(28, 28, 30, 0.72);
+    --sheet-bg: #2a2a2d;
   }
 }
 
-/* -- Windows 11 -----------------------------------------------------------
- * Fluent: Segoe UI Variable, squarer corners, a lighter card against a Mica
- * ground, and the system accent blue. Controls sit on a subtle border rather
- * than a shadow, and the toggle is a pill with a travelling dot.
- */
+/* With the system's sidebar material behind the window, the sidebar lets it
+   show through; the content pane stays opaque so text contrast never depends
+   on what is behind the window. */
+[data-vibrancy="on"] {
+  --sidebar-bg: transparent;
+}
 
 [data-platform="windows"] {
-  --radius-group: 8px;
-  --radius-control: 4px;
-  --titlebar-height: 46px;
-  --row-min-height: 44px;
-  --row-pad-x: 14px;
-  --row-pad-y: 10px;
-  --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
-    system-ui, sans-serif;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --size-body: 14px;
   --size-detail: 12px;
-  --size-header: 14px;
-
-  --bg: #f3f3f3;
-  --group-bg: #fbfbfb;
-  --group-border: rgba(0, 0, 0, 0.06);
-  --separator: rgba(0, 0, 0, 0.06);
-  --text: #1b1b1b;
-  --text-secondary: #5d5d5d;
+  --radius-group: 8px;
+  --radius-control: 4px;
+  --titlebar-height: 40px;
   --accent: #005fb8;
-  --control-bg: #fdfdfd;
-  --control-border: rgba(0, 0, 0, 0.16);
-  --track-off: #8a8a8a;
-  --field-bg: #fdfdfd;
-  --preview-bg: #eef4fc;
-  --shadow-control: none;
-  --titlebar-scrolled: rgba(243, 243, 243, 0.78);
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-platform="windows"] {
-    --bg: #202020;
-    --group-bg: #2b2b2b;
-    --group-border: rgba(255, 255, 255, 0.07);
-    --separator: rgba(255, 255, 255, 0.07);
-    --text: #ffffff;
-    --text-secondary: #cfcfcf;
-    --accent: #60cdff;
-    --accent-text: #003754;
-    --control-bg: #323232;
-    --control-border: rgba(255, 255, 255, 0.1);
-    --track-off: #9a9a9a;
-    --field-bg: #2d2d2d;
-    --preview-bg: #23344a;
-    --titlebar-scrolled: rgba(32, 32, 32, 0.78);
-  }
-}
-
-/* -- window material -------------------------------------------------------
- * Applied only when the Rust side confirms the system actually gave us one.
- * Making the window ground transparent without a material behind it would
- * leave a see-through window, so this is opt-in on success rather than assumed.
- *
- * The cards stay close to opaque on purpose. The material behind them already
- * blurs and desaturates whatever is on the desktop, but it does not guarantee
- * a contrast ratio — and body text needs 4.5:1 whatever happens to be behind
- * the window. Letting the material read through the gaps between groups gives
- * the depth without putting text on an unknown background.
- */
-
-[data-vibrancy="on"] {
-  --bg: transparent;
-  --group-bg: rgba(255, 255, 255, 0.86);
-  --group-border: rgba(0, 0, 0, 0.06);
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-vibrancy="on"] {
-    --group-bg: rgba(58, 58, 60, 0.78);
-    --group-border: rgba(255, 255, 255, 0.08);
-  }
-}
-
-[data-vibrancy="on"][data-platform="windows"] {
-  --group-bg: rgba(252, 252, 252, 0.82);
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-vibrancy="on"][data-platform="windows"] {
-    --group-bg: rgba(48, 48, 48, 0.78);
-  }
 }
 
 /* -- base ------------------------------------------------------------------ */
@@ -183,96 +119,274 @@
   box-sizing: border-box;
 }
 
-/* `display` on a class outranks the user agent's [hidden] rule, so anything
-   the code hides by setting `.hidden = true` would otherwise stay visible —
-   which is how the API key field turned up with the assist switched off. */
 [hidden] {
   display: none !important;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  /* Transparent under a material, so the window itself is what shows. */
-  background: var(--bg);
+  background: var(--content-bg);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--size-body);
-  line-height: 1.4;
+  line-height: 1.38;
   -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
   user-select: none;
+  cursor: default;
+  overflow: hidden;
 }
 
-.mono {
-  font-family: var(--font-mono);
+[data-vibrancy="on"] body {
+  background: transparent;
 }
 
-/* -- title bar ------------------------------------------------------------- */
+input,
+textarea,
+output,
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
-/* The functional layer: it floats above the content, and the content scrolls
-   underneath it. Sticky rather than fixed so it participates in layout. */
-.titlebar {
-  /* Fixed rather than sticky. A sticky element has its position recalculated
-     against the flow on every scroll frame; a fixed one is promoted to its own
-     layer and simply stays put, which is what stopped the strip stuttering as
-     content moved under it. */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  height: var(--titlebar-height);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+button {
+  font: inherit;
+  color: inherit;
+}
+
+kbd {
+  font-family: var(--font-ui);
+  font-size: 0.92em;
   font-weight: 600;
-  font-size: var(--size-body);
-  /* Dragging is handled by Tauri's own data-tauri-drag-region attribute on
-     this element; -webkit-app-region is a Chromium extension and does nothing
-     in the WebKit view Tauri uses on macOS. */
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid var(--keycap-border);
+  background: var(--keycap-bg);
+  box-shadow: var(--keycap-shadow);
+  white-space: nowrap;
 }
 
-/* A scroll edge effect: separate the bar once content passes beneath it.
- *
- * Deliberately no backdrop-filter. The window already sits on a system
- * vibrancy material, and compositing a live blur on top of a live blur is what
- * made the background tear while dragging and scrolling. The material behind
- * is already doing the blurring; this only needs to add a tint and a hairline
- * so the title stays legible over whatever is sliding past.
- */
-.titlebar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--titlebar-scrolled);
-  border-bottom: 1px solid var(--separator);
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-
-body.scrolled .titlebar::after {
-  opacity: 1;
-}
-
-/* Let clicks fall through to the drag region behind the title text. */
-.titlebar-title {
-  pointer-events: none;
-}
-
-/* Windows draws its own title bar above the content, so this becomes a
-   left-aligned header rather than a stand-in for one. */
-[data-platform="windows"] .titlebar {
-  justify-content: flex-start;
-  padding: 0 var(--gutter);
-  font-size: 15px;
-  font-weight: 600;
+:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 1px;
 }
 
 /* -- layout ---------------------------------------------------------------- */
 
-main {
-  /* The title bar is out of flow now, so the content has to make room. */
-  padding: var(--titlebar-height) var(--gutter) var(--gutter);
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px 12px;
+  overflow-y: auto;
+}
+
+.sidebar-top {
+  height: var(--titlebar-height);
+  flex: none;
+}
+
+[data-platform="windows"] .sidebar-top {
+  height: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 14px;
+}
+
+.brand-mark svg {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
+.brand-mark rect {
+  fill: #5e5ce6;
+}
+
+.brand-mark text {
+  fill: #fff;
+  font: 700 16px var(--font-ui);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-name {
+  font-weight: 650;
+  font-size: 14px;
+}
+
+.brand-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--size-detail);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.brand-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex: none;
+}
+
+.brand-status[data-state="ready"] i {
+  background: var(--ok);
+}
+
+.brand-status[data-state="permission"] i,
+.brand-status[data-state="secure_input"] i {
+  background: var(--warn);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 8px;
+  text-align: left;
+  font-size: var(--size-body);
+  transition: background-color 120ms ease;
+}
+
+.nav-item:hover {
+  background: var(--nav-hover);
+}
+
+.nav-item.active {
+  background: var(--nav-active);
+  font-weight: 550;
+}
+
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--tint);
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+}
+
+.nav-icon svg {
+  width: 15px;
+  height: 15px;
+  fill: #fff;
+}
+
+.nav-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 10px 8px 0;
+  font-size: var(--size-detail);
+  color: var(--text-tertiary);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--content-bg);
+}
+
+.content-header {
+  height: var(--titlebar-height);
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--gutter);
+  border-bottom: 1px solid transparent;
+  transition: border-color 150ms ease;
+}
+
+.content.scrolled .content-header {
+  border-bottom-color: var(--separator);
+}
+
+.content-header h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.pages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px var(--gutter) 28px;
+}
+
+.page {
+  max-width: 620px;
+  margin: 0 auto;
+  animation: page-in 160ms ease-out;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    animation: none;
+  }
+  * {
+    transition: none !important;
+  }
+}
+
+.page-intro {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+}
+
+/* -- groups and rows ------------------------------------------------------- */
+
+.group-header {
+  margin: 22px 4px 7px;
+  font-size: var(--size-header);
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .group {
@@ -282,23 +396,8 @@ main {
   overflow: hidden;
 }
 
-.group-header {
-  margin: var(--group-gap) 2px 6px;
-  font-size: var(--size-header);
-  font-weight: 600;
-  color: var(--text-secondary);
-  letter-spacing: 0;
-}
-
-/* Windows settings headers are full-size and sit in the text colour. */
-[data-platform="windows"] .group-header {
-  color: var(--text);
-  margin: 22px 2px 8px;
-}
-
-.group-footnote,
-.footnote {
-  margin: 6px 4px 0;
+.group-footnote {
+  margin: 7px 4px 0;
   font-size: var(--size-detail);
   color: var(--text-secondary);
 }
@@ -311,7 +410,6 @@ main {
   padding: var(--row-pad-y) var(--row-pad-x);
 }
 
-/* Separators are inset from the leading edge, as in both systems' lists. */
 .row + .row {
   border-top: 1px solid var(--separator);
 }
@@ -319,19 +417,23 @@ main {
 .row-column {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 8px;
 }
 
 .row-text {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 0;
+  gap: 2px;
   flex: 1;
+  min-width: 0;
 }
 
 .row-title {
   flex: 1;
+}
+
+.row-text .row-title {
+  flex: none;
 }
 
 .row-detail {
@@ -339,256 +441,128 @@ main {
   color: var(--text-secondary);
 }
 
-.row-detail:empty {
-  display: none;
-}
-
-/* -- switch ----------------------------------------------------------------
- * Two implementations. Where the system can draw a real switch, it does, and
- * the custom one is removed entirely — a hand-built control is always slightly
- * wrong, and gets more wrong as the system moves on. The fallback exists for
- * engines without it, currently everything outside WebKit.
- */
-
-[data-native-switch="on"] .switch input {
-  position: static;
-  opacity: 1;
-  width: auto;
-  height: auto;
-  appearance: auto;
-  accent-color: var(--accent);
-  margin: 0;
-}
-
-[data-native-switch="on"] .switch-track {
-  display: none;
-}
-
-
-.switch {
-  flex: none;
-  cursor: pointer;
-  display: inline-flex;
-}
-
-.switch input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.switch-track {
-  width: 38px;
-  height: 22px;
-  border-radius: 11px;
-  background: var(--track-off);
-  transition: background 0.15s ease;
-  display: block;
-}
-
-.switch-thumb {
-  display: block;
-  width: 18px;
-  height: 18px;
-  margin: 2px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform 0.15s ease;
-}
-
-.switch input:checked + .switch-track {
-  background: var(--accent);
-}
-
-.switch input:checked + .switch-track .switch-thumb {
-  transform: translateX(16px);
-}
-
-.switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Clicking a control focuses it, and the engine draws a ring for that. A ring
-   belongs to keyboard navigation, not to the pointer — :focus-visible is the
-   distinction, and every control here opts out of the rest. */
-.switch input:focus:not(:focus-visible),
-.select:focus:not(:focus-visible),
-input[type="checkbox"]:focus:not(:focus-visible),
-button:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Fluent's toggle is a bordered pill whose dot grows when it turns on. */
-[data-platform="windows"] .switch-track {
-  width: 40px;
-  height: 20px;
-  border-radius: 10px;
-  background: transparent;
-  border: 1px solid var(--track-off);
-}
-
-[data-platform="windows"] .switch-thumb {
-  width: 12px;
-  height: 12px;
-  margin: 3px;
-  background: var(--text);
-  box-shadow: none;
-  transition: transform 0.15s ease, width 0.15s ease, background 0.15s ease;
-}
-
-[data-platform="windows"] .switch input:checked + .switch-track {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-[data-platform="windows"] .switch input:checked + .switch-track .switch-thumb {
-  background: var(--accent-text);
-  transform: translateX(20px);
-}
-
-/* -- select ---------------------------------------------------------------- */
-
-/* A pop-up button. On macOS the system draws it, chevron and all, so the only
-   job here is to size it and stay out of the way; overriding its background and
-   border is what made the old one read as a web control. */
-.select {
-  flex: none;
-  max-width: 190px;
-  font: inherit;
-  font-size: var(--size-body);
-}
-
-[data-platform="windows"] .select {
-  background: var(--control-bg);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-control);
-  padding: 4px 8px;
-}
-
-.select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-/* -- fields and preview ---------------------------------------------------- */
-
-.field {
-  width: 100%;
-  font-size: var(--size-body);
-  color: var(--text);
-  background: var(--field-bg);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-control);
-  padding: 7px 9px;
-  user-select: text;
-}
-
-.field:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.preview {
-  min-height: 34px;
-  padding: 7px 9px;
-  border-radius: var(--radius-control);
-  background: var(--preview-bg);
-  user-select: text;
-  overflow-wrap: anywhere;
-}
-
-.preview.unchanged {
-  background: transparent;
+.row-value {
   color: var(--text-secondary);
-  border: 1px dashed var(--separator);
+  text-align: right;
 }
 
-/* -- languages ------------------------------------------------------------- */
+/* -- hero ------------------------------------------------------------------ */
 
-.layouts {
-  list-style: none;
-  margin: 0;
-  padding: 4px var(--row-pad-x) 8px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 12px;
-}
-
-.layouts label {
+.hero {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  cursor: pointer;
-  min-height: 26px;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--group-bg);
+  border: 1px solid var(--group-border);
 }
 
-.layouts .name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-input[type="checkbox"] {
+.hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(160deg, #34c759, #1fa846);
   flex: none;
-  accent-color: var(--accent);
-  width: 14px;
-  height: 14px;
-  margin: 0;
+  transition: background 200ms ease;
 }
 
-/* "limited" marker. Text, not just colour, so it survives colour blindness
-   and greyscale — and at 11px it clears the 10pt floor the old badge missed. */
-.badge {
-  font-size: var(--size-detail);
-  color: var(--text-secondary);
-  flex: none;
+.hero-icon svg {
+  width: 26px;
+  height: 26px;
 }
 
-/* -- chips ----------------------------------------------------------------- */
+.hero[data-state="paused"] .hero-icon {
+  background: linear-gradient(160deg, #a1a1a6, #7c7c80);
+}
 
-.chips {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.hero[data-state="permission"] .hero-icon,
+.hero[data-state="secure_input"] .hero-icon,
+.hero[data-state="starting"] .hero-icon {
+  background: linear-gradient(160deg, #ffb340, #ff9500);
+}
+
+.hero-text {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
-.chips li {
-  font-family: var(--font-mono);
-  font-size: var(--size-detail);
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--bg);
-  border: 1px solid var(--separator);
+.hero-title {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.hero-detail {
   color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.stat {
+  background: var(--group-bg);
+  border: 1px solid var(--group-border);
+  border-radius: var(--radius-group);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: var(--size-detail);
+  color: var(--text-secondary);
+}
+
+.how .row {
+  align-items: flex-start;
+}
+
+.how-step {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 1px;
 }
 
 /* -- banners --------------------------------------------------------------- */
 
 .banner {
-  margin: var(--titlebar-height) var(--gutter) 12px;
-  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
   border-radius: var(--radius-group);
+  padding: 12px 14px;
+  margin: 0 0 14px;
   border: 1px solid;
-  font-size: var(--size-body);
 }
 
 .banner p {
-  margin: 0;
-}
-
-.banner + .banner,
-.banner:not([hidden]) + main,
-.banner:not([hidden]) ~ main {
-  padding-top: 0;
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .banner-warn {
@@ -601,61 +575,545 @@ input[type="checkbox"] {
   border-color: var(--error-border);
 }
 
+.banner-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--warn);
+  color: #fff;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.banner-error .banner-icon {
+  background: var(--danger);
+}
+
+.banner-body {
+  flex: 1;
+}
+
 .banner-actions {
   display: flex;
   gap: 8px;
   margin-top: 10px;
 }
 
+/* -- controls -------------------------------------------------------------- */
+
 .btn {
-  font: inherit;
-  font-size: var(--size-body);
-  padding: 5px 13px;
-  border-radius: var(--radius-control);
+  appearance: none;
   border: 1px solid var(--control-border);
   background: var(--control-bg);
-  color: var(--text);
-  cursor: pointer;
+  border-radius: var(--radius-control);
+  padding: 4px 12px;
+  min-height: 24px;
   box-shadow: var(--shadow-control);
+  white-space: nowrap;
+  transition: background-color 120ms ease, filter 120ms ease;
 }
 
-.btn:hover {
-  border-color: var(--accent);
+.btn:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.btn:active:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.btn:disabled {
+  opacity: 0.45;
 }
 
 .btn-primary {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: transparent;
   color: var(--accent-text);
 }
 
-.btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.btn-small {
+  padding: 2px 10px;
+  font-size: 12px;
 }
 
-/* -- colophon -------------------------------------------------------------- */
+.field {
+  appearance: none;
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--field-bg);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  padding: 6px 9px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
 
-/* Deliberately not a fixed footer: the desktop guidance warns against putting
-   anything people need at the very bottom of a window, since windows are often
-   dragged partly off-screen. This is incidental information, so it simply ends
-   the page. */
-.colophon {
-  margin: var(--group-gap) 2px 0;
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.select {
+  font: inherit;
+  color: var(--text);
+  min-width: 170px;
+}
+
+.preview {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--preview-bg);
+  min-height: 34px;
+  font-size: 14px;
+  transition: color 150ms ease;
+}
+
+.preview.unchanged {
+  color: var(--text-secondary);
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--control-hover);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.badge-on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Segmented control. */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--control-hover);
+  border: 1px solid var(--group-border);
+  flex: none;
+}
+
+.segmented button {
+  border: 0;
+  background: transparent;
+  padding: 3px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  transition: background-color 120ms ease;
+}
+
+.segmented button:hover:not([aria-checked="true"]) {
+  background: var(--control-hover);
+}
+
+.segmented button[aria-checked="true"] {
+  background: var(--control-bg);
+  box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.18);
+  font-weight: 550;
+}
+
+/* Switch: WebKit's native one where available, a matching fallback elsewhere. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: default;
+}
+
+.switch-track {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--track-off);
+  position: relative;
+  transition: background-color 150ms ease;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track .switch-thumb {
+  transform: translateX(14px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 3px solid var(--accent-soft);
+}
+
+[data-native-switch="on"] .switch input {
+  position: static;
+  opacity: 1;
+  accent-color: var(--accent);
+}
+
+[data-native-switch="on"] .switch-track {
+  display: none;
+}
+
+/* -- keycaps (shortcut picker) --------------------------------------------- */
+
+.keycaps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.keycap {
+  appearance: none;
+  border: 1px solid var(--keycap-border);
+  background: var(--keycap-bg);
+  box-shadow: var(--keycap-shadow);
+  border-radius: 8px;
+  padding: 8px 4px 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 58px;
+  justify-content: center;
+  transition: transform 80ms ease, box-shadow 120ms ease;
+}
+
+.keycap:active {
+  transform: translateY(1px);
+}
+
+.keycap-symbol {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.keycap-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.keycap-tag {
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.keycap[aria-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--keycap-shadow);
+}
+
+.keycap[aria-checked="true"] .keycap-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.keycap.off .keycap-symbol {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* -- app list -------------------------------------------------------------- */
+
+.app-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.app-list-group .app-list {
+  min-height: 220px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.app-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px var(--row-pad-x);
+  min-height: 42px;
+  border-bottom: 1px solid var(--separator);
+}
+
+.app-item.selected {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.app-item.selected .app-id {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.app-icon {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 7px;
+  object-fit: contain;
+}
+
+.app-icon-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--control-hover);
+  color: var(--text-secondary);
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.app-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.app-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-id {
   font-size: var(--size-detail);
   color: var(--text-secondary);
-  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .switch-track,
-  .switch-thumb,
-  .titlebar::after {
-    transition: none;
+.app-empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  gap: 2px;
+  border-top: 1px solid var(--separator);
+  background: var(--group-bg);
+}
+
+.tool-btn {
+  width: 26px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tool-btn:hover:not(:disabled) {
+  background: var(--control-hover);
+}
+
+.tool-btn:disabled {
+  color: var(--text-tertiary);
+}
+
+.tool-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--separator);
+}
+
+.tool-spacer {
+  flex: 1;
+}
+
+/* Picker sheet. */
+.sheet {
+  border: 1px solid var(--group-border);
+  border-radius: 14px;
+  padding: 0;
+  width: min(520px, 92vw);
+  background: var(--sheet-bg);
+  color: var(--text);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.sheet[open] {
+  animation: sheet-in 180ms ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
   }
 }
 
-.excluded-apps { list-style:none; margin:0; padding:0; }
-.excluded-apps li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-top:1px solid var(--separator); }
-.excluded-apps li span { overflow-wrap:anywhere; font-size:var(--size-detail); }
-.excluded-apps li .btn { flex-shrink:0; }
+.sheet-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.sheet h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.picker-list {
+  height: 330px;
+  overflow-y: auto;
+  border: 1px solid var(--group-border);
+  border-radius: var(--radius-group);
+  background: var(--group-bg);
+}
+
+.picker-list .app-item {
+  cursor: default;
+}
+
+.picker-list .app-item:hover {
+  background: var(--control-hover);
+}
+
+.picker-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--control-border);
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.app-item[aria-checked="true"] .picker-check {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.running-dot {
+  font-size: 10.5px;
+  color: var(--ok);
+  white-space: nowrap;
+}
+
+.manual-id summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.manual-id .row {
+  padding: 8px 0 0;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* -- layouts and chips ----------------------------------------------------- */
+
+.layouts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.layouts li + li {
+  border-top: 1px solid var(--separator);
+}
+
+.layouts label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--row-pad-y) var(--row-pad-x);
+  min-height: var(--row-min-height);
+}
+
+.layouts input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.layouts .name {
+  flex: 1;
+}
+
+.layouts .native {
+  color: var(--text-secondary);
+}
+
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 20px;
+  background: var(--control-hover);
+  border: 1px solid var(--group-border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.chips button {
+  border: 0;
+  background: transparent;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.chips button:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}

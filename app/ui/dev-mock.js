@@ -43,62 +43,86 @@ if (!window.__TAURI__ && isLocalDevServer()) {
     "cgfcb,j": "спасибо",
     "yjhv": "норм",
     "руддщ": "hello",
+    "ghbdtn,": "привет,",
+    "ltkf?": "дела?",
+    "z": "я",
+    "nen": "тут",
   };
 
   const state = {
-    runtime_status: "ready",
-    diagnostic_counts: [100,80,3,0],
-    enabled: true,
-    layouts: ["us", "ru"],
-    sensitivity: "balanced",
-    skip_all_caps: true,
-    ai_assist: false,
+    config: {
+      enabled: true,
+      layouts: ["us", "ru"],
+      sensitivity: "balanced",
+      min_word_len: 2,
+      require_dict_below_len: 4,
+      exceptions: ["ghbdtn", "vs"],
+      excluded_apps: [
+        "com.apple.keychainaccess",
+        "com.1password.1password",
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.microsoft.VSCode",
+      ],
+      skip_all_caps: true,
+      ai_assist: false,
+      shortcut: { kind: "tap", modifier: "right_command" },
+      switch_layout: true,
+      convert_selection: true,
+      convert_word_before_caret: true,
+      sound: false,
+    },
+    status: "ready",
     has_api_key: false,
     launch_at_login: true,
-    excluded_apps: [
-      "com.apple.keychainaccess",
-      "com.1password.1password",
-      "com.bitwarden.desktop",
-      "com.apple.Terminal",
-      "com.googlecode.iterm2",
-    ],
-    exceptions: [],
-    shortcut: "tap:option",
     assist_active: false,
     assist_learned: 0,
-    vibrancy: true,
+    vibrancy: false,
     corrections: 1284,
     undos: 3,
+    manual: 41,
     has_permission: true,
-    hook_running: true, // flips on by itself once Accessibility is granted
+    hook_running: true,
+    can_hold: true,
     available_layouts: LAYOUTS.map(([id, name, language, limited]) => ({
       id, name, language, limited,
     })),
     models_loaded: ["ar", "de", "el", "en", "es", "fr", "he", "ru", "tr", "uk"],
-    version: "0.1.0",
+    version: "0.2.0",
     // Follow the host so the dev server previews the right skin.
     platform: globalThis.navigator?.userAgent?.includes("Windows")
       ? "windows"
       : "macos",
   };
 
+  const APPS = [
+    ["Safari", "com.apple.Safari", true],
+    ["Telegram", "ru.keepcoder.Telegram", true],
+    ["Visual Studio Code", "com.microsoft.VSCode", true],
+    ["Терминал", "com.apple.Terminal", false],
+    ["Заметки", "com.apple.Notes", false],
+    ["Slack", "com.tinyspeck.slackmacgap", false],
+    ["iTerm", "com.googlecode.iterm2", false],
+    ["Связка ключей", "com.apple.keychainaccess", false],
+    ["1Password", "com.1password.1password", false],
+    ["Firefox", "org.mozilla.firefox", false],
+  ].map(([name, bundle_id, running]) => ({ name, bundle_id, path: "", running }));
+
   const handlers = {
     get_state: () => structuredClone(state),
-    list_apps: () => [{name:"TextEdit",bundle_id:"com.apple.TextEdit"},{name:"Firefox",bundle_id:"org.mozilla.firefox"}],
-    set_config: ({ config, launchAtLogin }) => {
-      Object.assign(state, config);
-      // get_state answers with a flat string, so the mock has to convert back
-      // rather than echo the tagged shape it was given — otherwise it drifts
-      // from the real contract and hides bugs instead of exposing them.
-      if (config?.shortcut) {
-        const { kind, modifier } = config.shortcut;
-        state.shortcut = kind === "off" ? "off" : `${kind}:${modifier}`;
-      }
+    list_apps: () => structuredClone(APPS),
+    describe_app: () => null,
+    app_icon: () => null,
+    set_config: ({ config, launchAtLogin, apiKey }) => {
+      state.config = structuredClone(config);
+      state.status = config.enabled ? "ready" : "paused";
       if (launchAtLogin !== undefined) state.launch_at_login = launchAtLogin;
+      if (apiKey) state.has_api_key = true;
     },
     request_permission: () => true,
     open_accessibility_settings: () => {},
-    undo: () => {},
+    open_log: () => {},
+    remove_exception: () => {},
     preview: ({ text }) => {
       let changed = false;
       const output = text
@@ -122,5 +146,5 @@ if (!window.__TAURI__ && isLocalDevServer()) {
       },
     },
   };
-  console.info("Rekey UI running against the development mock.");
+  console.info("MarKey UI running against the development mock.");
 }
