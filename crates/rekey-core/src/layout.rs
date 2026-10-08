@@ -390,20 +390,99 @@ impl Layout {
     }
 }
 
-static REGISTRY: OnceLock<HashMap<&'static str, Layout>> = OnceLock::new();
+type Registry = std::sync::RwLock<HashMap<&'static str, &'static Layout>>;
 
-fn registry() -> &'static HashMap<&'static str, Layout> {
+static REGISTRY: OnceLock<Registry> = OnceLock::new();
+
+fn registry() -> &'static Registry {
     REGISTRY.get_or_init(|| {
-        LAYOUTS
+        let map = LAYOUTS
             .iter()
-            .map(|def| (def.id, Layout::build(def)))
-            .collect()
+            .map(|def| (def.id, &*Box::leak(Box::new(Layout::build(def)))))
+            .collect();
+        std::sync::RwLock::new(map)
     })
 }
 
 /// Look up a built layout by id (`"us"`, `"ru"`, …).
 pub fn layout(id: &str) -> Option<&'static Layout> {
-    registry().get(id)
+    let map = registry().read().unwrap_or_else(|e| e.into_inner());
+    map.get(id).copied()
+}
+
+/// Replace a layout's key table with the one the user's system actually uses.
+///
+/// The built-in tables describe one variant of each layout, but keyboards
+/// differ: Apple's `Russian` types `,` and `.` on Shift+6 and Shift+7 where
+/// `Russian – PC` uses the `/` key, and the Ukrainian, Hebrew and Arabic
+/// variants move punctuation around too. Converting against the wrong table
+/// gets the letters right and the punctuation wrong.
+///
+/// `lower` and `upper` give, per physical key, what the installed layout
+/// produces, or `None` to keep the built-in value (dead keys, keys that
+/// produce nothing). Returns false when the id is unknown or nothing changed.
+/// Each distinct table leaks a few kilobytes, which is fine for something
+/// done once per layout per launch.
+pub fn override_keys(id: &str, lower: &[Option<String>], upper: &[Option<String>]) -> bool {
+    let Some(def) = LAYOUTS.iter().find(|d| d.id == id) else {
+        return false;
+    };
+    if lower.len() != KEY_COUNT || upper.len() != KEY_COUNT {
+        return false;
+    }
+    let base_lower: Vec<&str> = def.lower.split(' ').collect();
+    let base_upper: Vec<&str> = def.upper.split(' ').collect();
+    let pick = |system: &Option<String>, base: &str| -> String {
+        match system {
+            // A token is one key's output; spaces would break the table.
+            Some(t) if !t.is_empty() && !t.contains(' ') && t != NONE => t.clone(),
+            _ => base.to_string(),
+        }
+    };
+    let new_lower: Vec<String> = (0..KEY_COUNT)
+        .map(|i| pick(&lower[i], base_lower[i]))
+        .collect();
+    let new_upper: Vec<String> = (0..KEY_COUNT)
+        .map(|i| pick(&upper[i], base_upper[i]))
+        .collect();
+    // Letters must stay letters: a table that lost the alphabet would turn
+    // conversion into vandalism. Keep the built-in one in that case.
+    let letters = |tokens: &[String]| {
+        tokens
+            .iter()
+            .filter(|t| t.chars().all(char::is_alphabetic))
+            .count()
+    };
+    if letters(&new_lower) + 4
+        < base_lower
+            .iter()
+            .filter(|t| t.chars().all(char::is_alphabetic))
+            .count()
+    {
+        log::warn!(
+            "system layout {id} does not look like {}; keeping the built-in table",
+            def.name
+        );
+        return false;
+    }
+    let lower_joined = new_lower.join(" ");
+    let upper_joined = new_upper.join(" ");
+    if let Some(current) = layout(id) {
+        if current.def.lower == lower_joined && current.def.upper == upper_joined {
+            return false;
+        }
+    }
+    let leaked_def: &'static LayoutDef = Box::leak(Box::new(LayoutDef {
+        lower: Box::leak(lower_joined.into_boxed_str()),
+        upper: Box::leak(upper_joined.into_boxed_str()),
+        ..*def
+    }));
+    // A system table can map two keys to one character; the first one wins in
+    // `build`, which is the conservative reading.
+    let built: &'static Layout = Box::leak(Box::new(Layout::build(leaked_def)));
+    let mut map = registry().write().unwrap_or_else(|e| e.into_inner());
+    map.insert(def.id, built);
+    true
 }
 
 /// Every layout id we know about.
@@ -583,7 +662,7 @@ mod tests {
     #[test]
     fn all_layouts_have_47_keys() {
         // Building the registry asserts the token counts.
-        assert_eq!(registry().len(), LAYOUTS.len());
+        assert_eq!(registry().read().unwrap().len(), LAYOUTS.len());
     }
 
     #[test]
@@ -774,5 +853,39 @@ mod tests {
         assert!(us.coverage("hello") > 0.99);
         assert!(us.coverage("привет") < 0.01);
         assert!(ru.coverage("привет") > 0.99);
+    }
+}
+
+#[cfg(test)]
+mod override_tests {
+    use super::*;
+
+    #[test]
+    fn a_system_table_replaces_punctuation_but_keeps_letters() {
+        // Apple's Russian layout: Shift+6 is a comma and Shift+7 a full stop,
+        // and the `/` key types `/` rather than `.`. Use Ukrainian here so the
+        // shared Russian table other tests rely on stays untouched.
+        let base = layout("uk").unwrap();
+        let mut lower: Vec<Option<String>> = vec![None; KEY_COUNT];
+        let mut upper: Vec<Option<String>> = vec![None; KEY_COUNT];
+        upper[6] = Some(",".into());
+        upper[7] = Some(".".into());
+        lower[46] = Some("/".into());
+        upper[46] = Some("?".into());
+        assert!(override_keys("uk", &lower, &upper));
+        let changed = layout("uk").unwrap();
+        assert_eq!(changed.token_at(6, true), ",");
+        assert_eq!(changed.token_at(46, false), "/");
+        // Letters are untouched.
+        assert_eq!(changed.token_at(13, false), base.token_at(13, false));
+        assert_eq!(convert_by_id("ghbdsn^", "us", "uk").unwrap(), "привіт,");
+        // The same table again is not a change.
+        assert!(!override_keys("uk", &lower, &upper));
+    }
+
+    #[test]
+    fn a_table_without_letters_is_refused() {
+        let junk: Vec<Option<String>> = vec![Some("#".into()); KEY_COUNT];
+        assert!(!override_keys("he", &junk, &junk));
     }
 }

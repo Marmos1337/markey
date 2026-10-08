@@ -295,10 +295,10 @@ impl Engine {
                     let expected = self.expected_layout.take();
                     if expected.is_none() || ctx.layout != expected {
                         // A switch the user made mid-word leaves the word in
-                        // two layouts; the finished words are still fine.
+                        // two layouts. Everything already on screen is
+                        // unaffected by which keyboard is selected now.
                         self.buffer.push(Input::Reset);
                         self.buffer_layout = None;
-                        self.last_change = None;
                     }
                 }
             }
@@ -349,9 +349,11 @@ impl Engine {
         }
 
         // Ctrl/Cmd chords are commands, not typing, and they usually move the
-        // caret as a side effect.
+        // caret as a side effect. A selection survives them: ⌘C is the most
+        // natural thing to press with text selected.
         if event.modifiers.is_shortcut() {
-            self.invalidate_caret();
+            self.forget();
+            self.expected_layout = None;
             return Action::None;
         }
         self.selection = false;
@@ -394,8 +396,7 @@ impl Engine {
                         self.buffer_layout = ctx.layout.clone();
                         // The word the shortcut just converted is being
                         // continued: it is the word in progress again.
-                        if self.history.last().is_some_and(|e| e.terminator == OPEN) {
-                            let entry = self.history.pop().expect("checked above");
+                        if let Some(entry) = self.history.pop_if(|e| e.terminator == OPEN) {
                             for ch in entry.shown.chars() {
                                 self.buffer.push(Input::Char(ch));
                             }
@@ -675,11 +676,9 @@ impl Engine {
             .count();
         let delete_text: String = old.chars().skip(common).collect();
         let type_text: String = new.chars().skip(common).collect();
-        let switch_to = self
-            .detector
-            .config
-            .switch_layout
-            .then(|| change.layouts[to].clone());
+        // Always named: the replacement is typed on this layout. Whether the
+        // keyboard stays there afterwards is the platform's call.
+        let switch_to = Some(change.layouts[to].clone());
         Action::Replace {
             delete: delete_text.chars().count(),
             text: type_text,
@@ -1489,6 +1488,34 @@ mod tests {
     }
 
     #[test]
+    fn copying_a_selection_keeps_it_convertible() {
+        let mut e = engine();
+        e.on_key(&special(Key::Selection), &ctx("us"));
+        let mut copy = key('c');
+        copy.modifiers.meta = true;
+        e.on_key(&copy, &ctx("us"));
+        assert_eq!(
+            tap_shortcut(&mut e, "us"),
+            Action::ConvertSelection { select_word: false }
+        );
+    }
+
+    #[test]
+    fn a_correction_can_be_undone_after_the_layout_changes_back() {
+        // With "switch the keyboard" off, the platform puts the old layout
+        // back right after typing the correction.
+        let mut s = Screen::new(false);
+        let mut e = engine();
+        s.type_str(&mut e, "ghbdtn ", "us");
+        assert_eq!(s.text, "привет ");
+        s.tap(&mut e, "ru");
+        s.tap(&mut e, "us");
+        assert_eq!(s.text, "привет ");
+        s.tap(&mut e, "us");
+        assert_eq!(s.text, "ghbdtn ");
+    }
+
+    #[test]
     fn with_nothing_tracked_the_shortcut_converts_the_word_before_the_caret() {
         let mut e = engine();
         e.on_key(&special(Key::Click), &ctx("us"));
@@ -1631,6 +1658,35 @@ mod tests {
             assert_ne!(question.typed, question.alternative);
             assert_eq!(question.typed_language, "en");
         }
+    }
+
+    #[test]
+    fn a_learned_assist_verdict_converts_an_ambiguous_word() {
+        use crate::assist::test_support::FakeAssist;
+        // Find a word the detector genuinely calls ambiguous, so the test
+        // exercises the path rather than assuming which word qualifies.
+        let probe = engine();
+        let ambiguous = [
+            "ne", "herb", "ntcn", "vjq", "hfp", "ldf", "ytn", "rjn", "yt", "jr",
+        ]
+        .iter()
+        .find(|w| matches!(probe.detector.evaluate(w, "us"), Verdict::Ambiguous(_)))
+        .copied();
+        let Some(word) = ambiguous else {
+            return;
+        };
+        let mut e = engine();
+        let mut cfg = e.config().clone();
+        cfg.ai_assist = true;
+        e.set_config(cfg);
+        e.set_assist(Some(std::sync::Arc::new(FakeAssist::with_answer(
+            word, true,
+        ))));
+        let action = type_str(&mut e, &format!("{word} "), "us");
+        assert!(
+            action != Action::None,
+            "a learned 'convert' verdict should be acted on for {word:?}"
+        );
     }
 
     #[test]

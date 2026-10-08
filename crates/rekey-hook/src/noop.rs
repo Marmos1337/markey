@@ -3,7 +3,7 @@
 //! It records what it was asked to do rather than touching a real keyboard,
 //! which is what lets the end-to-end engine tests run in CI on Linux.
 
-use crate::{Context, HookError, Injector, KeyEvent};
+use crate::{Capabilities, Context, Disposition, HookError, Injector, KeyEvent, RawKey};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Default, Clone)]
@@ -53,11 +53,26 @@ pub fn select_layout(_layout_id: &str) -> bool {
     false
 }
 
-pub fn request_permission() {}
+pub fn request_permission() -> bool {
+    false
+}
 
-pub fn run<F>(_on_key: F) -> Result<(), HookError>
+pub fn current_layout() -> Option<String> {
+    None
+}
+
+pub fn frontmost_app() -> Option<String> {
+    None
+}
+
+pub fn secure_input_active() -> bool {
+    false
+}
+
+pub fn run<F, R>(_on_ready: R, _on_key: F) -> Result<(), HookError>
 where
-    F: FnMut(KeyEvent) + Send + 'static,
+    F: FnMut(KeyEvent, Option<RawKey>) -> Disposition + Send + 'static,
+    R: FnOnce(Capabilities),
 {
     Err(HookError::Unsupported(
         "keyboard hooks are available on macOS and Windows",

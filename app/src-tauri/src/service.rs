@@ -1,90 +1,120 @@
 //! The background service: watches the keyboard, runs the engine, applies
 //! corrections.
+//!
+//! The engine runs synchronously inside the keyboard hook, so it sees every
+//! keystroke in order and can decide, before a word-ending key reaches the
+//! application, whether that key must be held back while the word is fixed.
+//! The actual typing happens on a separate injector thread: the hook callback
+//! has to return within milliseconds or macOS disables it.
+//!
+//! While the injector is typing a correction, further keys the user presses are
+//! held and queued behind it, then replayed in order — so fast typing never
+//! lands in the middle of a correction.
 
+use rekey_core::config::Config;
 use rekey_core::engine::{Action, Engine};
 use rekey_core::input::{Context, TextWriter};
-use rekey_hook::platform;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use rekey_hook::{platform, Capabilities, Disposition, RawKey};
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc;
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
 use tauri::AppHandle;
-
-/// How long a sampled OS context stays fresh.
-///
-/// Asking the OS for the frontmost app and active layout on *every* keystroke
-/// is an IPC round trip per character, which is far too expensive at typing
-/// speed. A short cache makes it negligible while still noticing an app or
-/// layout change well within one word.
-const CONTEXT_TTL: Duration = Duration::from_millis(150);
-
-/// How long to wait before replacing text.
-///
-/// The event tap sees a keystroke while it is still in flight, so the space
-/// that ended the word has not necessarily reached the application yet.
-/// Replacing immediately can race it and eat the wrong character. A short
-/// pause costs nothing perceptible and removes the race.
-const REPLACE_DELAY: Duration = Duration::from_millis(25);
-
-/// How often to re-check whether Accessibility has been granted.
-///
-/// macOS gives no notification when the user flips the switch, so the only way
-/// to notice is to ask. A second is far below the time it takes to find the
-/// setting, and the check is a cheap in-process call.
-const PERMISSION_POLL: Duration = Duration::from_secs(1);
-
-/// How long to wait for a requested layout to become active, and in what steps.
-/// Short, because the wait happens on the main thread.
-const LAYOUT_SETTLE_STEP: Duration = Duration::from_millis(10);
-const LAYOUT_SETTLE_STEPS: usize = 8;
-const LAYOUT_SWITCH_TIMEOUT: Duration = Duration::from_millis(400);
-
-/// The most recently sampled OS context, shared with the hook thread.
-///
-/// The hook thread must never sample this itself. macOS Text Input Services
-/// and AppKit are main-thread-only: calling `TISGetInputSourceProperty` from
-/// the event tap thread trips `dispatch_assert_queue` and kills the process
-/// with SIGILL on the first keystroke. The sampling therefore happens on the
-/// main thread and the result is published here for the hook to read.
-type SharedContext = Arc<Mutex<Context>>;
-
-/// Poll the OS for the frontmost app, active layout and secure-input state,
-/// on the main thread, and publish the result for the hook thread.
-///
-/// Sampling per keystroke would be an IPC round trip per character, which is
-/// far too expensive at typing speed; [`CONTEXT_TTL`] is short enough to notice
-/// an app or layout change well within one word.
-fn spawn_context_sampler(app: &AppHandle, context: SharedContext) {
-    let handle = app.clone();
-    std::thread::Builder::new()
-        .name("rekey-context".into())
-        .spawn(move || loop {
-            let slot = context.clone();
-            // Hop to the main thread to do the actual OS calls.
-            let posted = handle.run_on_main_thread(move || {
-                let sampled = platform::current_context();
-                if let Ok(mut current) = slot.lock() {
-                    *current = sampled;
-                }
-            });
-            if posted.is_err() {
-                // The app is shutting down.
-                break;
-            }
-            std::thread::sleep(CONTEXT_TTL);
-        })
-        .expect("spawn context sampler");
-}
 
 /// Shared handle to the running engine, used by the UI and the tray.
 pub type SharedEngine = Arc<Mutex<Engine>>;
 
+/// Called with the new configuration when the engine changed it by itself —
+/// when the user undid a correction and the word became an exception.
+pub type ConfigSink = Arc<dyn Fn(Config) + Send + Sync>;
+
+/// How often the frontmost app, active layout and secure-input state are
+/// sampled. Text Input Services is main-thread-only, so this cannot happen in
+/// the hook; a short interval keeps the sample current within a keystroke or
+/// two, and the engine double-checks the layout against the characters typed.
+const CONTEXT_INTERVAL: Duration = Duration::from_millis(40);
+
+/// Pause before typing a correction when the word-ending key could not be
+/// held back: the key is still on its way to the application, and replacing
+/// immediately can race it.
+const LATE_REPLACE_DELAY: Duration = Duration::from_millis(25);
+
+/// The same pause when the key was held: only the word's own letters may
+/// still be in flight, and they are ahead of anything posted now.
+const HELD_REPLACE_DELAY: Duration = Duration::from_millis(8);
+
+/// Keys are never held for longer than this, whatever happens to the
+/// injector. A stuck correction must not take the keyboard with it.
+const MAX_HOLD: Duration = Duration::from_millis(1500);
+
+/// How often to re-check whether Accessibility has been granted.
+const PERMISSION_POLL: Duration = Duration::from_secs(1);
+
+/// How long to wait for a requested layout to become active, and in what steps.
+const LAYOUT_SETTLE_STEP: Duration = Duration::from_millis(10);
+const LAYOUT_SETTLE_STEPS: usize = 10;
+const MAIN_THREAD_TIMEOUT: Duration = Duration::from_millis(400);
+
+/// How long to wait for the frontmost app to answer ⌘C.
+const COPY_TIMEOUT: Duration = Duration::from_millis(450);
+
+/// How long the converted text stays on the clipboard before the user's own
+/// clipboard is put back. The paste is handled asynchronously by the app.
+const PASTE_SETTLE: Duration = Duration::from_millis(250);
+
+/// The longest selection the shortcut converts. Beyond this it is not a
+/// mistyped phrase, and replacing it through the clipboard is a risk.
+const MAX_SELECTION: usize = 4000;
+
+/// What the keyboard is doing right now, for the settings window.
+#[derive(Default)]
+pub struct Runtime {
+    /// The hook is installed.
+    pub running: AtomicBool,
+    /// It is an active filter, able to hold keys back.
+    pub can_hold: AtomicBool,
+    /// Corrections actually typed.
+    pub applied: AtomicU64,
+    queue: SharedQueue,
+}
+
+impl Runtime {
+    /// Carry out an action that did not come from a keystroke — the menu's
+    /// undo, for instance.
+    pub fn perform(&self, action: Action) {
+        if matches!(action, Action::None) {
+            return;
+        }
+        let (lock, wake) = &*self.queue;
+        if let Ok(mut q) = lock.lock() {
+            q.jobs.push_back(Job::Act(action));
+            if !q.writing {
+                q.writing = true;
+                q.since = Some(Instant::now());
+            }
+        }
+        wake.notify_one();
+    }
+}
+
+enum Job {
+    Act(Action),
+    /// A key the user pressed while a correction was being typed.
+    Replay(RawKey),
+}
+
+#[derive(Default)]
+struct Queue {
+    jobs: VecDeque<Job>,
+    /// The injector is busy; keys pressed now must wait their turn.
+    writing: bool,
+    since: Option<Instant>,
+}
+
+type SharedQueue = Arc<(Mutex<Queue>, Condvar)>;
+
 /// Start the keyboard hook, waiting for Accessibility if it is not granted yet.
-///
-/// Returns a flag the UI can read to tell whether corrections are actually
-/// running. The hook API blocks forever, so it gets a dedicated thread; the
-/// engine is shared with the UI behind a mutex that is only ever held for the
-/// duration of a single keystroke evaluation.
 ///
 /// Waiting rather than failing matters: the alternative is telling the user to
 /// quit and reopen the app after granting permission, which is the single most
@@ -92,18 +122,26 @@ pub type SharedEngine = Arc<Mutex<Engine>>;
 pub fn spawn(
     app: &AppHandle,
     engine: SharedEngine,
-) -> Result<Arc<AtomicBool>, rekey_hook::HookError> {
-    let running = Arc::new(AtomicBool::new(false));
-    let flag = running.clone();
-
-    let context: SharedContext = Arc::new(Mutex::new(Context::default()));
+    on_config: ConfigSink,
+) -> Result<Arc<Runtime>, rekey_hook::HookError> {
+    let runtime = Arc::new(Runtime::default());
+    let context: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context::default()));
     spawn_context_sampler(app, context.clone());
+    refresh_system_layouts(app);
 
-    let injector: Arc<dyn TextWriter> = Arc::new(new_injector()?);
-    let replacements = spawn_injector(app, injector)?;
+    let queue: SharedQueue = runtime.queue.clone();
+    spawn_injector(
+        app,
+        engine.clone(),
+        context.clone(),
+        queue.clone(),
+        runtime.clone(),
+        on_config,
+    )?;
 
+    let flag = runtime.clone();
     std::thread::Builder::new()
-        .name("rekey-hook".into())
+        .name("markey-hook".into())
         .spawn(move || {
             if !platform::has_permission() {
                 log::info!("waiting for Accessibility permission…");
@@ -113,62 +151,221 @@ pub fn spawn(
                 log::info!("Accessibility granted; starting the keyboard hook");
             }
 
-            flag.store(true, Ordering::Relaxed);
-            let result = platform::run(move |event| {
-                // Read the published sample; never call into the OS here.
-                let ctx = match context.lock() {
-                    Ok(current) => current.clone(),
-                    Err(poisoned) => poisoned.into_inner().clone(),
-                };
-                let action = match engine.lock() {
-                    Ok(mut engine) => engine.on_key(&event, &ctx),
-                    Err(poisoned) => {
-                        // A panic in the engine must not silently stop
-                        // corrections for the rest of the session.
-                        log::error!("engine mutex was poisoned; recovering");
-                        poisoned.into_inner().on_key(&event, &ctx)
-                    }
-                };
-                if let Action::Replace { .. } = &action {
-                    // Hand the work to the injector thread and return at once.
-                    // macOS disables an event tap whose callback is slow, and
-                    // a replacement is a dozen synthetic events.
-                    let _ = replacements.send(action);
+            let can_hold = Arc::new(AtomicBool::new(false));
+            let ready_engine = engine.clone();
+            let ready_flag = flag.clone();
+            let ready_hold = can_hold.clone();
+            let on_ready = move |caps: Capabilities| {
+                ready_flag.running.store(true, Ordering::SeqCst);
+                ready_flag.can_hold.store(caps.can_hold, Ordering::SeqCst);
+                ready_hold.store(caps.can_hold, Ordering::SeqCst);
+                if let Ok(mut e) = ready_engine.lock() {
+                    e.set_hold_boundaries(caps.can_hold);
                 }
-            });
-            flag.store(false, Ordering::Relaxed);
+            };
+
+            let handler =
+                move |event: rekey_core::input::KeyEvent, raw: Option<RawKey>| -> Disposition {
+                    // Our own typing passes untouched and unexamined.
+                    if event.synthetic {
+                        return Disposition::Pass;
+                    }
+                    let ctx = match context.lock() {
+                        Ok(current) => current.clone(),
+                        Err(poisoned) => poisoned.into_inner().clone(),
+                    };
+                    let hold = can_hold.load(Ordering::Relaxed);
+                    let (lock, wake) = &*queue;
+                    let mut q = match lock.lock() {
+                        Ok(q) => q,
+                        Err(poisoned) => poisoned.into_inner(),
+                    };
+                    // Keys typed while a correction is going in wait behind it.
+                    let busy = hold
+                        && q.writing
+                        && q.since.is_some_and(|t| t.elapsed() < MAX_HOLD)
+                        && raw.is_some();
+
+                    let action = match engine.lock() {
+                        Ok(mut engine) => engine.on_key(&event, &ctx),
+                        Err(poisoned) => {
+                            // A panic in the engine must not silently stop
+                            // corrections for the rest of the session.
+                            log::error!("engine mutex was poisoned; recovering");
+                            poisoned.into_inner().on_key(&event, &ctx)
+                        }
+                    };
+
+                    let swallow = hold && action.swallows_key();
+                    let mut disposition = Disposition::Pass;
+                    if busy && !swallow {
+                        if let Some(raw) = raw {
+                            q.jobs.push_back(Job::Replay(raw));
+                            disposition = Disposition::Drop;
+                        }
+                    }
+                    if !matches!(action, Action::None) {
+                        if swallow {
+                            disposition = Disposition::Drop;
+                        }
+                        q.jobs.push_back(Job::Act(action));
+                    }
+                    if !q.jobs.is_empty() && !q.writing {
+                        q.writing = true;
+                        q.since = Some(Instant::now());
+                    }
+                    drop(q);
+                    wake.notify_one();
+                    disposition
+                };
+
+            let result = platform::run(on_ready, handler);
+            flag.running.store(false, Ordering::SeqCst);
             if let Err(e) = result {
                 log::error!("keyboard hook stopped: {e}");
             }
         })
         .map_err(|e| rekey_hook::HookError::Os(e.to_string()))?;
 
-    Ok(running)
+    Ok(runtime)
+}
+
+/// Poll the OS for the frontmost app, active layout and secure-input state,
+/// on the main thread, and publish the result for the hook thread.
+///
+/// The hook thread must never sample this itself. macOS Text Input Services
+/// and AppKit are main-thread-only: calling `TISGetInputSourceProperty` from
+/// the event tap thread kills the process with SIGILL on the first keystroke.
+fn spawn_context_sampler(app: &AppHandle, context: Arc<Mutex<Context>>) {
+    let handle = app.clone();
+    std::thread::Builder::new()
+        .name("markey-context".into())
+        .spawn(move || loop {
+            let slot = context.clone();
+            let posted = handle.run_on_main_thread(move || {
+                let sampled = platform::current_context();
+                if let Ok(mut current) = slot.lock() {
+                    *current = sampled;
+                }
+            });
+            if posted.is_err() {
+                break;
+            }
+            std::thread::sleep(CONTEXT_INTERVAL);
+        })
+        .expect("spawn context sampler");
+}
+
+/// Read the user's installed keyboard layouts from the system, so conversion
+/// follows the exact variant they use.
+pub fn refresh_system_layouts(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.run_on_main_thread(|| {
+            for (id, lower, upper) in platform::system_layouts() {
+                if rekey_core::layout::override_keys(&id, &lower, &upper) {
+                    log::info!("using the installed key table for layout {id}");
+                }
+            }
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+fn spawn_injector(
+    app: &AppHandle,
+    engine: SharedEngine,
+    context: Arc<Mutex<Context>>,
+    queue: SharedQueue,
+    runtime: Arc<Runtime>,
+    on_config: ConfigSink,
+) -> Result<(), rekey_hook::HookError> {
+    let injector = new_injector()?;
+    let handle = app.clone();
+    std::thread::Builder::new()
+        .name("markey-inject".into())
+        .spawn(move || loop {
+            let job = {
+                let (lock, wake) = &*queue;
+                let mut q = match lock.lock() {
+                    Ok(q) => q,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                while q.jobs.is_empty() {
+                    q.writing = false;
+                    q.since = None;
+                    q = match wake.wait(q) {
+                        Ok(q) => q,
+                        Err(poisoned) => poisoned.into_inner(),
+                    };
+                }
+                q.jobs.pop_front().expect("queue is not empty")
+            };
+            let config = engine
+                .lock()
+                .map(|e| e.config().clone())
+                .unwrap_or_default();
+            match job {
+                Job::Replay(raw) => replay(&injector, &raw),
+                Job::Act(action @ Action::Replace { .. }) => {
+                    let held = action.swallows_key();
+                    std::thread::sleep(if held {
+                        HELD_REPLACE_DELAY
+                    } else {
+                        LATE_REPLACE_DELAY
+                    });
+                    apply(&handle, &injector, &action, &config);
+                    runtime.applied.fetch_add(1, Ordering::Relaxed);
+                }
+                Job::Act(Action::ConvertSelection { select_word }) => {
+                    let active = context.lock().ok().and_then(|c| c.layout.clone());
+                    convert_selection(&handle, &injector, &engine, active, select_word, &config);
+                }
+                Job::Act(Action::None) => {}
+            }
+            // An undo may have taught the engine a new exception; keep it.
+            let changed = engine
+                .lock()
+                .ok()
+                .and_then(|mut e| e.take_config_dirty().then(|| e.config().clone()));
+            if let Some(config) = changed {
+                on_config(config);
+            }
+        })
+        .map_err(|e| rekey_hook::HookError::Os(e.to_string()))?;
+    Ok(())
 }
 
 /// Carry out one correction.
 ///
 /// The keyboard is switched *before* the replacement is typed, not after.
-/// Rekey types by replaying physical key presses, and a key press only means
-/// the right character once the matching layout is active — so the order is
-/// part of the mechanism, not a nicety. It also leaves the user on the right
-/// layout for the next word, which is the point of switching at all.
-fn apply(handle: &AppHandle, injector: &dyn TextWriter, action: &Action) {
+/// The replacement is typed by replaying physical key presses, and a key press
+/// only means the right character once the matching layout is active. It also
+/// leaves the user on the right layout for the next word, which is the point
+/// of switching at all — unless they asked for the keyboard to stay put.
+fn apply(handle: &AppHandle, injector: &Injector, action: &Action, config: &Config) {
     let Action::Replace {
         delete,
         text,
         switch_to,
+        then,
         ..
     } = action
     else {
         return;
     };
-
     log::info!(
-        "applying: delete={delete} length={} switch_to={switch_to:?}",
-        text.chars().count()
+        "applying: delete={delete} length={} switch_to={switch_to:?} held={}",
+        text.chars().count(),
+        then.is_some()
     );
 
+    let original = if config.switch_layout {
+        None
+    } else {
+        run_on_main(handle, platform::current_layout).flatten()
+    };
     let selected = match switch_to {
         Some(layout) => select_layout_and_wait(handle, layout),
         None => None,
@@ -177,13 +374,8 @@ fn apply(handle: &AppHandle, injector: &dyn TextWriter, action: &Action) {
     if *delete > 0 {
         injector.backspace(*delete);
     }
-
-    // Replay the presses when the right layout is active; otherwise fall back
-    // to attaching the text to the events and hope the app honours it.
-    //
-    // The presses are resolved *before* anything is typed: `type_keys` giving
-    // up half way would otherwise leave a partial word that the fallback then
-    // types over the top of.
+    // Replay the presses when the right layout is active; otherwise attach the
+    // text to the events and hope the app honours it.
     let presses = selected
         .as_deref()
         .and_then(|layout| rekey_core::layout::presses_for(text, layout));
@@ -191,11 +383,111 @@ fn apply(handle: &AppHandle, injector: &dyn TextWriter, action: &Action) {
         Some(presses) => injector.type_keys(&presses),
         None => false,
     };
-
-    if !replayed {
-        log::info!("replaying key presses was not possible; typing directly instead");
+    if !replayed && !text.is_empty() {
         injector.type_text(text);
     }
+    if let Some(boundary) = then {
+        injector.boundary(boundary.key, boundary.shift);
+    }
+
+    if let Some(original) = original {
+        select_layout_and_wait(handle, &original);
+    }
+    if config.sound {
+        let _ = handle.run_on_main_thread(play_sound);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn play_sound() {
+    platform::play_sound();
+}
+
+#[cfg(not(target_os = "macos"))]
+fn play_sound() {}
+
+#[cfg(target_os = "macos")]
+fn replay(injector: &Injector, raw: &RawKey) {
+    injector.replay(raw);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn replay(_injector: &Injector, _raw: &RawKey) {}
+
+/// Convert the selected text, or the word before the caret, through the
+/// clipboard — which is the one way to read and replace a selection that every
+/// application supports. The user's clipboard is put back afterwards.
+#[cfg(target_os = "macos")]
+fn convert_selection(
+    handle: &AppHandle,
+    injector: &Injector,
+    engine: &SharedEngine,
+    active: Option<String>,
+    select_word: bool,
+    config: &Config,
+) {
+    // When the app can say, trust it: nothing selected means nothing to do.
+    if !select_word && platform::focused_selection_length() == Some(0) {
+        log::info!("shortcut: the app reports no selection");
+        return;
+    }
+    let snapshot = platform::pasteboard_snapshot();
+    let before = platform::pasteboard_change_count();
+    if select_word {
+        injector.select_word_left();
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    injector.copy();
+    let started = Instant::now();
+    while platform::pasteboard_change_count() == before && started.elapsed() < COPY_TIMEOUT {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let copied = (platform::pasteboard_change_count() != before)
+        .then(platform::pasteboard_string)
+        .flatten()
+        .filter(|t| !t.trim().is_empty() && t.chars().count() <= MAX_SELECTION);
+    let abort = |why: &str| {
+        log::info!("shortcut: selection not converted ({why})");
+        if select_word {
+            injector.collapse_right();
+        }
+        platform::pasteboard_restore(&snapshot);
+    };
+    let Some(text) = copied else {
+        abort("nothing was copied");
+        return;
+    };
+    let converted = engine
+        .lock()
+        .ok()
+        .and_then(|mut e| e.convert_text(&text, active.as_deref()));
+    let Some((converted, target)) = converted else {
+        abort("no other reading");
+        return;
+    };
+    if config.switch_layout {
+        select_layout_and_wait(handle, &target);
+    }
+    platform::pasteboard_set_string(&converted);
+    injector.paste();
+    std::thread::sleep(PASTE_SETTLE);
+    platform::pasteboard_restore(&snapshot);
+    log::info!(
+        "shortcut: converted a selection of {} chars",
+        converted.chars().count()
+    );
+}
+
+#[cfg(not(target_os = "macos"))]
+fn convert_selection(
+    _handle: &AppHandle,
+    _injector: &Injector,
+    _engine: &SharedEngine,
+    _active: Option<String>,
+    _select_word: bool,
+    _config: &Config,
+) {
+    log::info!("converting a selection is only supported on macOS");
 }
 
 /// Select `layout` on the main thread and confirm it took effect.
@@ -204,37 +496,29 @@ fn apply(handle: &AppHandle, injector: &dyn TextWriter, action: &Action) {
 /// against the wrong layout would produce the wrong characters, so this is
 /// deliberately a confirmation rather than a request.
 fn select_layout_and_wait(handle: &AppHandle, layout: &str) -> Option<String> {
-    if !run_on_main(handle, {
-        let layout = layout.to_string();
-        move || platform::select_layout(&layout)
-    })? {
+    let requested = layout.to_string();
+    if !run_on_main(handle, move || platform::select_layout(&requested))? {
         log::debug!("layout {layout} is not enabled; keyboard left alone");
         return None;
     }
-
     // Selection is asynchronous, so confirm it before replaying key presses
     // against it. The waiting happens here, on the injector thread — sleeping
-    // on the main thread would stall the UI and, worse, the event tap, which
-    // macOS switches off when it is starved.
+    // on the main thread would stall the UI.
     for _ in 0..LAYOUT_SETTLE_STEPS {
-        let active = run_on_main(handle, {
-            let layout = layout.to_string();
-            move || platform::current_layout().as_deref() == Some(layout.as_str())
+        let wanted = layout.to_string();
+        let active = run_on_main(handle, move || {
+            platform::current_layout().as_deref() == Some(wanted.as_str())
         })?;
         if active {
             return Some(layout.to_string());
         }
         std::thread::sleep(LAYOUT_SETTLE_STEP);
     }
-
-    log::warn!("layout {layout} did not become active; not replaying key presses");
+    log::warn!("layout {layout} did not become active; typing the text directly");
     None
 }
 
 /// Run `f` on the main thread and wait for its result.
-///
-/// Text Input Services and AppKit are main-thread-only, so every query about
-/// the keyboard has to go through here. Each hop is short by design.
 fn run_on_main<T, F>(handle: &AppHandle, f: F) -> Option<T>
 where
     T: Send + 'static,
@@ -246,43 +530,27 @@ where
             let _ = tx.send(f());
         })
         .ok()?;
-    rx.recv_timeout(LAYOUT_SWITCH_TIMEOUT).ok()
-}
-
-/// Start the thread that applies corrections, and return its inbox.
-///
-/// Injection is deliberately off the tap callback: it keeps the callback fast
-/// enough that macOS will not disable the tap, and it lets the keystroke that
-/// triggered the correction land before the correction is typed.
-fn spawn_injector(
-    app: &AppHandle,
-    injector: Arc<dyn TextWriter>,
-) -> Result<Sender<Action>, rekey_hook::HookError> {
-    let (tx, rx) = mpsc::channel::<Action>();
-    let handle = app.clone();
-    std::thread::Builder::new()
-        .name("rekey-inject".into())
-        .spawn(move || {
-            for action in rx {
-                std::thread::sleep(REPLACE_DELAY);
-                apply(&handle, injector.as_ref(), &action);
-            }
-        })
-        .map_err(|e| rekey_hook::HookError::Os(e.to_string()))?;
-    Ok(tx)
+    rx.recv_timeout(MAIN_THREAD_TIMEOUT).ok()
 }
 
 #[cfg(target_os = "macos")]
-fn new_injector() -> Result<rekey_hook::macos::MacInjector, rekey_hook::HookError> {
+type Injector = rekey_hook::macos::MacInjector;
+#[cfg(target_os = "windows")]
+type Injector = rekey_hook::windows::WindowsInjector;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+type Injector = rekey_hook::noop::RecordingInjector;
+
+#[cfg(target_os = "macos")]
+fn new_injector() -> Result<Injector, rekey_hook::HookError> {
     rekey_hook::macos::MacInjector::new()
 }
 
 #[cfg(target_os = "windows")]
-fn new_injector() -> Result<rekey_hook::windows::WindowsInjector, rekey_hook::HookError> {
+fn new_injector() -> Result<Injector, rekey_hook::HookError> {
     rekey_hook::windows::WindowsInjector::new()
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn new_injector() -> Result<rekey_hook::noop::RecordingInjector, rekey_hook::HookError> {
+fn new_injector() -> Result<Injector, rekey_hook::HookError> {
     Ok(rekey_hook::noop::RecordingInjector::new())
 }

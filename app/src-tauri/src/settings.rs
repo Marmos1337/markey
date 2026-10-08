@@ -1,7 +1,16 @@
-//! Where Rekey's settings live on disk, and how they are loaded.
+//! Where MarKey's settings live on disk, and how they are loaded.
 
-use rekey_core::config::Config;
+use rekey_core::config::{Config, Modifier, Shortcut};
 use std::path::PathBuf;
+
+/// Bumped whenever loading needs to adjust settings written by an older build.
+const SETTINGS_VERSION: u32 = 2;
+
+/// The bundle identifier, which names the settings folder.
+const APP_ID: &str = "com.marmos.markey";
+
+/// Where the app kept its settings when it was still called Rekey.
+const LEGACY_APP_ID: &str = "app.rekey.desktop";
 
 /// Settings plus the things that are not part of the detection config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -12,14 +21,23 @@ pub struct Settings {
     /// config directory; empty unless the user pastes one in.
     pub api_key: String,
     pub launch_at_login: bool,
+    /// Which build last wrote these settings; see [`SETTINGS_VERSION`].
+    pub version: u32,
 }
 
-/// `~/Library/Application Support/app.rekey.desktop` (macOS) or
-/// `%APPDATA%\app.rekey.desktop` (Windows).
+/// `~/Library/Application Support/com.marmos.markey` (macOS) or
+/// `%APPDATA%\com.marmos.markey` (Windows).
 pub fn config_dir() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("app.rekey.desktop")
+        .join(APP_ID)
+}
+
+fn legacy_config_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(LEGACY_APP_ID)
+        .join("settings.json")
 }
 
 pub fn config_path() -> PathBuf {
@@ -32,8 +50,43 @@ impl Settings {
     /// A corrupt settings file must never stop the app from starting: the user
     /// would have no way to fix it from inside the UI.
     pub fn load() -> Settings {
-        let path = config_path();
-        match std::fs::read_to_string(&path) {
+        let mut path = config_path();
+        // First launch after the rename: carry the old settings over.
+        if !path.exists() && legacy_config_path().exists() {
+            log::info!("importing settings from the Rekey build");
+            path = legacy_config_path();
+        }
+        let mut settings = Settings::read(&path);
+        settings.migrate();
+        settings
+    }
+
+    /// Bring settings written by an older build up to date.
+    fn migrate(&mut self) {
+        if self.version < 2 {
+            // Older builds defaulted to tapping Option, which collides with
+            // ⌥⌫ and ⌥←. A tap of right Command is the new default; anyone who
+            // picked something else keeps their choice.
+            if self.config.shortcut
+                == (Shortcut::Tap {
+                    modifier: Modifier::Option,
+                })
+            {
+                self.config.shortcut = Shortcut::Tap {
+                    modifier: Modifier::RightCommand,
+                };
+            }
+            for id in Config::default().excluded_apps {
+                if !self.config.is_excluded_app(&id) {
+                    self.config.excluded_apps.push(id);
+                }
+            }
+        }
+        self.version = SETTINGS_VERSION;
+    }
+
+    fn read(path: &std::path::Path) -> Settings {
+        match std::fs::read_to_string(path) {
             Ok(text) => match serde_json::from_str(&text) {
                 Ok(settings) => settings,
                 Err(e) => {
@@ -44,7 +97,10 @@ impl Settings {
                     Settings::default()
                 }
             },
-            Err(_) => Settings::default(),
+            Err(_) => Settings {
+                version: SETTINGS_VERSION,
+                ..Settings::default()
+            },
         }
     }
 
@@ -52,7 +108,11 @@ impl Settings {
         let dir = config_dir();
         std::fs::create_dir_all(&dir)?;
         let text = serde_json::to_string_pretty(self)?;
-        std::fs::write(config_path(), text)
+        // Write beside and rename, so a crash mid-write never leaves a
+        // truncated settings file behind.
+        let tmp = config_path().with_extension("json.tmp");
+        std::fs::write(&tmp, text)?;
+        std::fs::rename(tmp, config_path())
     }
 }
 
@@ -124,10 +184,56 @@ mod exclusion_tests {
     }
     #[test]
     fn removing_exception_enables_only_selected_app() {
-        let mut config = Config::default();
-        config.excluded_apps = vec!["com.apple.TextEdit".into(), "org.mozilla.firefox".into()];
+        let mut config = Config {
+            excluded_apps: vec!["com.apple.TextEdit".into(), "org.mozilla.firefox".into()],
+            ..Config::default()
+        };
         config.excluded_apps.retain(|id| id != "com.apple.TextEdit");
         assert!(!config.is_excluded_app("com.apple.TextEdit"));
         assert!(config.is_excluded_app("org.mozilla.firefox"));
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+
+    #[test]
+    fn the_old_option_default_moves_to_right_command() {
+        let mut s: Settings =
+            serde_json::from_str(r#"{"config":{"shortcut":{"kind":"tap","modifier":"option"}}}"#)
+                .unwrap();
+        s.migrate();
+        assert_eq!(
+            s.config.shortcut,
+            Shortcut::Tap {
+                modifier: Modifier::RightCommand
+            }
+        );
+        assert_eq!(s.version, SETTINGS_VERSION);
+        // A deliberate choice is kept.
+        let mut s: Settings = serde_json::from_str(
+            r#"{"config":{"shortcut":{"kind":"doubletap","modifier":"shift"}}}"#,
+        )
+        .unwrap();
+        s.migrate();
+        assert_eq!(
+            s.config.shortcut,
+            Shortcut::DoubleTap {
+                modifier: Modifier::Shift
+            }
+        );
+        // And current settings are left alone.
+        let mut s: Settings = serde_json::from_str(
+            r#"{"version":2,"config":{"shortcut":{"kind":"tap","modifier":"option"}}}"#,
+        )
+        .unwrap();
+        s.migrate();
+        assert_eq!(
+            s.config.shortcut,
+            Shortcut::Tap {
+                modifier: Modifier::Option
+            }
+        );
     }
 }

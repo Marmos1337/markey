@@ -18,8 +18,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, GetKeyboardLayout, GetKeyboardState, MapVirtualKeyW, SendInput, ToUnicodeEx,
     INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
     MAPVK_VK_TO_VSC, VIRTUAL_KEY, VK_BACK, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME,
-    VK_LEFT, VK_LMENU, VK_LWIN, VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RWIN,
-    VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
+    VK_LEFT, VK_LMENU, VK_LWIN, VK_MENU, VK_NEXT, VK_PRIOR, VK_RCONTROL, VK_RETURN, VK_RIGHT,
+    VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId,
@@ -274,6 +274,10 @@ fn modifiers_now() -> Modifiers {
         control: down(VK_CONTROL),
         alt: down(VK_MENU),
         meta: down(VK_LWIN) || down(VK_RWIN),
+        right_shift: down(VK_RSHIFT),
+        right_control: down(VK_RCONTROL),
+        right_alt: down(VK_RMENU),
+        right_meta: down(VK_RWIN),
     }
 }
 
@@ -358,17 +362,27 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
 ///
 /// A low-level keyboard hook only delivers events to a thread with a message
 /// loop, so this blocks and callers put it on a dedicated thread.
-pub fn run<F>(on_key: F) -> Result<(), HookError>
+/// Install the hook and pump messages on the calling thread.
+///
+/// The Windows hook only observes: every keystroke is passed on, so the
+/// engine is told it cannot hold word-ending keys back.
+pub fn run<F, R>(on_ready: R, mut on_key: F) -> Result<(), HookError>
 where
-    F: FnMut(KeyEvent) + Send + 'static,
+    F: FnMut(KeyEvent, Option<crate::RawKey>) -> crate::Disposition + Send + 'static,
+    R: FnOnce(crate::Capabilities),
 {
-    HANDLER.with(|h| *h.borrow_mut() = Some(Box::new(on_key)));
+    HANDLER.with(|h| {
+        *h.borrow_mut() = Some(Box::new(move |event: KeyEvent| {
+            let _ = on_key(event, None);
+        }))
+    });
 
     let hook: HHOOK = unsafe {
         let module = GetModuleHandleW(None).map_err(|e| HookError::Os(e.to_string()))?;
         SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), Some(module.into()), 0)
             .map_err(|_| HookError::PermissionDenied)?
     };
+    on_ready(crate::Capabilities { can_hold: false });
 
     unsafe {
         let mut msg = MSG::default();

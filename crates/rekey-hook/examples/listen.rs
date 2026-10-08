@@ -30,18 +30,24 @@ fn main() {
     let counter = count.clone();
 
     std::thread::spawn(move || {
-        let result = platform::run(move |event| {
+        let ready = |caps: rekey_hook::Capabilities| {
+            println!("tap installed, can hold keys: {}", caps.can_hold)
+        };
+        let result = platform::run(ready, move |event, _raw| {
             let n = counter.fetch_add(1, Ordering::Relaxed);
             println!(
-                "{n:>3}  {:<18} char={:?} alt={} shift={} ctrl={} cmd={} synthetic={}",
+                "{n:>3}  {:<18} char={:?} alt={} shift={} ctrl={} cmd={} right-cmd={} right-alt={} synthetic={}",
                 format!("{:?}", event.key),
                 event.character,
                 event.modifiers.alt,
                 event.modifiers.shift,
                 event.modifiers.control,
                 event.modifiers.meta,
+                event.modifiers.right_meta,
+                event.modifiers.right_alt,
                 event.synthetic,
             );
+            rekey_hook::Disposition::Pass
         });
         if let Err(e) = result {
             eprintln!("hook failed: {e}");
