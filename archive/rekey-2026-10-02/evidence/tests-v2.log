@@ -1,0 +1,328 @@
+   Compiling serde v1.0.229
+   Compiling regex-automata v0.4.18
+   Compiling icu_locale_core v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling icu_collections v2.3.0
+   Compiling regex v1.13.1
+   Compiling objc2-foundation v0.3.2
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling cssparser v0.36.0
+   Compiling url v2.5.8
+   Compiling objc2-core-image v0.3.2
+   Compiling objc2-cloud-kit v0.3.2
+   Compiling objc2-core-data v0.3.2
+   Compiling objc2-quartz-core v0.3.2
+   Compiling swift-rs v1.0.8
+   Compiling adler2 v2.0.1
+   Compiling selectors v0.36.1
+   Compiling tinyvec v1.13.2
+   Compiling objc2-app-kit v0.3.2
+   Compiling html5ever v0.38.0
+   Compiling cfb v0.7.3
+   Compiling jsonptr v0.6.3
+   Compiling erased-serde v0.4.10
+   Compiling time v0.3.55
+   Compiling dom_query v0.27.0
+   Compiling schemars v0.8.22
+   Compiling cargo_metadata v0.19.2
+   Compiling plist v1.10.1
+   Compiling serde-untagged v0.1.9
+   Compiling json-patch v3.0.1
+   Compiling infer v0.19.0
+   Compiling unicode-normalization v0.1.25
+   Compiling crc32fast v1.5.1
+   Compiling miniz_oxide v0.9.1
+   Compiling urlpattern v0.3.0
+   Compiling tinystr v0.8.4
+   Compiling serde_with v3.23.0
+   Compiling tauri-utils v2.9.3
+   Compiling flate2 v1.1.10
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling percent-encoding v2.3.2
+   Compiling rekey-core v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core)
+   Compiling core-foundation-sys v0.8.7
+   Compiling option-ext v0.2.0
+   Compiling dirs-sys v0.5.0
+   Compiling core-foundation v0.10.1
+   Compiling serde_json v1.0.151
+   Compiling foreign-types-shared v0.3.1
+   Compiling once_cell v1.21.4
+   Compiling foreign-types v0.5.0
+   Compiling core-graphics-types v0.2.0
+   Compiling dirs v6.0.0
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling embed-resource v3.0.11
+   Compiling core-graphics v0.25.0
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling heck v0.5.0
+   Compiling tauri-winres v0.3.6
+   Compiling cargo_toml v0.22.3
+   Compiling form_urlencoded v1.2.2
+   Compiling time-macros v0.2.32
+   Compiling tauri-build v2.6.3
+   Compiling dpi v0.1.2
+   Compiling crossbeam-utils v0.8.23
+   Compiling uuid v1.26.0
+   Compiling zeroize v1.9.0
+   Compiling raw-window-handle v0.6.2
+   Compiling rustls-pki-types v1.15.1
+   Compiling crossbeam-channel v0.5.17
+   Compiling tauri v2.11.6
+   Compiling tauri-plugin v2.6.3
+   Compiling phf_shared v0.13.1
+   Compiling getrandom v0.2.17
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling untrusted v0.9.0
+   Compiling ring v0.17.14
+   Compiling png v0.17.16
+   Compiling toml v1.1.5+spec-1.1.0
+   Compiling phf v0.13.1
+   Compiling cookie v0.18.2
+   Compiling png v0.18.1
+   Compiling objc2-web-kit v0.3.2
+   Compiling cpufeatures v0.2.17
+   Compiling semver v1.0.28
+   Compiling unicode-segmentation v1.13.3
+   Compiling keyboard-types v0.7.0
+   Compiling sha2 v0.10.9
+   Compiling num-traits v0.2.19
+   Compiling ico v0.5.0
+   Compiling rustls-webpki v0.103.15
+   Compiling httparse v1.10.1
+   Compiling dispatch2 v0.3.1
+   Compiling pxfm v0.1.30
+   Compiling subtle v2.6.1
+   Compiling rustls v0.23.45
+   Compiling tauri-codegen v2.6.3
+   Compiling moxcms v0.8.1
+   Compiling tao v0.35.3
+   Compiling ureq-proto v0.6.2
+   Compiling tauri-runtime v2.11.3
+   Compiling muda v0.19.3
+   Compiling wry v0.55.1
+   Compiling webpki-roots v1.0.9
+   Compiling rekey-hook v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook)
+   Compiling utf8-zero v0.8.1
+   Compiling byteorder-lite v0.1.0
+   Compiling pin-project-lite v0.2.17
+   Compiling bytemuck v1.25.2
+   Compiling image v0.25.10
+   Compiling tokio v1.53.1
+   Compiling ureq v3.4.1
+   Compiling serialize-to-javascript v0.1.2
+   Compiling tauri-runtime-wry v2.11.4
+   Compiling tray-icon v0.24.2
+   Compiling tauri-macros v2.6.3
+   Compiling getrandom v0.3.4
+   Compiling tauri-plugin-autostart v2.5.1
+   Compiling tauri-plugin-opener v2.5.5
+   Compiling window-vibrancy v0.6.0
+   Compiling dirs-sys v0.3.7
+   Compiling mime v0.3.17
+   Compiling utf8parse v0.2.2
+   Compiling embed_plist v1.2.2
+   Compiling anstyle-parse v1.0.0
+   Compiling dirs v4.0.0
+   Compiling colorchoice v1.0.5
+   Compiling anstyle-query v1.1.5
+   Compiling jiff-core v0.1.0
+   Compiling anstyle v1.0.14
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling anstream v1.0.0
+   Compiling jiff v0.2.35
+   Compiling auto-launch v0.5.0
+   Compiling rekey-ai v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-ai)
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+   Compiling env_filter v2.0.0
+   Compiling open v5.4.3
+   Compiling env_logger v0.11.11
+   Compiling eval v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/eval)
+   Compiling modelgen v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/modelgen)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 29s
+     Running unittests src/main.rs (rekey-source/target/debug/deps/eval-1f228b2b48bfbec2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (rekey-source/target/debug/deps/modelgen-0659927f8824a115)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (rekey-source/target/debug/deps/rekey_ai-d1fb7fb6ce4d17bb)
+
+running 9 tests
+test tests::a_refusal_leaves_the_text_alone ... ok
+test tests::an_unusable_answer_is_an_error_not_a_guess ... ok
+test tests::cache_is_case_insensitive ... ok
+test tests::ignores_thinking_blocks ... ok
+test tests::missing_api_key_is_refused_before_any_request ... ok
+test tests::parses_a_plain_convert ... ok
+test tests::parses_a_plain_keep ... ok
+test tests::prompt_includes_both_readings_and_languages ... ok
+test tests::tolerates_surrounding_prose ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (rekey-source/target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 7 tests
+test transaction::tests::adversarial_transitions_at_every_check ... ok
+test transaction::tests::cancellation_does_not_blindly_restore ... ok
+test transaction::tests::collapsed_selection_never_inserts ... ok
+test transaction::tests::exact_origin_replaces ... ok
+test transaction::tests::original_fragment_mismatch_skips ... ok
+test transaction::tests::replace_failure_restores_only_unchanged_selection ... ok
+test transaction::tests::selection_failure_has_no_writes ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (rekey-source/target/debug/deps/rekey_core-877875cf5b608bcb)
+
+running 77 tests
+test buffer::tests::backspace_edits_the_current_word ... ok
+test buffer::tests::backspacing_past_the_start_stops_trusting_the_position ... ok
+test buffer::tests::caret_movement_discards_the_word ... ok
+test buffer::tests::deletion_count_includes_the_terminator ... ok
+test buffer::tests::deletion_count_is_in_characters_not_bytes ... ok
+test buffer::tests::emits_words_at_boundaries ... ok
+test buffer::tests::manual_flush_takes_the_word_in_progress ... ok
+test buffer::tests::repeated_boundaries_emit_nothing ... ok
+test buffer::tests::very_long_runs_are_abandoned ... ok
+test buffer::tests::word_in_progress_is_not_emitted ... ok
+test engine::tests::a_correction_also_asks_for_the_layout_to_switch ... ok
+test engine::tests::a_double_tap_shortcut_needs_both_taps ... ok
+test engine::tests::a_layout_change_the_user_made_still_clears_the_record ... ok
+test engine::tests::a_learned_assist_verdict_converts_an_ambiguous_word ... ok
+test engine::tests::a_shortcut_discards_the_word_in_progress ... ok
+test engine::tests::a_word_with_one_letter_wrong_is_still_corrected ... ok
+test engine::tests::an_ambiguous_word_is_queued_for_the_assist_and_left_alone ... ok
+test engine::tests::arrow_keys_discard_the_word_in_progress ... ok
+test engine::tests::caret_movement_makes_the_shortcut_inert ... ok
+test engine::tests::corrects_a_word_at_the_space ... ok
+test engine::tests::cycling_back_teaches_rekey_to_leave_that_word_alone ... ok
+test engine::tests::cycling_through_three_layouts_visits_each_reading ... ok
+test engine::tests::disabled_engine_does_nothing ... ok
+test engine::tests::does_not_convert_gibberish_into_other_gibberish ... ok
+test engine::tests::does_not_strip_punctuation_that_is_a_cyrillic_letter ... ok
+test engine::tests::external_caret_invalidation_forgets_a_completed_word ... ok
+test engine::tests::external_caret_invalidation_forgets_a_partial_word ... ok
+test engine::tests::holding_option_to_type_an_accent_is_not_a_shortcut ... ok
+test engine::tests::ignores_its_own_typing ... ok
+test engine::tests::keeps_trailing_punctuation_and_puts_it_back ... ok
+test engine::tests::leaves_correct_words_untouched ... ok
+test engine::tests::manual_hotkey_converts_below_threshold ... ok
+test engine::tests::option_as_part_of_a_chord_is_not_a_shortcut ... ok
+test engine::tests::stands_down_in_excluded_apps ... ok
+test engine::tests::stands_down_in_password_fields ... ok
+test engine::tests::switching_apps_discards_the_word_in_progress ... ok
+test engine::tests::tapping_option_cycles_the_last_word ... ok
+test engine::tests::the_assist_is_ignored_when_the_setting_is_off ... ok
+test engine::tests::the_shortcut_acts_on_the_word_being_typed_not_an_earlier_one ... ok
+test engine::tests::the_shortcut_can_be_switched_off_entirely ... ok
+test engine::tests::the_shortcut_does_nothing_before_any_word ... ok
+test engine::tests::the_shortcut_modifier_is_configurable ... ok
+test engine::tests::the_shortcut_never_acts_on_a_stale_word ... ok
+test engine::tests::the_shortcut_survives_rekeys_own_layout_switch ... ok
+test engine::tests::undo_restores_the_original_and_learns_the_exception ... ok
+test engine::tests::undo_without_a_correction_does_nothing ... ok
+test engine::tests::unknown_layout_is_never_guessed ... ok
+test layout::tests::all_layouts_have_47_keys ... ok
+test layout::tests::arabic_lam_alef_ligature_normalises ... ok
+test layout::tests::azerty_swaps_a_and_q ... ok
+test layout::tests::coverage_detects_foreign_text ... ok
+test layout::tests::en_to_ru_roundtrip ... ok
+test layout::tests::foreign_rendering_is_a_fixed_point_for_every_layout ... ok
+test layout::tests::french_circumflex_roundtrips ... ok
+test layout::tests::greek_accents_roundtrip_through_dead_keys ... ok
+test layout::tests::greek_final_sigma_collapses_in_uppercase ... ok
+test layout::tests::greek_roundtrip ... ok
+test layout::tests::hebrew_roundtrip ... ok
+test layout::tests::presses_cover_dead_key_accents ... ok
+test layout::tests::presses_include_the_space_that_ended_the_word ... ok
+test layout::tests::presses_refuse_untypeable_text ... ok
+test layout::tests::presses_reproduce_the_text_on_the_target_layout ... ok
+test layout::tests::qwertz_swaps_y_and_z ... ok
+test layout::tests::ru_to_en_roundtrip ... ok
+test layout::tests::trailing_dead_key_shows_as_bare_accent ... ok
+test layout::tests::ukrainian_differs_from_russian ... ok
+test layout::tests::unambiguous_layouts_roundtrip_all_us_letters_exactly ... ok
+test layout::tests::unmappable_chars_pass_through ... ok
+test layout::tests::uppercase_roundtrips_for_bicameral_layouts ... ok
+test model::tests::frequency_is_reflected ... ok
+test model::tests::known_words_beat_gibberish ... ok
+test model::tests::rejects_foreign_files ... ok
+test model::tests::rejects_truncated_files ... ok
+test model::tests::roundtrips_through_bytes ... ok
+test model::tests::scoring_is_case_insensitive ... ok
+test model::tests::trigrams_are_padded ... ok
+test model::tests::unknown_but_wordlike_beats_unknown_gibberish ... ok
+
+test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/real_models.rs (rekey-source/target/debug/deps/real_models-f1ae1bfd12eb29b8)
+
+running 20 tests
+test a_mistyped_word_is_still_recognised_as_the_wrong_layout ... ok
+test a_typo_match_does_not_licence_guessing ... ok
+test fixes_arabic ... ok
+test fixes_english_typed_on_russian_layout ... ok
+test fixes_greek_including_accented_words ... ok
+test fixes_hebrew ... ok
+test fixes_russian_typed_on_english_layout ... ok
+test fixes_ukrainian ... ok
+test fixes_words_whose_keys_are_punctuation_on_the_wrong_layout ... ok
+test latin_pairs_are_held_to_a_higher_bar ... ok
+test leaves_acronyms_alone ... ok
+test leaves_real_english_alone ... ok
+test leaves_real_russian_alone ... ok
+test never_touches_passwords_or_identifiers ... ok
+test recognises_slang_not_found_in_dictionaries ... ok
+test respects_user_exceptions ... ok
+test sensitivity_changes_how_eager_it_is ... ok
+test three_layouts_do_not_degrade_the_two_layout_result ... ok
+test three_layouts_pick_the_right_target ... ok
+test very_short_words_need_a_dictionary_hit ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running unittests src/lib.rs (rekey-source/target/debug/deps/rekey_hook-e3bbdbfc89bd3bcd)
+
+running 8 tests
+test macos::tests::classifies_editing_keys ... ok
+test macos::tests::every_keycode_is_distinct ... ok
+test macos::tests::keycodes_match_the_layout_table_positions ... ok
+test macos::tests::maps_apple_input_sources_to_layouts ... ok
+test macos::tests::modifier_keys_are_never_mistaken_for_whitespace ... ok
+test macos::tests::shortcuts_are_distinguished_from_typing ... ok
+test macos::tests::unknown_input_sources_are_not_guessed ... ok
+test macos::tests::whitespace_is_recognised_by_key_not_by_character ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rekey_ai
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rekey_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rekey_hook
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,29 @@
+{
+  "dist": {
+    "shasum": "91d114bda03f301f53fa1973bfc80ba6aff443c8",
+    "tarball": "https://registry.npmjs.org/@tauri-apps/cli-darwin-arm64/-/cli-darwin-arm64-2.12.1.tgz",
+    "fileCount": 3,
+    "integrity": "sha512-8bMnbpJ2jKO/ufrOPL65EMHC3ptw7fzeraoQkwibyfGLqIl+UCWsC0152kmNbW6r9NvVQduXqAZF5mH1QgTWhw==",
+    "signatures": [
+      {
+        "sig": "MEUCIQD7BpecE+nGnlmwKZXK9aA9MFH0tAqyB3SaA1JWRbW9FgIgCKJLbYlmKqzzuQDgHcu7EMd/PW4R9oMuxajfh5JviLY=",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      },
+      {
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+        "sig": "MEYCIQDy6gEI8ctoA6wLrS6nfZ2NcO7Khjpj7QQ8UqAmuRlg0QIhANNDeakK6J/mPfcEiAjBDBoERa9eRF8q51wPNV+yyd6X"
+      }
+    ],
+    "attestations": {
+      "url": "https://registry.npmjs.org/-/npm/v1/attestations/@tauri-apps%2fcli-darwin-arm64@2.12.1",
+      "provenance": {
+        "predicateType": "https://slsa.dev/provenance/v1"
+      }
+    },
+    "unpackedSize": 15136836
+  },
+  "repository": {
+    "url": "git+https://github.com/tauri-apps/tauri.git",
+    "type": "git"
+  }
+}

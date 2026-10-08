@@ -586,8 +586,8 @@ input[type="checkbox"] {
 }
 
 .banner + .banner,
-.banner + main,
-.banner ~ main {
+.banner:not([hidden]) + main,
+.banner:not([hidden]) ~ main {
   padding-top: 0;
 }
 
@@ -654,3 +654,8 @@ input[type="checkbox"] {
     transition: none;
   }
 }
+
+.excluded-apps { list-style:none; margin:0; padding:0; }
+.excluded-apps li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-top:1px solid var(--separator); }
+.excluded-apps li span { overflow-wrap:anywhere; font-size:var(--size-detail); }
+.excluded-apps li .btn { flex-shrink:0; }

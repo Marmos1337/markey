@@ -1,0 +1,27 @@
+nice: setpriority: Operation not permitted
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+warning: unused import: `super::*`
+   --> app/src-tauri/src/safe_service.rs:613:9
+    |
+613 |     use super::*;
+    |         ^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rekey-app` (bin "rekey" test) generated 1 warning (run `cargo fix --bin "rekey" -p rekey-app --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.26s
+     Running unittests src/main.rs (target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 9 tests
+test input_phase::tests::all_phase_sequences_deliver_exact_word_once_to_real_core ... ok
+test input_phase::tests::bootstrap_needs_phase_specific_boundary_not_blind_caret_subtraction ... ok
+test input_phase::tests::observer_before_and_after_snapshot_accept_only_published_transition ... ok
+test input_phase::tests::post_to_post_and_mixed_phases_consume_each_event_once ... ok
+test input_phase::tests::pre_to_pre_and_pre_to_post_space_have_identical_origin ... ok
+test input_phase::tests::revision_secure_focus_generation_changes_cancel_before_engine_delivery ... ok
+test input_phase::tests::two_delivered_characters_or_foreign_edit_cancel ... ok
+test input_phase::tests::unchanged_modifier_is_not_double_advanced ... ok
+test input_phase::tests::unknown_ambiguous_overflow_and_shortcuts_cancel ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.12s
+

@@ -1,0 +1,22 @@
+   Compiling rekey-hook v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook)
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.16s
+     Running unittests src/main.rs (target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 13 tests
+test input_phase::tests::all_phase_sequences_deliver_exact_word_once_to_real_core ... ok
+test input_phase::tests::blocking_focus_probe_invalidation_is_sampled_after_probe ... ok
+test input_phase::tests::bootstrap_needs_phase_specific_boundary_not_blind_caret_subtraction ... ok
+test input_phase::tests::bootstrap_notification_during_policy_wait_is_reconciled_not_authorized ... ok
+test input_phase::tests::deferred_foreign_edit_removing_boundary_cancels_unchanged_tail ... ok
+test input_phase::tests::foreign_edit_after_bootstrap_scope_before_next_key_invalidates_word_start ... ok
+test input_phase::tests::observer_before_and_after_snapshot_accept_only_published_transition ... ok
+test input_phase::tests::post_to_post_and_mixed_phases_consume_each_event_once ... ok
+test input_phase::tests::pre_to_pre_and_pre_to_post_space_have_identical_origin ... ok
+test input_phase::tests::revision_secure_focus_generation_changes_cancel_before_engine_delivery ... ok
+test input_phase::tests::two_delivered_characters_or_foreign_edit_cancel ... ok
+test input_phase::tests::unchanged_modifier_is_not_double_advanced ... ok
+test input_phase::tests::unknown_ambiguous_overflow_and_shortcuts_cancel ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.12s
+

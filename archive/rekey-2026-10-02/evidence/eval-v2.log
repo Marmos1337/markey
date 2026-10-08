@@ -1,0 +1,46 @@
+   Compiling rekey-core v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core)
+   Compiling eval v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/eval)
+    Finished `release` profile [optimized] target(s) in 3.25s
+     Running `rekey-source/target/release/eval rekey-source/tools/.cache rekey-source/crates/rekey-core/data/models 1000`
+
+=== Cautious ===
+pair         recall   recall  false-pos  false-pos
+               A->B     B->A       in A       in B
+us<->ru       95.3%    92.4%      0.00%      0.00%
+us<->uk       89.3%    89.4%      0.00%      0.00%
+us<->he       74.9%    80.6%      0.00%      0.00%
+us<->ar       91.6%    81.7%      0.00%      0.00%
+us<->el       82.5%    56.4%      0.00%      0.00%
+us<->de        0.2%     0.2%      0.00%      0.00%
+us<->fr        3.7%     4.2%      0.00%      0.00%
+us<->es        0.7%     0.0%      0.00%      0.00%
+us<->tr       14.1%     0.5%      0.00%      0.00%
+TOTAL         47.6% (overall recall)      0.00% (overall false positives)
+
+=== Balanced ===
+pair         recall   recall  false-pos  false-pos
+               A->B     B->A       in A       in B
+us<->ru       99.2%    99.6%      0.00%      0.00%
+us<->uk       94.9%    99.6%      0.00%      0.00%
+us<->he       95.8%    98.3%      0.00%      0.00%
+us<->ar       99.0%    90.9%      0.00%      0.00%
+us<->el       96.7%    95.2%      0.00%      0.00%
+us<->de        9.8%     4.2%      0.00%      0.00%
+us<->fr       31.2%    37.4%      0.00%      0.00%
+us<->es       10.8%     0.0%      0.00%      0.00%
+us<->tr       52.6%    14.5%      0.00%      0.00%
+TOTAL         62.8% (overall recall)      0.00% (overall false positives)
+
+=== Eager ===
+pair         recall   recall  false-pos  false-pos
+               A->B     B->A       in A       in B
+us<->ru       99.6%    99.6%      0.00%      0.00%
+us<->uk       95.3%    99.6%      0.00%      0.00%
+us<->he       97.7%    98.3%      0.00%      0.00%
+us<->ar       99.6%    91.0%      0.00%      0.00%
+us<->el       98.1%    97.2%      0.00%      0.00%
+us<->de       16.9%    11.7%      0.00%      0.00%
+us<->fr       46.5%    49.6%      0.00%      0.00%
+us<->es       16.5%     0.0%      0.00%      0.00%
+us<->tr       64.0%    30.3%      0.00%      0.00%
+TOTAL         67.3% (overall recall)      0.00% (overall false positives)

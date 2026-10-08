@@ -1,0 +1,79 @@
+warning: fields `bootstrap`, `expected`, and `policy` are never read
+   --> crates/rekey-hook/src/focus.rs:382:5
+    |
+381 | struct WatchState {
+    |        ---------- fields in this struct
+382 |     bootstrap: Arc<BootstrapState>,
+    |     ^^^^^^^^^
+...
+387 |     expected: Arc<Mutex<Vec<Expected>>>,
+    |     ^^^^^^^^
+388 |     policy: Arc<dyn Fn(u64) -> bool + Send + Sync>,
+    |     ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rekey-hook` (lib) generated 1 warning
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+warning: static `CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:23:8
+   |
+23 | static CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: static `OTHER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:24:8
+   |
+24 | static OTHER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^
+
+warning: static `EMPTY_CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:25:8
+   |
+25 | static EMPTY_CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `candidate` is never used
+   --> app/src-tauri/src/safe_service.rs:182:4
+    |
+182 | fn candidate(t: &Track, event: &KeyEvent) -> Option<Track> {
+    |    ^^^^^^^^^
+
+warning: function `bootstrap` is never used
+   --> app/src-tauri/src/safe_service.rs:217:4
+    |
+217 | fn bootstrap(focus: &Focus, event: &KeyEvent, revision: u64) -> Option<(Track, Track)> {
+    |    ^^^^^^^^^
+
+warning: function `gen_changed` is never used
+   --> app/src-tauri/src/safe_service.rs:786:4
+    |
+786 | fn gen_changed(generation: &AtomicU64, n: u64, revision: u64) -> bool {
+    |    ^^^^^^^^^^^
+
+warning: `rekey-app` (bin "rekey" test) generated 6 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.77s
+     Running unittests src/main.rs (target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 16 tests
+test queued_input::tests::cancelled_boundary_preserves_next_prefix_and_clears_speculative_cycle ... ok
+test queued_input::tests::failed_word_actual_space_then_next_word_yields_one_real_core_proposal ... ok
+test queued_input::tests::failed_word_post_space_recovers_at_real_caret_without_phantom_space ... ok
+test queued_input::tests::full_queued_span_is_verified_across_word_boundaries ... ok
+test queued_input::tests::long_session_compacts_only_after_exact_batch_delivery ... ok
+test queued_input::tests::modifier_equivalent_prefixes_deliver_in_known_order_once ... ok
+test queued_input::tests::new_keys_during_ipc_remain_after_snapshot_prefix_and_are_delivered_once ... ok
+test queued_input::tests::notification_before_hook_publication_does_not_destroy_known_baseline ... ok
+test queued_input::tests::off_secure_and_mid_batch_policy_change_deliver_no_more_core_input ... ok
+test queued_input::tests::overflow_gap_and_focus_away_back_discard_old_lineage ... ok
+test queued_input::tests::paused_reservation_before_publication_is_not_a_phantom_gap ... ok
+test queued_input::tests::pre_and_post_space_hypotheses_are_disambiguated_by_real_snapshot ... ok
+test queued_input::tests::queued_character_before_host_application_is_retained_at_whitespace_baseline ... ok
+test queued_input::tests::same_caret_tail_with_changed_boundary_cancels_proof ... ok
+test queued_input::tests::snapshot_ahead_two_to_six_known_keys_delivers_once ... ok
+test queued_input::tests::unknown_insertion_and_caret_move_never_deliver_guessed_events ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.12s
+

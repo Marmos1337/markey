@@ -1,0 +1,52 @@
+{
+  "version": "local safety V4-r4",
+  "base_commit": "b4928649e07a1fea7e91c8f469a97215eb54b712",
+  "source_patch": "evidence/local-safety-v4-r4-review.patch",
+  "source_patch_sha256": "a5b9ad75e70ee5008c05bc675892ee7516e636108a62c5004fe1ac82f8b1d59b",
+  "app_path": "$USER_HOME/Applications/Rekey.app",
+  "binary_sha256": "4651cb3046afbe62236e69deb4c4eddfad29ad4e077aa1db64102a9f38e26fde",
+  "architecture": "arm64",
+  "signature": "local ad-hoc; not notarized",
+  "v3_backup": "$USER_HOME/Documents/Codex/2026-10-01/task-3/backups/Rekey-V3.app",
+  "targeted_tests_passed": 13,
+  "workspace_tests_passed": 139,
+  "all_target_check": "pass",
+  "independent_source_review": "PASS; targeted code-only; thread01a0f54b-551b-766e-b760-03111ddd20c1",
+  "launched": true,
+  "correct_enabled": true,
+  "ai_assist": false,
+  "launch_at_login": false,
+  "secure_input_checkpoint": {
+    "active": true,
+    "owner_pid": 399,
+    "console": true,
+    "login_done": true
+  },
+  "runtime_status": "Correct ON for user-authorized physical test in new disposable TextEdit document; awaiting actual result, no runtime PASS.",
+  "timestamp_utc": "2026-10-01T08:14:02.674556+00:00",
+  "v3_backup_binary_sha256": "91aa58a1736c90247ffd05f0eb593c78673af72f2d0251d74a26aabd6cadfe8c",
+  "remaining_limitations": [
+    "System Secure Input was active at last checkpoint; no further polling until a new user event.",
+    "AX selection/check/set are non-atomic; app input during selection can replace text, and lost ownership can prevent safe selection rollback.",
+    "Source review and automated tests do not establish real foreground keyboard correction or input-source switching."
+  ],
+  "resume_controlled_test": [
+    "After the user finishes the normal system/session step, perform one read-only Secure Input and actual foreground checkpoint.",
+    "If Secure Input is OFF, coordinate exclusive GUI slot and verify Rekey Accessibility using normal UI if required by updated local signature.",
+    "Use only a new disposable TextEdit document; enable Correct there, keep AI/startup OFF.",
+    "Verify ordinary and fast ghbdtn Space to привет Space and reverse руддщ Space to hello Space, actual input-source changes, multiple words, field/app transitions, exclusions and recovery.",
+    "If CUA targeted keys bypass the global tap, request a short manual physical test sequence through parent.",
+    "Do not claim runtime completion until observed correction and source-switch results; respect fail-closed guards."
+  ],
+  "post_reboot_checkpoint": {
+    "boot_time_epoch": 1790851795,
+    "boot_time_utc": "2026-10-01 13:49:55 UTC",
+    "independent_secure_input": false,
+    "diagnostic_ax_trusted": true,
+    "rekey_ui_accessibility": true,
+    "system_settings_rekey_toggle": "on",
+    "state": "User regrant completed; permission banner gone. New empty TextEdit document created, but CUA app focus is addressed and actual global foreground remains Firefox.",
+    "checked_at_utc": "2026-10-01T10:54:11.905031+00:00"
+  },
+  "manual_test_log_offset_bytes": 154
+}

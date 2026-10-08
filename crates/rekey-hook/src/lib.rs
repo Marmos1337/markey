@@ -15,6 +15,8 @@ pub use rekey_core::input::{Context, Key, KeyEvent, Modifiers, TextWriter as Inj
 pub mod noop;
 
 #[cfg(target_os = "macos")]
+pub mod focus;
+#[cfg(target_os = "macos")]
 pub mod macos;
 #[cfg(target_os = "macos")]
 pub use macos as platform;

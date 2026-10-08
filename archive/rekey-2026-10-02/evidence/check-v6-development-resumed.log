@@ -1,0 +1,116 @@
+warning: fields `bootstrap`, `expected`, and `policy` are never read
+   --> crates/rekey-hook/src/focus.rs:382:5
+    |
+381 | struct WatchState {
+    |        ---------- fields in this struct
+382 |     bootstrap: Arc<BootstrapState>,
+    |     ^^^^^^^^^
+...
+387 |     expected: Arc<Mutex<Vec<Expected>>>,
+    |     ^^^^^^^^
+388 |     policy: Arc<dyn Fn(u64) -> bool + Send + Sync>,
+    |     ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rekey-hook` (lib) generated 1 warning
+    Checking rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+warning: enum `Phase` is never used
+ --> app/src-tauri/src/input_phase.rs:9:10
+  |
+9 | pub enum Phase {
+  |          ^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `advance` is never used
+  --> app/src-tauri/src/input_phase.rs:15:8
+   |
+15 | pub fn advance(before: &State, event: &KeyEvent) -> Option<State> {
+   |        ^^^^^^^
+
+warning: function `reconcile` is never used
+  --> app/src-tauri/src/input_phase.rs:40:8
+   |
+40 | pub fn reconcile(
+   |        ^^^^^^^^^
+
+warning: struct `Fence` is never constructed
+  --> app/src-tauri/src/input_phase.rs:55:12
+   |
+55 | pub struct Fence {
+   |            ^^^^^
+
+warning: function `deliver` is never used
+  --> app/src-tauri/src/input_phase.rs:64:8
+   |
+64 | pub fn deliver<T>(fence: Fence, receive: impl FnOnce() -> T) -> Option<T> {
+   |        ^^^^^^^
+
+warning: function `after_probe` is never used
+  --> app/src-tauri/src/input_phase.rs:76:8
+   |
+76 | pub fn after_probe(probe: impl FnOnce() -> bool, sample: impl FnOnce() -> Fence) -> Fence {
+   |        ^^^^^^^^^^^
+
+warning: function `bootstrap` is never used
+  --> app/src-tauri/src/input_phase.rs:82:8
+   |
+82 | pub fn bootstrap(
+   |        ^^^^^^^^^
+
+warning: function `confirm_bootstrap` is never used
+   --> app/src-tauri/src/input_phase.rs:119:8
+    |
+119 | pub fn confirm_bootstrap(
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: static `CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:23:8
+   |
+23 | static CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^
+
+warning: static `OTHER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:24:8
+   |
+24 | static OTHER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^
+
+warning: static `EMPTY_CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:25:8
+   |
+25 | static EMPTY_CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `synchronized` is never read
+   --> app/src-tauri/src/safe_service.rs:154:5
+    |
+150 | struct Track {
+    |        ----- field in this struct
+...
+154 |     synchronized: bool,
+    |     ^^^^^^^^^^^^
+    |
+    = note: `Track` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: function `candidate` is never used
+   --> app/src-tauri/src/safe_service.rs:180:4
+    |
+180 | fn candidate(t: &Track, event: &KeyEvent) -> Option<Track> {
+    |    ^^^^^^^^^
+
+warning: function `bootstrap` is never used
+   --> app/src-tauri/src/safe_service.rs:214:4
+    |
+214 | fn bootstrap(focus: &Focus, event: &KeyEvent, revision: u64) -> Option<(Track, Track)> {
+    |    ^^^^^^^^^
+
+warning: function `gen_changed` is never used
+   --> app/src-tauri/src/safe_service.rs:773:4
+    |
+773 | fn gen_changed(generation: &AtomicU64, n: u64, revision: u64) -> bool {
+    |    ^^^^^^^^^^^
+
+warning: `rekey-app` (bin "rekey") generated 15 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.51s

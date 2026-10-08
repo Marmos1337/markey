@@ -46,6 +46,8 @@ if (!window.__TAURI__ && isLocalDevServer()) {
   };
 
   const state = {
+    runtime_status: "ready",
+    diagnostic_counts: [100,80,3,0],
     enabled: true,
     layouts: ["us", "ru"],
     sensitivity: "balanced",
@@ -82,6 +84,7 @@ if (!window.__TAURI__ && isLocalDevServer()) {
 
   const handlers = {
     get_state: () => structuredClone(state),
+    list_apps: () => [{name:"TextEdit",bundle_id:"com.apple.TextEdit"},{name:"Firefox",bundle_id:"org.mozilla.firefox"}],
     set_config: ({ config, launchAtLogin }) => {
       Object.assign(state, config);
       // get_state answers with a flat string, so the mock has to convert back

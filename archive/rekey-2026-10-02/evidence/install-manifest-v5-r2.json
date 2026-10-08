@@ -1,0 +1,22 @@
+{
+  "version": "local safety V5-r2",
+  "base_commit": "b4928649e07a1fea7e91c8f469a97215eb54b712",
+  "source_patch_sha256": "9b53a09421774c509e25c527199eae6dcb9a4f5bf4803b7d3250c363799e5de4",
+  "binary_sha256": "930b97643fd252665098438fd6c99cb678aa3dd23dcb03d7929a145fa285bcf8",
+  "app_path": "$USER_HOME/Applications/Rekey.app",
+  "backup": "$USER_HOME/Documents/Codex/2026-10-01/task-3/backups/Rekey-V4-r4.app",
+  "architecture": "arm64",
+  "signature": "local ad-hoc, strict deep seal PASS, not notarized",
+  "workspace_tests_passed": 144,
+  "independent_review": "code-only PASS",
+  "runtime": "FAIL: user reports nowhere works. Real input received, only 37 core events, zero candidate replacements/writes. Bootstrap and observer invalidation path under investigation; no runtime PASS.",
+  "timestamp_utc": "2026-10-01T11:39:45.035943+00:00",
+  "launched": true,
+  "accessibility": "granted after user normal regrant; banner gone",
+  "secure_input": false,
+  "correct_enabled": true,
+  "ai_assist": false,
+  "launch_at_login": false,
+  "settings_ui_persistence": "OFF + add TextEdit verified persisted; remove restored original nine exclusions, previous ON restored",
+  "runtime_evidence": "evidence/runtime-v5-fail-count-events.log"
+}

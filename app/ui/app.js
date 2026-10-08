@@ -84,6 +84,11 @@ async function pollLiveFields() {
   state.undos = fresh.undos;
   state.has_permission = fresh.has_permission;
   state.hook_running = fresh.hook_running;
+  state.enabled = fresh.enabled;
+  state.runtime_status = fresh.runtime_status;
+  state.diagnostic_counts = fresh.diagnostic_counts;
+  $("enabled").checked = fresh.enabled;
+  renderRuntime();
   renderStats();
   $("permission").hidden = fresh.has_permission && fresh.hook_running;
 }
@@ -96,9 +101,7 @@ function render() {
   document.documentElement.dataset.vibrancy = state.vibrancy ? "on" : "off";
 
   $("enabled").checked = state.enabled;
-  $("enabled-detail").textContent = state.enabled
-    ? "Watching for words typed on the wrong layout"
-    : "Paused — nothing is being corrected";
+  renderRuntime();
   $("permission").hidden = state.has_permission && state.hook_running;
   $("no-models").hidden = state.models_loaded.length > 0;
   $("version").textContent = `v${state.version}`;
@@ -133,13 +136,62 @@ function render() {
           } settled so far.`
         : "Waiting for a word the local models can't settle.";
 
-  $("excluded-summary").title = state.excluded_apps.join("\n");
+  renderExcludedApps();
   $("exceptions-section").hidden = state.exceptions.length === 0;
   renderChips("exceptions", state.exceptions);
 
   updatePreview();
 }
 
+const RUNTIME_LABELS = {
+  paused: "Paused — automatic correction is off in every app.",
+  permission: "Accessibility access is needed. Allow Rekey in System Settings.",
+  hook_stopped: "Keyboard observation is unavailable. Check Accessibility and restart Rekey.",
+  secure_input: "macOS Secure Input is active — correction is safely suspended.",
+  excluded: "The last app is excluded. Automatic correction is off there.",
+  unsupported_field: "The last field does not support safe accessible editing. It is skipped.",
+  resync: "The field or input changed. Waiting for a verified start of the next word.",
+  cancelled: "A correction was cancelled because the field or input changed. Click to place the caret before typing again.",
+  ready: "Ready in the last compatible field. Corrections are applied after a word ends.",
+  waiting: "Waiting for typing in a compatible text field.",
+};
+function renderRuntime() {
+  const code = !state.enabled ? "paused" : !state.has_permission ? "permission" : state.runtime_status ?? "waiting";
+  const label = RUNTIME_LABELS[code] ?? RUNTIME_LABELS.waiting;
+  $("enabled-detail").textContent = label;
+  $("runtime-status").textContent = `Last observed input: ${label}`;
+  const counts = state.diagnostic_counts ?? [0,0,0,0];
+  $("runtime-counts").textContent = `Observed events: ${counts[0]} · Tracked events: ${counts[1]} · Proposed corrections: ${counts[2]} · Applied corrections: ${counts[3]}`;
+}
+let appChoices = [];
+async function refreshApps() {
+  try {
+    appChoices = await invoke("list_apps");
+    const select = $("app-choice");
+    const previous = select.value;
+    select.textContent = "";
+    const empty = document.createElement("option"); empty.value = ""; empty.textContent = "Choose a running app…"; select.append(empty);
+    for (const app of appChoices) {
+      const option = document.createElement("option"); option.value = app.bundle_id; option.textContent = `${app.name} — ${app.bundle_id}`; select.append(option);
+    }
+    select.value = previous;
+    renderExcludedApps();
+  } catch { $("app-error").hidden = false; $("app-error").textContent = "Could not list apps. Enter a bundle ID instead."; }
+}
+function renderExcludedApps() {
+  const list = $("excluded-apps"); list.textContent = "";
+  for (const id of state.excluded_apps) {
+    const row = document.createElement("li");
+    const label = document.createElement("span");
+    const app = appChoices.find(a => a.bundle_id.toLowerCase() === id.toLowerCase());
+    label.textContent = app ? `${app.name} — ${id}` : id;
+    const remove = document.createElement("button"); remove.className = "btn"; remove.type = "button"; remove.textContent = "Enable in this app";
+    remove.setAttribute("aria-label", `Remove exception for ${id}`);
+    remove.addEventListener("click", () => save(current => ({excluded_apps: current.excluded_apps.filter(value => value.toLowerCase() !== id.toLowerCase())})));
+    row.append(label,remove); list.append(row);
+  }
+  if (!state.excluded_apps.length) { const empty=document.createElement("li");empty.textContent="No app exceptions. Password fields remain protected.";list.append(empty); }
+}
 function renderStats() {
   const { corrections, undos } = state;
   if (corrections === 0) {
@@ -238,23 +290,18 @@ async function save(changes = {}, extras = {}) {
   }
 }
 
-async function writeConfig(changes, extras) {
-  const config = {
-    enabled: state.enabled,
-    layouts: state.layouts,
-    sensitivity: state.sensitivity,
-    min_word_len: 2,
-    require_dict_below_len: 4,
-    exceptions: state.exceptions,
-    excluded_apps: state.excluded_apps,
-    skip_all_caps: state.skip_all_caps,
-    ai_assist: state.ai_assist,
-    shortcut: parseShortcut(state.shortcut),
-    ...changes,
-  };
-  await invoke("set_config", { config, ...extras });
-  await refresh();
-}
+const configWriter = RekeyConfigWriter({
+  readState: () => invoke("get_state"),
+  writeState: (config, extras) => invoke("set_config", {config,...extras}),
+  toConfig: fresh => ({
+    enabled:fresh.enabled, layouts:fresh.layouts, sensitivity:fresh.sensitivity,
+    min_word_len:2, require_dict_below_len:4, exceptions:fresh.exceptions,
+    excluded_apps:fresh.excluded_apps, skip_all_caps:fresh.skip_all_caps,
+    ai_assist:fresh.ai_assist, shortcut:parseShortcut(fresh.shortcut),
+  }),
+  onState: fresh => {state=fresh;render();},
+});
+function writeConfig(changes, extras) {return configWriter.enqueue(changes,extras);}
 
 /**
  * Turn "doubletap:option" into the tagged shape the engine expects.
@@ -286,6 +333,15 @@ function updatePreview() {
 
 // -- wiring -----------------------------------------------------------------
 
+$("refresh-apps").addEventListener("click", refreshApps);
+$("app-choice").addEventListener("change", e => { $("app-id").value = e.target.value; });
+$("add-excluded").addEventListener("click", async () => {
+  const id = $("app-id").value.trim();
+  if (!id || id.length > 256 || /\s/.test(id)) { $("app-error").hidden=false;$("app-error").textContent="Enter a bundle ID such as com.example.app."; return; }
+  $("app-error").hidden=true;
+  await save(current => ({excluded_apps: current.excluded_apps.some(value => value.toLowerCase() === id.toLowerCase()) ? current.excluded_apps : [...current.excluded_apps,id]}));
+  $("app-id").value="";
+});
 $("enabled").addEventListener("change", (e) => save({ enabled: e.target.checked }));
 $("skip-caps").addEventListener("change", (e) => save({ skip_all_caps: e.target.checked }));
 $("ai").addEventListener("change", (e) => save({ ai_assist: e.target.checked }));
@@ -335,7 +391,7 @@ if (!invoke) {
     "The settings window cannot show or change anything. " +
     "Please reinstall Rekey and report this.</p></div>";
 } else {
-  refresh();
+  refresh().then(refreshApps);
 }
 
 // -- window chrome ----------------------------------------------------------

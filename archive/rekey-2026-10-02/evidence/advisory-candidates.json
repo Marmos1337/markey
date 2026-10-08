@@ -1,0 +1,1421 @@
+[
+  {
+    "id": "RUSTSEC-2020-0070",
+    "crate": "lock_api",
+    "locked": [
+      "0.4.14"
+    ],
+    "title": null,
+    "url": "https://github.com/Amanieu/parking_lot/pull/262",
+    "versions": {
+      "patched": [
+        ">= 0.4.2"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2026-0104",
+    "crate": "rustls-webpki",
+    "locked": [
+      "0.103.15"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.103.13, < 0.104.0-alpha.1",
+        ">= 0.104.0-alpha.7"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2023-0053",
+    "crate": "rustls-webpki",
+    "locked": [
+      "0.103.15"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.100.2, < 0.101.0",
+        ">= 0.101.4"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2026-0098",
+    "crate": "rustls-webpki",
+    "locked": [
+      "0.103.15"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.103.12, < 0.104.0-alpha.1",
+        ">= 0.104.0-alpha.6"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2026-0099",
+    "crate": "rustls-webpki",
+    "locked": [
+      "0.103.15"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.103.12, < 0.104.0-alpha.1",
+        ">= 0.104.0-alpha.6"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2026-0049",
+    "crate": "rustls-webpki",
+    "locked": [
+      "0.103.15"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.103.10"
+      ],
+      "unaffected": [
+        "< 0.102.0-alpha.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0006",
+    "crate": "shlex",
+    "locked": [
+      "2.0.1"
+    ],
+    "title": null,
+    "url": "https://github.com/comex/rust-shlex/security/advisories/GHSA-r7qv-8r2h-pg27",
+    "versions": {
+      "patched": [
+        ">= 1.3.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2023-0078",
+    "crate": "tracing",
+    "locked": [
+      "0.1.44"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/tracing/pull/2765",
+    "versions": {
+      "patched": [
+        ">= 0.1.40"
+      ],
+      "unaffected": [
+        "<= 0.1.37"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2020-0060",
+    "crate": "futures-task",
+    "locked": [
+      "0.3.34"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-lang/futures-rs/pull/2206",
+    "versions": {
+      "patched": [
+        ">= 0.3.6"
+      ],
+      "unaffected": [
+        "<= 0.2.1"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0061",
+    "crate": "futures-task",
+    "locked": [
+      "0.3.34"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-lang/futures-rs/issues/2091",
+    "versions": {
+      "patched": [
+        ">= 0.3.5"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0041",
+    "crate": "crossbeam-utils",
+    "locked": [
+      "0.8.23"
+    ],
+    "title": null,
+    "url": "https://github.com/crossbeam-rs/crossbeam/pull/781",
+    "versions": {
+      "patched": [
+        ">= 0.8.7"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2020-0006",
+    "crate": "bumpalo",
+    "locked": [
+      "3.20.3"
+    ],
+    "title": null,
+    "url": "https://github.com/fitzgen/bumpalo/issues/69",
+    "versions": {
+      "patched": [
+        ">= 3.2.1"
+      ],
+      "unaffected": [
+        "< 3.0.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0078",
+    "crate": "bumpalo",
+    "locked": [
+      "3.20.3"
+    ],
+    "title": null,
+    "url": "https://github.com/fitzgen/bumpalo/blob/main/CHANGELOG.md#3111",
+    "versions": {
+      "patched": [
+        ">= 3.11.1"
+      ],
+      "unaffected": [
+        "< 1.1.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2021-0100",
+    "crate": "sha2",
+    "locked": [
+      "0.10.9"
+    ],
+    "title": null,
+    "url": "https://github.com/RustCrypto/hashes/pull/314",
+    "versions": {
+      "patched": [
+        ">= 0.9.8"
+      ],
+      "unaffected": [
+        "< 0.9.7"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2025-0047",
+    "crate": "slab",
+    "locked": [
+      "0.4.12"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/slab/security/advisories/GHSA-qx2v-8332-m4fv",
+    "versions": {
+      "patched": [
+        ">= 0.4.11"
+      ],
+      "unaffected": [
+        "< 0.4.10"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2025-0080",
+    "crate": "unic-common",
+    "locked": [
+      "0.9.0"
+    ],
+    "title": null,
+    "url": "https://github.com/rustsec/advisory-db/issues/2414",
+    "versions": {
+      "patched": [],
+      "unaffected": []
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2026-0221",
+    "crate": "event-listener",
+    "locked": [
+      "5.4.2"
+    ],
+    "title": null,
+    "url": "https://github.com/smol-rs/event-listener/pull/163",
+    "versions": {
+      "patched": [
+        ">= 5.4.2"
+      ],
+      "unaffected": [
+        "< 5.1.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2026-0007",
+    "crate": "bytes",
+    "locked": [
+      "1.12.1"
+    ],
+    "title": null,
+    "url": "https://github.com/advisories/GHSA-434x-w66g-qw3r",
+    "versions": {
+      "patched": [
+        ">= 1.11.1"
+      ],
+      "unaffected": [
+        "< 1.2.1"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0159",
+    "crate": "chrono",
+    "locked": [
+      "0.4.45"
+    ],
+    "title": null,
+    "url": "https://github.com/chronotope/chrono/issues/499",
+    "versions": {
+      "patched": [
+        ">=0.4.20"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0052",
+    "crate": "crossbeam-channel",
+    "locked": [
+      "0.5.17"
+    ],
+    "title": null,
+    "url": "https://github.com/crossbeam-rs/crossbeam/pull/533",
+    "versions": {
+      "patched": [
+        ">= 0.4.4"
+      ],
+      "unaffected": [
+        "< 0.4.3"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2025-0024",
+    "crate": "crossbeam-channel",
+    "locked": [
+      "0.5.17"
+    ],
+    "title": null,
+    "url": "https://github.com/crossbeam-rs/crossbeam/pull/1187",
+    "versions": {
+      "patched": [
+        ">= 0.5.15"
+      ],
+      "unaffected": [
+        "<= 0.5.11"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0019",
+    "crate": "crossbeam-channel",
+    "locked": [
+      "0.5.17"
+    ],
+    "title": null,
+    "url": "https://github.com/crossbeam-rs/crossbeam/pull/458",
+    "versions": {
+      "patched": [
+        ">= 0.4.3"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2022-0091",
+    "crate": "tauri",
+    "locked": [
+      "2.11.5"
+    ],
+    "title": null,
+    "url": "https://github.com/tauri-apps/tauri/issues/5234",
+    "versions": {
+      "patched": [
+        ">= 1.0.7, < 1.1.0",
+        ">= 1.1.2"
+      ],
+      "unaffected": [
+        "< 1.0.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0088",
+    "crate": "tauri",
+    "locked": [
+      "2.11.5"
+    ],
+    "title": null,
+    "url": "https://github.com/tauri-apps/tauri/issues/4882",
+    "versions": {
+      "patched": [
+        ">= 1.0.6"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0429",
+    "crate": "glib",
+    "locked": [
+      "0.18.5"
+    ],
+    "title": null,
+    "url": "https://github.com/gtk-rs/gtk-rs-core/pull/1343",
+    "versions": {
+      "patched": [
+        ">=0.20.0"
+      ],
+      "unaffected": [
+        "<0.15.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2019-0017",
+    "crate": "once_cell",
+    "locked": [
+      "1.21.4"
+    ],
+    "title": null,
+    "url": "https://github.com/matklad/once_cell/issues/46",
+    "versions": {
+      "patched": [
+        ">= 1.0.1"
+      ],
+      "unaffected": [
+        "< 0.2.5"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2021-0003",
+    "crate": "smallvec",
+    "locked": [
+      "1.16.0"
+    ],
+    "title": null,
+    "url": "https://github.com/servo/rust-smallvec/issues/252",
+    "versions": {
+      "patched": [
+        ">= 0.6.14, < 1.0.0",
+        ">= 1.6.1"
+      ],
+      "unaffected": [
+        "< 0.6.3"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2019-0009",
+    "crate": "smallvec",
+    "locked": [
+      "1.16.0"
+    ],
+    "title": null,
+    "url": "https://github.com/servo/rust-smallvec/issues/148",
+    "versions": {
+      "patched": [
+        ">= 0.6.10"
+      ],
+      "unaffected": [
+        "< 0.6.5"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2018-0018",
+    "crate": "smallvec",
+    "locked": [
+      "1.16.0"
+    ],
+    "title": null,
+    "url": "https://github.com/servo/rust-smallvec/issues/126",
+    "versions": {
+      "patched": [
+        ">= 0.6.13"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2018-0003",
+    "crate": "smallvec",
+    "locked": [
+      "1.16.0"
+    ],
+    "title": null,
+    "url": "https://github.com/servo/rust-smallvec/issues/96",
+    "versions": {
+      "patched": [
+        ">= 0.6.3",
+        "^0.3.4",
+        "^0.4.5",
+        "^0.5.1"
+      ],
+      "unaffected": [
+        "< 0.3.2"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2019-0012",
+    "crate": "smallvec",
+    "locked": [
+      "1.16.0"
+    ],
+    "title": null,
+    "url": "https://github.com/servo/rust-smallvec/issues/149",
+    "versions": {
+      "patched": [
+        ">= 0.6.10"
+      ],
+      "unaffected": [
+        "< 0.6.3"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0402",
+    "crate": "hashbrown",
+    "locked": [
+      "0.12.3",
+      "0.17.1"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-lang/hashbrown/issues/576",
+    "versions": {
+      "patched": [
+        ">= 0.15.1"
+      ],
+      "unaffected": [
+        "< 0.15.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2017-0004",
+    "crate": "base64",
+    "locked": [
+      "0.21.7",
+      "0.22.1",
+      "0.23.1"
+    ],
+    "title": null,
+    "url": "https://github.com/alicemaz/rust-base64/commit/24ead980daf11ba563e4fb2516187a56a71ad319",
+    "versions": {
+      "patched": [
+        ">= 0.5.2"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0421",
+    "crate": "idna",
+    "locked": [
+      "1.1.0"
+    ],
+    "title": null,
+    "url": "https://bugzilla.mozilla.org/show_bug.cgi?id=1887898",
+    "versions": {
+      "patched": [
+        ">= 1.0.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0370",
+    "crate": "proc-macro-error",
+    "locked": [
+      "1.0.4"
+    ],
+    "title": null,
+    "url": "https://gitlab.com/CreepySkeleton/proc-macro-error/-/issues/20",
+    "versions": {
+      "patched": []
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2019-0011",
+    "crate": "memoffset",
+    "locked": [
+      "0.9.1"
+    ],
+    "title": null,
+    "url": "https://github.com/Gilnaa/memoffset/issues/9#issuecomment-505461490",
+    "versions": {
+      "patched": [
+        ">= 0.5.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2023-0045",
+    "crate": "memoffset",
+    "locked": [
+      "0.9.1"
+    ],
+    "title": null,
+    "url": "https://github.com/Gilnaa/memoffset/issues/24",
+    "versions": {
+      "patched": [
+        ">= 0.6.2"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2026-0195",
+    "crate": "quick-xml",
+    "locked": [
+      "0.42.0"
+    ],
+    "title": null,
+    "url": "https://github.com/tafia/quick-xml/issues/970",
+    "versions": {
+      "patched": [
+        ">= 0.41.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2026-0194",
+    "crate": "quick-xml",
+    "locked": [
+      "0.42.0"
+    ],
+    "title": null,
+    "url": "https://github.com/tafia/quick-xml/issues/969",
+    "versions": {
+      "patched": [
+        ">= 0.41.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0013",
+    "crate": "regex",
+    "locked": [
+      "1.13.1"
+    ],
+    "title": null,
+    "url": "https://groups.google.com/g/rustlang-security-announcements/c/NcNNL1Jq7Yw",
+    "versions": {
+      "patched": [
+        ">= 1.5.5"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0049",
+    "crate": "iana-time-zone",
+    "locked": [
+      "0.1.65"
+    ],
+    "title": null,
+    "url": "https://github.com/strawlab/iana-time-zone/pull/54",
+    "versions": {
+      "patched": [
+        ">= 0.1.45"
+      ],
+      "unaffected": [
+        "< 0.1.43"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2019-0014",
+    "crate": "image",
+    "locked": [
+      "0.25.10"
+    ],
+    "title": null,
+    "url": "https://github.com/image-rs/image/pull/985",
+    "versions": {
+      "patched": [
+        ">= 0.21.3"
+      ],
+      "unaffected": [
+        "< 0.10.2"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0073",
+    "crate": "image",
+    "locked": [
+      "0.25.10"
+    ],
+    "title": null,
+    "url": "https://github.com/image-rs/image/issues/1357",
+    "versions": {
+      "patched": [
+        ">= 0.23.12"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2026-0009",
+    "crate": "time",
+    "locked": [
+      "0.3.55"
+    ],
+    "title": null,
+    "url": "https://github.com/time-rs/time/blob/main/CHANGELOG.md#0347-2026-02-05",
+    "versions": {
+      "patched": [
+        ">= 0.3.47"
+      ],
+      "unaffected": [
+        "< 0.3.6"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0071",
+    "crate": "time",
+    "locked": [
+      "0.3.55"
+    ],
+    "title": null,
+    "url": "https://github.com/time-rs/time/issues/293",
+    "versions": {
+      "patched": [
+        ">= 0.2.23"
+      ],
+      "unaffected": [
+        "=0.2.0",
+        "=0.2.1",
+        "=0.2.2",
+        "=0.2.3",
+        "=0.2.4",
+        "=0.2.5",
+        "=0.2.6"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0146",
+    "crate": "generic-array",
+    "locked": [
+      "0.14.7"
+    ],
+    "title": null,
+    "url": "https://github.com/fizyk20/generic-array/issues/98",
+    "versions": {
+      "patched": [
+        ">= 0.8.4, < 0.9.0",
+        ">= 0.9.1, < 0.10.0",
+        ">= 0.10.1, < 0.11.0",
+        ">= 0.11.2, < 0.12.0",
+        ">= 0.12.4, < 0.13.0",
+        ">= 0.13.3"
+      ],
+      "unaffected": [
+        "< 0.8.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0347",
+    "crate": "zerovec",
+    "locked": [
+      "0.11.8"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.10.4",
+        ">= 0.9.7, <0.10.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0346",
+    "crate": "zerovec-derive",
+    "locked": [
+      "0.11.6"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.10.3",
+        ">= 0.9.7, <0.10.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2026-0190",
+    "crate": "anyhow",
+    "locked": [
+      "1.0.104"
+    ],
+    "title": null,
+    "url": "https://github.com/dtolnay/anyhow/issues/451",
+    "versions": {
+      "patched": [
+        ">= 1.0.103"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2021-0072",
+    "crate": "tokio",
+    "locked": [
+      "1.53.1"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/tokio/issues/3929",
+    "versions": {
+      "patched": [
+        ">= 1.5.1, < 1.6.0",
+        ">= 1.6.3, < 1.7.0",
+        ">= 1.7.2, < 1.8.0",
+        ">= 1.8.1"
+      ],
+      "unaffected": [
+        "< 0.3.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2021-0124",
+    "crate": "tokio",
+    "locked": [
+      "1.53.1"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/tokio/issues/4225",
+    "versions": {
+      "patched": [
+        ">= 1.8.4, < 1.9.0",
+        ">= 1.13.1"
+      ],
+      "unaffected": [
+        "< 0.1.14"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2025-0023",
+    "crate": "tokio",
+    "locked": [
+      "1.53.1"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/tokio/pull/7232",
+    "versions": {
+      "patched": [
+        ">= 1.38.2, < 1.39.0",
+        ">= 1.42.1, < 1.43.0",
+        ">= 1.43.1, < 1.44.0",
+        ">= 1.44.2"
+      ],
+      "unaffected": [
+        "< 0.2.5"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2023-0001",
+    "crate": "tokio",
+    "locked": [
+      "1.53.1"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/tokio/security/advisories/GHSA-7rrj-xr53-82p7",
+    "versions": {
+      "patched": [
+        ">= 1.18.4, < 1.19.0",
+        ">= 1.20.3, < 1.21.0",
+        ">= 1.23.1"
+      ],
+      "unaffected": [
+        "< 1.7.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2023-0005",
+    "crate": "tokio",
+    "locked": [
+      "1.53.1"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/tokio/issues/5372",
+    "versions": {
+      "patched": [
+        ">= 1.18.5, < 1.19.0",
+        ">= 1.20.4, < 1.21.0",
+        ">= 1.24.2"
+      ],
+      "unaffected": [
+        "< 0.2.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2020-0059",
+    "crate": "futures-util",
+    "locked": [
+      "0.3.34"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-lang/futures-rs/issues/2239",
+    "versions": {
+      "patched": [
+        ">= 0.3.7"
+      ],
+      "unaffected": [
+        "< 0.3.2"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0062",
+    "crate": "futures-util",
+    "locked": [
+      "0.3.34"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-lang/futures-rs/issues/2050",
+    "versions": {
+      "patched": [
+        ">= 0.3.2"
+      ],
+      "unaffected": [
+        "< 0.3.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0404",
+    "crate": "anstream",
+    "locked": [
+      "1.0.0"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-cli/anstyle/issues/156",
+    "versions": {
+      "patched": [
+        ">= 0.6.8"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2019-0034",
+    "crate": "http",
+    "locked": [
+      "1.5.0"
+    ],
+    "title": null,
+    "url": null,
+    "versions": {
+      "patched": [
+        ">= 0.1.20"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2019-0033",
+    "crate": "http",
+    "locked": [
+      "1.5.0"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/http/issues/352",
+    "versions": {
+      "patched": [
+        ">= 0.1.20"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0401",
+    "crate": "zlib-rs",
+    "locked": [
+      "0.6.7"
+    ],
+    "title": null,
+    "url": "https://github.com/trifectatechfoundation/zlib-rs/security/advisories/GHSA-j3px-q95c-9683",
+    "versions": {
+      "patched": [
+        ">= 0.4.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2018-0001",
+    "crate": "untrusted",
+    "locked": [
+      "0.9.0"
+    ],
+    "title": null,
+    "url": "https://github.com/briansmith/untrusted/pull/20",
+    "versions": {
+      "patched": [
+        ">= 0.6.2"
+      ],
+      "unaffected": []
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2025-0075",
+    "crate": "unic-char-range",
+    "locked": [
+      "0.9.0"
+    ],
+    "title": null,
+    "url": "https://github.com/rustsec/advisory-db/issues/2414",
+    "versions": {
+      "patched": [],
+      "unaffected": []
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2020-0079",
+    "crate": "socket2",
+    "locked": [
+      "0.6.5"
+    ],
+    "title": null,
+    "url": "https://github.com/rust-lang/socket2-rs/issues/119",
+    "versions": {
+      "patched": [
+        ">= 0.3.16"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2017-0005",
+    "crate": "cookie",
+    "locked": [
+      "0.18.2"
+    ],
+    "title": null,
+    "url": "https://github.com/alexcrichton/cookie-rs/pull/86",
+    "versions": {
+      "patched": [
+        "< 0.6.0",
+        "^0.6.2",
+        ">= 0.7.6"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2026-0285",
+    "crate": "rustls",
+    "locked": [
+      "0.23.44"
+    ],
+    "title": null,
+    "url": "https://github.com/rustls/rustls/security/advisories/GHSA-2mjx-qc3c-rqvc",
+    "versions": {
+      "patched": [
+        ">= 0.23.45"
+      ],
+      "unaffected": [
+        "< 0.23.13"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0336",
+    "crate": "rustls",
+    "locked": [
+      "0.23.44"
+    ],
+    "title": null,
+    "url": "https://github.com/rustls/rustls/security/advisories/GHSA-6g7w-8wpp-frhj",
+    "versions": {
+      "patched": [
+        ">= 0.23.5",
+        ">= 0.22.4, < 0.23.0",
+        ">= 0.21.11, < 0.22.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2024-0399",
+    "crate": "rustls",
+    "locked": [
+      "0.23.44"
+    ],
+    "title": null,
+    "url": "https://github.com/rustls/rustls/issues/2227",
+    "versions": {
+      "patched": [
+        ">= 0.23.18"
+      ],
+      "unaffected": [
+        ">= 0.23, < 0.23.13",
+        "< 0.23"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0043",
+    "crate": "tower-http",
+    "locked": [
+      "0.6.11"
+    ],
+    "title": null,
+    "url": "https://github.com/tower-rs/tower-http/pull/204",
+    "versions": {
+      "patched": [
+        ">= 0.2.1",
+        ">= 0.1.3, < 0.2.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2025-0010",
+    "crate": "ring",
+    "locked": [
+      "0.17.14"
+    ],
+    "title": null,
+    "url": "https://github.com/briansmith/ring/discussions/2450",
+    "versions": {
+      "patched": [],
+      "unaffected": [
+        ">= 0.17"
+      ]
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2025-0009",
+    "crate": "ring",
+    "locked": [
+      "0.17.14"
+    ],
+    "title": null,
+    "url": "https://github.com/briansmith/ring/blob/main/RELEASES.md#version-01712-2025-03-05",
+    "versions": {
+      "patched": [
+        ">= 0.17.12"
+      ],
+      "unaffected": []
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2022-0008",
+    "crate": "windows",
+    "locked": [
+      "0.61.3",
+      "0.62.2"
+    ],
+    "title": null,
+    "url": "https://github.com/microsoft/windows-rs/issues/1409",
+    "versions": {
+      "patched": [
+        ">= 0.32.0"
+      ],
+      "unaffected": [
+        "< 0.1.2"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2025-0098",
+    "crate": "unic-ucd-version",
+    "locked": [
+      "0.9.0"
+    ],
+    "title": null,
+    "url": "https://github.com/rustsec/advisory-db/issues/2414",
+    "versions": {
+      "patched": [],
+      "unaffected": []
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2025-0081",
+    "crate": "unic-char-property",
+    "locked": [
+      "0.9.0"
+    ],
+    "title": null,
+    "url": "https://github.com/rustsec/advisory-db/issues/2414",
+    "versions": {
+      "patched": [],
+      "unaffected": []
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2025-0100",
+    "crate": "unic-ucd-ident",
+    "locked": [
+      "0.9.0"
+    ],
+    "title": null,
+    "url": "https://github.com/rustsec/advisory-db/issues/2414",
+    "versions": {
+      "patched": [],
+      "unaffected": []
+    },
+    "informational": "unmaintained"
+  },
+  {
+    "id": "RUSTSEC-2022-0022",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/pull/2545",
+    "versions": {
+      "patched": [
+        ">= 0.14.12"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2021-0079",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/security/advisories/GHSA-5h46-h7hh-c6x9",
+    "versions": {
+      "patched": [
+        ">= 0.14.10"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2021-0078",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/security/advisories/GHSA-f3pg-qwvg-p99c",
+    "versions": {
+      "patched": [
+        ">= 0.14.10"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2020-0008",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/issues/1925",
+    "versions": {
+      "patched": [
+        ">= 0.12.34"
+      ],
+      "unaffected": [
+        "< 0.11.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2017-0002",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/wiki/Security-001",
+    "versions": {
+      "patched": [
+        ">= 0.10.2",
+        "< 0.10.0, >= 0.9.18"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2016-0002",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/blob/master/CHANGELOG.md#v094-2016-05-09",
+    "versions": {
+      "patched": [
+        ">= 0.9.4"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2021-0020",
+    "crate": "hyper",
+    "locked": [
+      "1.11.1"
+    ],
+    "title": null,
+    "url": "https://github.com/hyperium/hyper/security/advisories/GHSA-6hfq-h8hq-87mf",
+    "versions": {
+      "patched": [
+        ">= 0.14.3",
+        "0.13.10",
+        "0.12.36"
+      ],
+      "unaffected": [
+        "< 0.12.0"
+      ]
+    },
+    "informational": null
+  },
+  {
+    "id": "RUSTSEC-2023-0035",
+    "crate": "enumflags2",
+    "locked": [
+      "0.7.12"
+    ],
+    "title": null,
+    "url": "https://github.com/meithecatte/enumflags2/releases/tag/v0.7.7",
+    "versions": {
+      "patched": [
+        ">= 0.7.7"
+      ],
+      "unaffected": [
+        "< 0.7.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2020-0081",
+    "crate": "mio",
+    "locked": [
+      "1.2.3"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/mio/issues/1386",
+    "versions": {
+      "patched": [
+        ">= 0.7.6"
+      ],
+      "unaffected": [
+        "< 0.7.0"
+      ]
+    },
+    "informational": "unsound"
+  },
+  {
+    "id": "RUSTSEC-2024-0019",
+    "crate": "mio",
+    "locked": [
+      "1.2.3"
+    ],
+    "title": null,
+    "url": "https://github.com/tokio-rs/mio/security/advisories/GHSA-r8w9-5wcg-vfj7",
+    "versions": {
+      "patched": [
+        ">= 0.8.11"
+      ],
+      "unaffected": [
+        "< 0.7.2"
+      ]
+    },
+    "informational": null
+  }
+]

@@ -32,10 +32,11 @@
   <p id="save-error" class="banner banner-error" hidden></p>
 
   <main>
+    <p class="group-footnote">Automatic correction runs across apps with accessible editable text fields. Custom editors may be skipped. Password fields and Secure Input are always protected.</p>
     <section class="group">
       <div class="row">
         <div class="row-text">
-          <span class="row-title">Correct as I type</span>
+          <span class="row-title">Automatic correction — entire Mac</span>
           <span class="row-detail" id="enabled-detail">Watching for words typed on the wrong layout</span>
         </div>
         <label class="switch">
@@ -145,14 +146,28 @@
       </div>
     </section>
 
-    <h2 class="group-header">Never corrects in</h2>
+    <p class="group-footnote" id="runtime-status" role="status" aria-live="polite"></p>
+    <h2 class="group-header">App exceptions</h2>
     <section class="group">
       <div class="row">
-        <span class="row-detail" id="excluded-summary">Password managers,
-          terminals and password fields, where a silent rewrite would do real
-          damage.</span>
+        <span class="row-detail" id="excluded-summary">Automatic correction is off in these apps. Remove an app to enable it again. Password fields remain protected.</span>
+      </div>
+      <ul id="excluded-apps" class="excluded-apps"></ul>
+      <div class="row row-column">
+        <label for="app-choice" class="row-title">Add an app exception</label>
+        <select id="app-choice" class="select"><option value="">Choose a running app…</option></select>
+        <button class="btn" id="refresh-apps" type="button">Refresh app list</button>
+        <label for="app-id" class="row-detail">Or enter its bundle ID</label>
+        <input id="app-id" class="field mono" placeholder="com.example.app" spellcheck="false" autocomplete="off" />
+        <button class="btn" id="add-excluded" type="button">Disable correction in this app</button>
+        <span class="row-detail" id="app-error" role="alert" hidden></span>
       </div>
     </section>
+    <details class="group-footnote">
+      <summary>Local diagnostics</summary>
+      <p id="runtime-counts"></p>
+      <p>No typed words are recorded here. A changed field or selection cancels a pending correction; tracking resumes at a verified word boundary.</p>
+    </details>
 
     <section id="exceptions-section" hidden>
       <h2 class="group-header">Words you told it to leave alone</h2>
@@ -168,6 +183,7 @@
 
   <!-- Inert when running inside Tauri; see dev-mock.js. -->
   <script src="dev-mock.js"></script>
+  <script src="save-queue.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

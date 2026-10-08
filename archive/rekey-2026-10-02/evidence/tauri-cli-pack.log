@@ -1,0 +1,38 @@
+npm notice
+npm notice 📦  @tauri-apps/cli@2.12.1
+npm notice Tarball Contents
+npm notice 211.1kB CHANGELOG.md
+npm notice 10.2kB LICENSE-APACHE-2.0
+npm notice 1.1kB LICENSE-MIT
+npm notice 3.5kB README.md
+npm notice 520B append-headers.js
+npm notice 172.6kB config.schema.json
+npm notice 395B index.d.ts
+npm notice 25.0kB index.js
+npm notice 284B main.d.ts
+npm notice 450B main.js
+npm notice 2.5kB package.json
+npm notice 1.9kB tauri.js
+npm notice Tarball Details
+npm notice name: @tauri-apps/cli
+npm notice version: 2.12.1
+npm notice filename: tauri-apps-cli-2.12.1.tgz
+npm notice package size: 100.4 kB
+npm notice unpacked size: 429.4 kB
+npm notice shasum: a24aeabc30673c90e915e8b4bac7dbc458212d12
+npm notice integrity: sha512-kEDEiGzG+yAc5[...]DiHnU3+naOmLg==
+npm notice total files: 12
+npm notice
+tauri-apps-cli-2.12.1.tgz
+npm notice 📦  @tauri-apps/cli-darwin-arm64@2.12.1
+npm notice 100B README.md
+npm notice 15.1MB cli.darwin-arm64.node
+npm notice 704B package.json
+npm notice name: @tauri-apps/cli-darwin-arm64
+npm notice filename: tauri-apps-cli-darwin-arm64-2.12.1.tgz
+npm notice package size: 8.1 MB
+npm notice unpacked size: 15.1 MB
+npm notice shasum: 91d114bda03f301f53fa1973bfc80ba6aff443c8
+npm notice integrity: sha512-8bMnbpJ2jKO/u[...]AZF5mH1QgTWhw==
+npm notice total files: 3
+tauri-apps-cli-darwin-arm64-2.12.1.tgz

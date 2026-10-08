@@ -1,0 +1,54 @@
+{
+  "dist": {
+    "shasum": "a24aeabc30673c90e915e8b4bac7dbc458212d12",
+    "tarball": "https://registry.npmjs.org/@tauri-apps/cli/-/cli-2.12.1.tgz",
+    "fileCount": 12,
+    "integrity": "sha512-kEDEiGzG+yAc5FeLxtXpES/VN+F2C8H0r4gDVtfRLKxT9np9101d9REG/Kgo2lr0hKi0IpDsODiHnU3+naOmLg==",
+    "signatures": [
+      {
+        "sig": "MEUCIClW8ccvdMqWYL2ZzNfPUUkoiyfqo/ZAgkLmJcUHWfb0AiEA6F4Sm1G1THtvLjY70qIyVG4dBdz9fX5bkHnklCuIzno=",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      },
+      {
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+        "sig": "MEUCIQDmjTxUhsfAUOGWPumcqhJXr5v1jgbZNYvzv7BtXSjRbwIgCC/2sGOjB0MuwgRLWmclPIH8nsHtt5dCXtY6XXqrlPs="
+      }
+    ],
+    "attestations": {
+      "url": "https://registry.npmjs.org/-/npm/v1/attestations/@tauri-apps%2fcli@2.12.1",
+      "provenance": {
+        "predicateType": "https://slsa.dev/provenance/v1"
+      }
+    },
+    "unpackedSize": 429371
+  },
+  "optionalDependencies": {
+    "@tauri-apps/cli-darwin-x64": "2.12.1",
+    "@tauri-apps/cli-darwin-arm64": "2.12.1",
+    "@tauri-apps/cli-linux-x64-gnu": "2.12.1",
+    "@tauri-apps/cli-linux-x64-musl": "2.12.1",
+    "@tauri-apps/cli-win32-x64-msvc": "2.12.1",
+    "@tauri-apps/cli-linux-arm64-gnu": "2.12.1",
+    "@tauri-apps/cli-win32-ia32-msvc": "2.12.1",
+    "@tauri-apps/cli-linux-arm64-musl": "2.12.1",
+    "@tauri-apps/cli-win32-arm64-msvc": "2.12.1",
+    "@tauri-apps/cli-linux-riscv64-gnu": "2.12.1",
+    "@tauri-apps/cli-linux-arm-gnueabihf": "2.12.1"
+  },
+  "repository": {
+    "url": "git+https://github.com/tauri-apps/tauri.git",
+    "type": "git"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "cross-env TARGET=node napi build --platform --profile release-size-optimized",
+    "tauri": "node ./tauri.js",
+    "prepack": "cp ../../crates/tauri-schema-generator/schemas/config.schema.json .",
+    "version": "napi version",
+    "artifacts": "napi artifacts",
+    "postbuild": "node append-headers.js",
+    "build:debug": "cross-env TARGET=node napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm --gh-release-id $RELEASE_ID",
+    "postbuild:debug": "node append-headers.js"
+  }
+}

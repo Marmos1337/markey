@@ -22,7 +22,7 @@ rekey-ai = { workspace = true }
 # lets the system's vibrancy material show behind the content. It rules out the
 # Mac App Store — which Rekey cannot ship to anyway, since App Store sandboxing
 # forbids the keyboard access the whole app depends on.
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri = { version = "=2.11.6", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
 serde = { workspace = true }

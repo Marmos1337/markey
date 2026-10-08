@@ -1,0 +1,7 @@
+    Checking rekey-core v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core)
+    Checking rekey-hook v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook)
+    Checking rekey-ai v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-ai)
+    Checking rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+    Checking eval v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/eval)
+    Checking modelgen v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/modelgen)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.08s

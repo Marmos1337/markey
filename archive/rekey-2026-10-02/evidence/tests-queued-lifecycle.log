@@ -1,0 +1,13 @@
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.72s
+     Running unittests src/main.rs (target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 5 tests
+test queued_input::tests::failed_word_post_space_recovers_at_real_caret_without_phantom_space ... ok
+test queued_input::tests::full_queued_span_is_verified_across_word_boundaries ... ok
+test queued_input::tests::notification_before_hook_publication_does_not_destroy_known_baseline ... ok
+test queued_input::tests::snapshot_ahead_two_to_six_known_keys_delivers_once ... ok
+test queued_input::tests::unknown_insertion_and_caret_move_never_deliver_guessed_events ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.00s
+

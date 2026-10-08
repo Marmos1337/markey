@@ -1,0 +1,9 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+   Compiling rekey-hook v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook)
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+    Finished `release` profile [optimized] target(s) in 1m 10s
+       Built application at: $USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/target/aarch64-apple-darwin/release/rekey
+    Bundling Rekey.app ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/target/aarch64-apple-darwin/release/bundle/macos/Rekey.app)
+    Finished 1 bundle at:
+        $USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/target/aarch64-apple-darwin/release/bundle/macos/Rekey.app (11.35 MiB)
+

@@ -1,0 +1,46 @@
+    Checking rekey-core v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core)
+    Checking rekey-ai v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-ai)
+    Checking rekey-hook v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook)
+warning: fields `bootstrap`, `expected`, and `policy` are never read
+   --> crates/rekey-hook/src/focus.rs:382:5
+    |
+381 | struct WatchState {
+    |        ---------- fields in this struct
+382 |     bootstrap: Arc<BootstrapState>,
+    |     ^^^^^^^^^
+...
+387 |     expected: Arc<Mutex<Vec<Expected>>>,
+    |     ^^^^^^^^
+388 |     policy: Arc<dyn Fn(u64) -> bool + Send + Sync>,
+    |     ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rekey-hook` (lib) generated 1 warning
+    Checking rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+error[E0308]: mismatched types
+   --> app/src-tauri/src/safe_service.rs:597:38
+    |
+597 |                         layout: Some(switch_to.clone()),
+    |                                 ---- ^^^^^^^^^^^^^^^^^ expected `String`, found `Option<String>`
+    |                                 |
+    |                                 arguments to this enum variant are incorrect
+    |
+    = note: expected struct `std::string::String`
+                 found enum `std::option::Option<std::string::String>`
+help: the type constructed contains `std::option::Option<std::string::String>` due to the type of the argument passed
+   --> app/src-tauri/src/safe_service.rs:597:33
+    |
+597 |                         layout: Some(switch_to.clone()),
+    |                                 ^^^^^-----------------^
+    |                                      |
+    |                                      this argument influences the type of `Some`
+note: tuple variant defined here
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:606:4
+help: consider using `Option::expect` to unwrap the `std::option::Option<std::string::String>` value, panicking if the value is an `Option::None`
+    |
+597 |                         layout: Some(switch_to.clone().expect("REASON")),
+    |                                                       +++++++++++++++++
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `rekey-app` (bin "rekey") due to 1 previous error

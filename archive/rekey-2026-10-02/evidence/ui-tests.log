@@ -1,0 +1,8 @@
+  ok   dev server on localhost        activates=true expected=true
+  ok   dev server on 127.0.0.1        activates=true expected=true
+  ok   packaged app (macOS)           activates=false expected=false
+  ok   packaged app (Windows)         activates=false expected=false
+  ok   remote host                    activates=false expected=false
+  ok   dev server with real bridge    activates=false expected=false
+
+6 cases, 0 failure(s)

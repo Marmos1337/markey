@@ -1,0 +1,10 @@
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.98s
+     Running unittests src/main.rs (target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 2 tests
+test runtime_state::tests::obsolete_cancellation_preserves_new_word_in_real_core ... ok
+test runtime_state::tests::stale_worker_cannot_replace_new_exclusion_or_settings_status ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 0.05s
+

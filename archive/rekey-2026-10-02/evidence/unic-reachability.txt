@@ -1,0 +1,34 @@
+unic-char-property v0.9.0
+└── unic-ucd-ident v0.9.0
+    └── urlpattern v0.3.0
+        └── tauri-utils v2.9.3
+            ├── tauri-build v2.6.3
+            │   [build-dependencies]
+            │   ├── rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+            │   └── tauri v2.11.6
+            │       ├── rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+            │       ├── tauri-plugin-autostart v2.5.1
+            │       │   └── rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+            │       └── tauri-plugin-opener v2.5.5
+            │           └── rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+            ├── tauri-codegen v2.6.3
+            │   └── tauri-macros v2.6.3 (proc-macro)
+            │       └── tauri v2.11.6 (*)
+            ├── tauri-macros v2.6.3 (proc-macro) (*)
+            └── tauri-plugin v2.6.3
+                [build-dependencies]
+                ├── tauri-plugin-autostart v2.5.1 (*)
+                └── tauri-plugin-opener v2.5.5 (*)
+            [build-dependencies]
+            └── tauri v2.11.6 (*)
+
+unic-char-property v0.9.0
+└── unic-ucd-ident v0.9.0
+    └── urlpattern v0.3.0
+        └── tauri-utils v2.9.3
+            ├── tauri v2.11.6 (*)
+            ├── tauri-runtime v2.11.3
+            │   ├── tauri v2.11.6 (*)
+            │   └── tauri-runtime-wry v2.11.4
+            │       └── tauri v2.11.6 (*)
+            └── tauri-runtime-wry v2.11.4 (*)

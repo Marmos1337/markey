@@ -1,0 +1,1701 @@
+{
+  "date": "2026-10-09",
+  "files": [
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/cargo-fetch.log",
+      "bytes": 16882,
+      "sha256": "69f873bbaeb7b1988ce85aa871b7a775980b01f4989c076313bb9f523bb8eafc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v4-r2-review.patch",
+      "bytes": 82840,
+      "sha256": "03ebf7027960dfcfc031f11974244a83fea71487d02e726fe742aeacc5598105"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/cargo-audit-compatible.json",
+      "bytes": 13458,
+      "sha256": "dd55f9c7dc7023c9e8470141ca1c06d06aeee99f63b7bc437619b584e796fb36"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v4-r4.log",
+      "bytes": 291,
+      "sha256": "30daa1eb35a61b99bef7596ff2d5beffa9870a93afc3a4e8f6e33fab5fd22659"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety.patch",
+      "bytes": 21725,
+      "sha256": "9be1b3a6ce79d7585d4526aba24d1d7697ac4c599f4ef12b6d621756647fdb6e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v6-development.log",
+      "bytes": 15001,
+      "sha256": "13116a87a1b9a55e534cde3022f5c81b6e6268a3e862db1065600cb6bc2c20ab"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/codesign-v4-r4.log",
+      "bytes": 127,
+      "sha256": "7ef9a045f8d46de03c88d49138e6031b34787e7bc3d07deda55dab46b8c3ad91"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v6-r2.log",
+      "bytes": 3986,
+      "sha256": "8a6881b3b688ffebdfafc6fbce8c8f9c253f3a968734f3b83f11a49f93434339"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v3.log",
+      "bytes": 9482,
+      "sha256": "e322eec6d17c947b0e70867fdc72fbc745ab95009180f116d393634c5e53a831"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v4-r3.log",
+      "bytes": 179,
+      "sha256": "20386be5d590a3967112728a8fc6ce99458e445ee0886f3309bd64e6e232cd3d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v6-r2.log",
+      "bytes": 15124,
+      "sha256": "e7928d639138fae02e1631dba4a6d9b895ce6f3cfd64f20855127e7edfe59677"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v4-r2.log",
+      "bytes": 291,
+      "sha256": "6dc60d722aa71dbd2cc1e6e2fb41890f4623bd864af29f9173db7dfef126f619"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v4-r3-review.patch",
+      "bytes": 85045,
+      "sha256": "6f2f0c6b3041777b0c7ff473add67e85ff42c25b033344603d9c85eec6b279a4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/audit-current-install.log",
+      "bytes": 16436,
+      "sha256": "c061a841d17a8071a196478a5028f4597fee9567c0ec6312bda8d2c0c738f54c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v2.log",
+      "bytes": 14365,
+      "sha256": "ff7e5e96b9dc1ceba8661408b6ee395db6e5dd72262049fb9a6ad660ec953535"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v4-r4-review.patch",
+      "bytes": 88601,
+      "sha256": "a5b9ad75e70ee5008c05bc675892ee7516e636108a62c5004fe1ac82f8b1d59b"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v6-development.log",
+      "bytes": 2472,
+      "sha256": "ef016fdeb6a15fd55070755e419632724d77a90c44ef41ee4c32d4dcb9bdbd99"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v3.patch",
+      "bytes": 61515,
+      "sha256": "3183c2417d9b21befde7f5827066541bf29b4190b3ecb66151c18b56a7d0a5db"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v6-r2-development.log",
+      "bytes": 3728,
+      "sha256": "8ed7b897cbe097159e2d8fa19a3b3caaf00a81043bd423601c659c73a7dcd222"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/unic-reachability.txt",
+      "bytes": 1776,
+      "sha256": "74ab74a0173c70ac1b8ed1debca6afdc15df3bcc8bb333f66ea470f6d50b3349"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/install-manifest.json",
+      "bytes": 864,
+      "sha256": "973c2ce1b0ce4e0480d652628a58da67186bb44f2a04027d2323cfd6c7959c88"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v3-final.log",
+      "bytes": 717,
+      "sha256": "154a748064f0e6c0dcc9a78a13eaa32fb0b0a21649e4ab9fd242472cff8ca642"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-queued-lifecycle.log",
+      "bytes": 839,
+      "sha256": "f35b93fbb9a1aedca4a1e85c2285e29cde54fc5e0389bf9237d0c231c6f9ee5c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v2.log",
+      "bytes": 8417,
+      "sha256": "067d093c873a443b358f7951a82ead1180c11009070ab7af06813ee3dfa0e661"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tauri-cli-pack.log",
+      "bytes": 1334,
+      "sha256": "bf52e43ede54be28f8290bf9fe2b7a9e1c4bb7bca4b10e4a517ea45ba18a3507"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/exclusions-v5-installed.png",
+      "bytes": 143144,
+      "sha256": "630aab1705802b1ab37413ae241b6ba178ae5a8060a68afb438789d23f164a62"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v3.log",
+      "bytes": 291,
+      "sha256": "92b5bad1d5190029a2bc804e4925b304dcc66d820cd211df5424adae2e3a10ba"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/build-v5-r2.log",
+      "bytes": 807,
+      "sha256": "7967f2f9f87146b83255f4a259a5f4dabd4ec86ec91a3c242fd5fde455203eab"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/cargo-audit.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v4-review.patch",
+      "bytes": 75052,
+      "sha256": "5fedc55d2116817d05f8ab8add50e91267a1433790d6e87802e395e6b4425e8f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-phase-r4.log",
+      "bytes": 1678,
+      "sha256": "dff3f321d1b84aa2c86a8d97f49962aae6a46b7ed80ba30764f600fecab0037e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/advisory-candidates.json",
+      "bytes": 27225,
+      "sha256": "0bef73e2a71e843b5970a97c649f1439f8ae85d1004303e5d8849a69e90b8e2b"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v2.patch",
+      "bytes": 37091,
+      "sha256": "d07095d97e587eb68b451b271f35a93980e7b7f729d143863ad974354d2e2d88"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/ui-tests.log",
+      "bytes": 433,
+      "sha256": "e81f459fb644ba13d88bdad72ed3e5bb257f111f76a92f9a01ada301017ba387"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/audit-install.log",
+      "bytes": 17666,
+      "sha256": "694a449c4637f11d4f1c7d602327087f609772111ed869655f466ed41fc5fc08"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v5-r2-review.patch",
+      "bytes": 122580,
+      "sha256": "9b53a09421774c509e25c527199eae6dcb9a4f5bf4803b7d3250c363799e5de4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v5-diagnostic.log",
+      "bytes": 11259,
+      "sha256": "4e59df4d4c18734d9dd340b1484b6f8e7d0c0b78cb01501f1598d492cb9737d0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/targeted-tests-v3.log",
+      "bytes": 1266,
+      "sha256": "535fc2ebbc56987ddd021bccc0696751c0ace23fca84ede1083470d012e62191"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v3-final.log",
+      "bytes": 10318,
+      "sha256": "b32cba35a58336c00ff746d7809661577b132e0f8743198f70cd3d4ab3e0d8ba"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v5-runtime-state.log",
+      "bytes": 555,
+      "sha256": "7df7fcfed60c6867a74758af360b12173d90426f6e3ccba59cd4656fce57e203"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-phase-r2.log",
+      "bytes": 1520,
+      "sha256": "d77217f7e56cb3dcc93cec31ad9ceb402db04f50cfac914e8a9d8a7d58fb7c1e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/build-v3.log",
+      "bytes": 9847,
+      "sha256": "c21ea3a1b6f1e3838e86991e0e43c70e6f54b371486064786f5ac3a328ac37a6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tauri-security-update.log",
+      "bytes": 137,
+      "sha256": "674301d4f06d5830654a1c88c7d58c6beb4a07a91b788f8a994b6bb1bacbe2c6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/proc-macro-error-reachability.txt",
+      "bytes": 176,
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-phase-r3.log",
+      "bytes": 1460,
+      "sha256": "98408573d939807cf5dec8af09eaa68be3906fec04c35b9ece3a71012fdb988d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/settings-v5-preview.png",
+      "bytes": 126346,
+      "sha256": "b2c5acb3f30499c5fd5be301e8130257a920985dda0925e864bc5a99ff062f99"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v5-review.patch",
+      "bytes": 110899,
+      "sha256": "8bdbe06bf90242378d99b595f82eba8fc08a4983fde8acdb5560e063c6cd7c93"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/glib-macos-reachability.txt",
+      "bytes": 176,
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/cargo-audit-compatible-patched.json",
+      "bytes": 11059,
+      "sha256": "b2e11fc00b60e451615731938314c44616bece7246600f2efa8977854122e4ce"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-full-r3.log",
+      "bytes": 10668,
+      "sha256": "c3fcd023565d4cc57877f2d174703ad76014fe72001589f58513bf23d6414cc1"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/security-review.txt",
+      "bytes": 13978,
+      "sha256": "8825270b4ddca00e99a73c9576c809f0c6cad32ce00bde390d39637901f0f895"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v5-r2.log",
+      "bytes": 11442,
+      "sha256": "466453f24ce0b2dfd981fd615e9c7e14faac70d8639b5dc57d8d5ff9d298a9ef"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-full-r2.log",
+      "bytes": 10685,
+      "sha256": "603f21e218e9884dcc0b8bb1378cd0fa715408cef4eeac4423dbad65eec2b748"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v6-development-resumed.log",
+      "bytes": 3654,
+      "sha256": "63a500988077cbb897fd71921abb933d5c618375335aa5549b5f606674fd5abf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/settings-v5-installed.png",
+      "bytes": 164370,
+      "sha256": "86801c5a7631190cc930e18898f8529e68abcfbc1dfb620d0eb327010abf2af6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tauri-install.log",
+      "bytes": 38617,
+      "sha256": "7c71bb7387961ab26748a0d1b17b4c28cc485b1cdf3c940939effbcea86e9e54"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/eval-v2.log",
+      "bytes": 2351,
+      "sha256": "0592e1f1faea0c7a46ca8d1e0039ff703b0de5bdd2c244862b3b5807c0748d75"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/install-manifest-v4-r4.json",
+      "bytes": 3062,
+      "sha256": "a8d15026be7c6cc6f3282f72a06a2c156c9c758d8d9801eb890546bd04fa17d9"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/runtime-v5-fail-count-events.log",
+      "bytes": 273605,
+      "sha256": "531272b6b7cbb4d7eedab507a42b7a3a883bcc793ff3133e1524f4ad3553e989"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-full-r4.log",
+      "bytes": 10886,
+      "sha256": "2040d1f6e6e9db39eb12681678ea505c89f5374b5b58dd6a6d0ccbe690f7da0c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v5-r2.log",
+      "bytes": 291,
+      "sha256": "d2036cac1db3f1cab16f764636933ee5abf042e564e03bb19edb93e7b64e9622"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/runtime-v4-r4-count-events.log",
+      "bytes": 397,
+      "sha256": "e69e35e2f26f5f9af6eb13067bb948cb3c147a85e6b93fdedfcf9599d2436fa3"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/v4-review-notes.txt",
+      "bytes": 2659,
+      "sha256": "58fb71af031bcdcf01c9755b384dc7883213c7376c445605bbb2f64b750e23d7"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests.log",
+      "bytes": 4510,
+      "sha256": "8492791984f85f03876ce72b1ecbde8e2ea515f90fd807a32b14e29c89791418"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tauri-cli-npm-metadata.json",
+      "bytes": 2179,
+      "sha256": "a02bb3181b087d40186f8d9e5af09a184cfa98b14dd3cdf42d5797f016daa25c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v6-queued-development.log",
+      "bytes": 3954,
+      "sha256": "ef776c04302f890735eb2b644111f877a7b2003baaa85615ccf6044997a7f35f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/local-safety-v6-r2-review.patch",
+      "bytes": 154861,
+      "sha256": "b8bf0b357c5cd106e4b7a0ede7db382f278110bab1204f8afd0df8ab019c35b0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tauri-cli-arm64-npm-metadata.json",
+      "bytes": 1096,
+      "sha256": "2a9a7d61353190aae5180c4a76668ad50769de8e4c27cae4ad069aeebb6d706e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/corpora-sha256.txt",
+      "bytes": 1030,
+      "sha256": "7c72237fe03ae8b25a064a33421237e293905463cd63dcab015e47afece15323"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/modelgen.log",
+      "bytes": 1206,
+      "sha256": "7e2411205baf6d83741ec4ae351d7b52ad0e30f8aa359e33fe7758855a761694"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-full.log",
+      "bytes": 10531,
+      "sha256": "1f5747d5f86058f3ec77d787671dc495cf5bd4bc4aa70b93f16a42a7275ff08c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/tests-v4-phase.log",
+      "bytes": 1571,
+      "sha256": "6f5cebfae2de1dd13e4eb2485aad5c6a01cfb1e4c566a1b597779fec8394eeba"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/cargo-audit-native-v3.json",
+      "bytes": 11221,
+      "sha256": "ed78d298c6dc7bfdffb85ae817032fba8be8ea51b8bdf992f077debaaddbf632"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/check-v5-diagnostic.log",
+      "bytes": 291,
+      "sha256": "6e63eccc73332edd002027c0ffaa82be0460c3e36163913d0161a3d3658e0157"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/build-v4-r4.log",
+      "bytes": 807,
+      "sha256": "44a2d176200a03aee6a90ed3dfb11e950adaac940c885227b03a76cafc0cccfc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/install-manifest-v5-r2.json",
+      "bytes": 1245,
+      "sha256": "f30abd16374f652a5ebd54d9852f15f3b33319aac3c37c1487544ae90d4541fa"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/rustfmt-install.log",
+      "bytes": 36,
+      "sha256": "eb99b4a4cac7b9133a096e4d9c50c3c06be47953bc602343afcb34913585f06a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/evidence/rustls-security-update.log",
+      "bytes": 140,
+      "sha256": "f9ae33ed6c80ff4aec34e6e62bb498fef04e68da6ccf3410b818b96520e40991"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/export-result.json",
+      "bytes": 702,
+      "sha256": "01ca4262c53669bcbc467485ab27134e9f5815eea74f1bcfd43fec6ca3cc2e3d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/Rekey-paused-source-history-evidence-20261002.tar.gz",
+      "bytes": 5105448,
+      "sha256": "f0db4787049a3b78e4814ec7875ea2ae2d395db4cd3cf4380abada58c2b0adfc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/bundle-verify.txt",
+      "bytes": 2832,
+      "sha256": "bd296ed002cff06e6070d618d2e0788e697a3910b9562273708af6e9d2385b51"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/RESTORE.md",
+      "bytes": 723,
+      "sha256": "9a0cce07ff6b20fac29c25cfad50525c852c9d0b35305e11d0689e7ffc4dddd0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/working-tree.patch",
+      "bytes": 154861,
+      "sha256": "b8bf0b357c5cd106e4b7a0ede7db382f278110bab1204f8afd0df8ab019c35b0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/manifest.json",
+      "bytes": 35083,
+      "sha256": "d95c9efa3339ec7a8e4b05ffc03d5a9405a15e83b9c6a57579d946c7f7b3ddf2"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/rekey-all-refs.bundle",
+      "bytes": 4545200,
+      "sha256": "33c955c49a362aa409e0949d66a2f0937ac6eba2b3cf856455334f06462709ba"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/cargo-fetch.log",
+      "bytes": 16882,
+      "sha256": "69f873bbaeb7b1988ce85aa871b7a775980b01f4989c076313bb9f523bb8eafc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v4-r2-review.patch",
+      "bytes": 82840,
+      "sha256": "03ebf7027960dfcfc031f11974244a83fea71487d02e726fe742aeacc5598105"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/cargo-audit-compatible.json",
+      "bytes": 13458,
+      "sha256": "dd55f9c7dc7023c9e8470141ca1c06d06aeee99f63b7bc437619b584e796fb36"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v4-r4.log",
+      "bytes": 285,
+      "sha256": "8b06d1c42284ae0f23e4698d590e8afcaf7bf6d830edb7a8f2afb93681fae9e1"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety.patch",
+      "bytes": 21725,
+      "sha256": "9be1b3a6ce79d7585d4526aba24d1d7697ac4c599f4ef12b6d621756647fdb6e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v6-development.log",
+      "bytes": 14983,
+      "sha256": "2bf6c066b4783f0f9d8390c6ce922f5521820ff6ff388009ebf6bde8fe6c48ad"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/codesign-v4-r4.log",
+      "bytes": 121,
+      "sha256": "ea6f8fba058db559d90db181d867cb2acc47eb6f1664dcccd167851418a0dda3"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v6-r2.log",
+      "bytes": 3968,
+      "sha256": "daf5696d03f722de8762a6661d798fe458cbbf7e7cbcf11c59ff627cbeb093b8"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v3.log",
+      "bytes": 9476,
+      "sha256": "b8d33ae55c7bb3b5401542c69cbb67dff62d499a99ec0a5ae3cb89ae2f40c3c2"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v4-r3.log",
+      "bytes": 176,
+      "sha256": "60a995901ad1787b31527e98395a9f1136823d90792ab1ee9e4626237232f640"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v6-r2.log",
+      "bytes": 15106,
+      "sha256": "8fd95a2182ab77041ec03ef13e327fdc27e6d5bf5022fc34c48b6655f83f60a3"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v4-r2.log",
+      "bytes": 285,
+      "sha256": "770283216360dd0feb9e0d23518f08a1aecdafdc592b3ed31eee8834a44283e0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v4-r3-review.patch",
+      "bytes": 85045,
+      "sha256": "6f2f0c6b3041777b0c7ff473add67e85ff42c25b033344603d9c85eec6b279a4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/audit-current-install.log",
+      "bytes": 16430,
+      "sha256": "86a600b9b7ea484b32b5791b2e182eef59a8d4f8d1102de3a898193e5dd67248"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v2.log",
+      "bytes": 14347,
+      "sha256": "2133cecae6542940ad50f0d170baaf062a0eb3c695111d08ef0501ef5c8b4f5e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v4-r4-review.patch",
+      "bytes": 88601,
+      "sha256": "a5b9ad75e70ee5008c05bc675892ee7516e636108a62c5004fe1ac82f8b1d59b"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v6-development.log",
+      "bytes": 2460,
+      "sha256": "27722d4aaf5e7071cefbc481a43acd017708d0883e068a111753c37eaf2700df"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v3.patch",
+      "bytes": 61515,
+      "sha256": "3183c2417d9b21befde7f5827066541bf29b4190b3ecb66151c18b56a7d0a5db"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v6-r2-development.log",
+      "bytes": 3725,
+      "sha256": "1c7eddecdf40414f1e7e61e3ca8c0d2146449b3e88c8ba6d9ede92cead801512"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/unic-reachability.txt",
+      "bytes": 1764,
+      "sha256": "3abd7d84394a1838737c8e85e917dbd1514bb6e56831e3194a1a64c3ce1ae0c6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/install-manifest.json",
+      "bytes": 861,
+      "sha256": "9c3017c0611a4a9e0f2ab8c40cf2fb240bb6982071d04da88062cfa479dc02c6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v3-final.log",
+      "bytes": 699,
+      "sha256": "a9a33e2a8463c5d14a40daefb35138c24b84a4d915bf34cf18342370ecea080d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-queued-lifecycle.log",
+      "bytes": 836,
+      "sha256": "ec10ec34e629f8830b14c687ec7379969f46d31c080db10da4da72faeaf7a8c2"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v2.log",
+      "bytes": 8399,
+      "sha256": "bda6e9680403617d9043d1b52a58c63fb830e668758eb0adc3f6d129f73f1388"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tauri-cli-pack.log",
+      "bytes": 1334,
+      "sha256": "bf52e43ede54be28f8290bf9fe2b7a9e1c4bb7bca4b10e4a517ea45ba18a3507"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v3.log",
+      "bytes": 285,
+      "sha256": "6cd6fdfe4a22709d1c32040103a1e5e92e4d0e80b72b84bd2d10628f2d442c00"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/build-v5-r2.log",
+      "bytes": 792,
+      "sha256": "b3546b418d041e8efbb71d4cf6835313e7fccaa09cfdc6c23773b4da03f60e73"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/cargo-audit.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v4-review.patch",
+      "bytes": 75052,
+      "sha256": "5fedc55d2116817d05f8ab8add50e91267a1433790d6e87802e395e6b4425e8f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-phase-r4.log",
+      "bytes": 1672,
+      "sha256": "80c1da1258c6023c0d5806625230dc79e30613e05cc38c29e56c986f86126958"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/advisory-candidates.json",
+      "bytes": 27225,
+      "sha256": "0bef73e2a71e843b5970a97c649f1439f8ae85d1004303e5d8849a69e90b8e2b"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v2.patch",
+      "bytes": 37091,
+      "sha256": "d07095d97e587eb68b451b271f35a93980e7b7f729d143863ad974354d2e2d88"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/ui-tests.log",
+      "bytes": 433,
+      "sha256": "e81f459fb644ba13d88bdad72ed3e5bb257f111f76a92f9a01ada301017ba387"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/audit-install.log",
+      "bytes": 17660,
+      "sha256": "1889dd0c01d5ec95ab69ad0143f76cab8cd44d870f7326e449344b72a8ec56b9"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v5-r2-review.patch",
+      "bytes": 122580,
+      "sha256": "9b53a09421774c509e25c527199eae6dcb9a4f5bf4803b7d3250c363799e5de4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v5-diagnostic.log",
+      "bytes": 11253,
+      "sha256": "b62a91859f8a50039578fe8df86274911f55a2f1f00e355649704426df45c7eb"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/targeted-tests-v3.log",
+      "bytes": 1263,
+      "sha256": "51f144f829734bafbeb8b0b7ef1d492885d91192d19306b0330efbc50deb3ee2"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v3-final.log",
+      "bytes": 10300,
+      "sha256": "8f60138e2d1c2db76f2627756be1d50f3c6f65512b14ac3374a41e3694eecd77"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v5-runtime-state.log",
+      "bytes": 552,
+      "sha256": "2adea8dbd518d7af0abe87e4904c26f416e08b4e95674a3f34a4a4e819e7bc43"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-phase-r2.log",
+      "bytes": 1514,
+      "sha256": "0a23dcbc33532135bd54b5ca7fa9ffcee016c04c6687cec55fe06daef3f16dc0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/build-v3.log",
+      "bytes": 9826,
+      "sha256": "88ae45de5312f6948f050e563b9a2f834c12064633225cbc3d9df0370f9e36c4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tauri-security-update.log",
+      "bytes": 137,
+      "sha256": "674301d4f06d5830654a1c88c7d58c6beb4a07a91b788f8a994b6bb1bacbe2c6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/proc-macro-error-reachability.txt",
+      "bytes": 176,
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-phase-r3.log",
+      "bytes": 1457,
+      "sha256": "3572dcc371053fbec25cb26b9685edce6b3488ee44c965f2aeee0c487b26d10e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v5-review.patch",
+      "bytes": 110899,
+      "sha256": "8bdbe06bf90242378d99b595f82eba8fc08a4983fde8acdb5560e063c6cd7c93"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/glib-macos-reachability.txt",
+      "bytes": 176,
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/cargo-audit-compatible-patched.json",
+      "bytes": 11059,
+      "sha256": "b2e11fc00b60e451615731938314c44616bece7246600f2efa8977854122e4ce"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-full-r3.log",
+      "bytes": 10668,
+      "sha256": "c3fcd023565d4cc57877f2d174703ad76014fe72001589f58513bf23d6414cc1"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/security-review.txt",
+      "bytes": 13975,
+      "sha256": "5b73c1d2ab17f527b7df1952ed339b027c7c212dde3b4bbaef481538b3a36f1f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v5-r2.log",
+      "bytes": 11436,
+      "sha256": "00090197df3c44728e5ca85c7ad6f91de7131dee4544831d4b55ae7cfb33eb87"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-full-r2.log",
+      "bytes": 10682,
+      "sha256": "90fe5e2adb4aaadce7b9ac1576557a4751aa55e248874569935955c0bfe5b4ab"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v6-development-resumed.log",
+      "bytes": 3651,
+      "sha256": "86051dcbf7af596ce5744fc4f4c4a73392d5da34fe38b788de6ead4f11468393"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tauri-install.log",
+      "bytes": 38617,
+      "sha256": "7c71bb7387961ab26748a0d1b17b4c28cc485b1cdf3c940939effbcea86e9e54"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/eval-v2.log",
+      "bytes": 2345,
+      "sha256": "885b88567ed26b5a5463e876a8bf641b0eb0b0565c2a67d52f3e04dff4f7d0e2"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/install-manifest-v4-r4.json",
+      "bytes": 3056,
+      "sha256": "058b2b759ff48bdf60c428d038bf88f1d255d3759b6de47465f11796bf856d08"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/runtime-v5-fail-count-events.log",
+      "bytes": 273602,
+      "sha256": "0269f1f32b50a351440cb53f60c76ef928a96f24b1aef101d24746439353fc18"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-full-r4.log",
+      "bytes": 10883,
+      "sha256": "be500a6286139f10c7d886de4ffc49265d088e3d5b7af7cd5033922ba91e612d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v5-r2.log",
+      "bytes": 285,
+      "sha256": "8556829f09a3c1d3965151e3b69d2d043515effaaa0b964c0803bbb85ab209ce"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/runtime-v4-r4-count-events.log",
+      "bytes": 397,
+      "sha256": "e69e35e2f26f5f9af6eb13067bb948cb3c147a85e6b93fdedfcf9599d2436fa3"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/v4-review-notes.txt",
+      "bytes": 2659,
+      "sha256": "58fb71af031bcdcf01c9755b384dc7883213c7376c445605bbb2f64b750e23d7"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests.log",
+      "bytes": 4510,
+      "sha256": "8492791984f85f03876ce72b1ecbde8e2ea515f90fd807a32b14e29c89791418"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tauri-cli-npm-metadata.json",
+      "bytes": 2179,
+      "sha256": "a02bb3181b087d40186f8d9e5af09a184cfa98b14dd3cdf42d5797f016daa25c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v6-queued-development.log",
+      "bytes": 3951,
+      "sha256": "95520d70000248f9e84352ad167e9a63544cedcba2106221d1c970aa27175baa"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/local-safety-v6-r2-review.patch",
+      "bytes": 154861,
+      "sha256": "b8bf0b357c5cd106e4b7a0ede7db382f278110bab1204f8afd0df8ab019c35b0"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tauri-cli-arm64-npm-metadata.json",
+      "bytes": 1096,
+      "sha256": "2a9a7d61353190aae5180c4a76668ad50769de8e4c27cae4ad069aeebb6d706e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/corpora-sha256.txt",
+      "bytes": 1030,
+      "sha256": "7c72237fe03ae8b25a064a33421237e293905463cd63dcab015e47afece15323"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/modelgen.log",
+      "bytes": 1200,
+      "sha256": "13ed75489c54fa67137aa8db1d694ca7599e122412a686fd8ffe338f463773cb"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-full.log",
+      "bytes": 10528,
+      "sha256": "c1813cbfd2af8bb5af8412136ad3044277c2f09b14da179b79ba89b509ef1443"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/tests-v4-phase.log",
+      "bytes": 1568,
+      "sha256": "7c7ae6a2d69582c90c99c70c318599a81dcf99ff7601fba3d21bbbc8fe427fb1"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/cargo-audit-native-v3.json",
+      "bytes": 11221,
+      "sha256": "ed78d298c6dc7bfdffb85ae817032fba8be8ea51b8bdf992f077debaaddbf632"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/check-v5-diagnostic.log",
+      "bytes": 285,
+      "sha256": "e4b086c322db5c10d2e106155f6e56c794e10a32eb47d4ae4f91cad88814d354"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/build-v4-r4.log",
+      "bytes": 792,
+      "sha256": "588dcd7cc692284fe8744fa9d7ec456b13f05ac4ad959101ca91524877826280"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/install-manifest-v5-r2.json",
+      "bytes": 1239,
+      "sha256": "4cb4330e747275f7f2ef1357acaa939221f22e4027b331f7e591adcec7481c6f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/rustfmt-install.log",
+      "bytes": 36,
+      "sha256": "eb99b4a4cac7b9133a096e4d9c50c3c06be47953bc602343afcb34913585f06a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/evidence/rustls-security-update.log",
+      "bytes": 140,
+      "sha256": "f9ae33ed6c80ff4aec34e6e62bb498fef04e68da6ccf3410b818b96520e40991"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/Cargo.toml",
+      "bytes": 684,
+      "sha256": "48c112e40d01706028a09f9e2aa99516dfe7b41b725ef69ff2c22915a8f8e30c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/LICENSE",
+      "bytes": 1073,
+      "sha256": "46bc22d710a7fe79e4b12ee5e24bf7330004fca8b90622880713ba26965e4d78"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/Cargo.lock",
+      "bytes": 133960,
+      "sha256": "bea132fa1849d5d43e798d61a434e63fbc76291809b55c21ce6abca3ce2e34a4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/README.md",
+      "bytes": 10645,
+      "sha256": "e1195838d77fd690d115d3e9527cd4afe1e66b5549fc99f58e0e6b08125a24ea"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/.gitignore",
+      "bytes": 654,
+      "sha256": "bc5ae0ed07892fd6ed20e4ec5934951a8e3074d50532237fd0c736625a3d1a86"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/tools/fetch_corpora.sh",
+      "bytes": 943,
+      "sha256": "babaf181fb38a518ef9d6f380f9240e751bc9773fd7b0c6ac5bade50dcd967b8"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/tools/make_icons.py",
+      "bytes": 7922,
+      "sha256": "99a9c2b17547ef5abb7f3ffd392afab2201530d14302a4ca3d7707215dcb6148"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/tools/modelgen/Cargo.toml",
+      "bytes": 250,
+      "sha256": "7d3381337ebefe011ab85b3a3c900f0ddd5cd87ff1070603d40ad41b7e8a0160"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/tools/modelgen/src/main.rs",
+      "bytes": 3981,
+      "sha256": "c85f106aa064aec73ea424a150c58c0b8e8c655e7ee701e2037d413c8cccdbf5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/tools/eval/Cargo.toml",
+      "bytes": 259,
+      "sha256": "e5b8c1d04b9d6ebaa15ed3e1a1a299b030f4400f6e9e1e2d9147b410c2d2064a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/tools/eval/src/main.rs",
+      "bytes": 5710,
+      "sha256": "91b55db2036d3ca8c8e51579fd130610eb689ac13365696a0373d8bf9b674fde"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-ai/Cargo.toml",
+      "bytes": 411,
+      "sha256": "beef4ba9d9288d9e9f897572cbfa565154ec5d8c3e837d9f9b10423b88625adf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-ai/src/lib.rs",
+      "bytes": 12326,
+      "sha256": "07fccc60adb845d24bd6763833482226a74e3121cfd7b2b7172a532805ec6239"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/Cargo.toml",
+      "bytes": 351,
+      "sha256": "814b02633168bd6a5dbadc0d67e9e8cf107df753186d3da357909cfb6741572b"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/tests/real_models.rs",
+      "bytes": 10917,
+      "sha256": "a77a402948ef4cde6083de2c3fabca573b0a5f2fc563d9bbb94186e2080b2a9f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/examples/explain.rs",
+      "bytes": 2061,
+      "sha256": "45c0a1bf5a8c5f1b5acbb76a48bab9214fc6ed3eee1e70affadcc94292d7e9b7"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/assist.rs",
+      "bytes": 3013,
+      "sha256": "36e87fc96b4473833f7c4c53cbfe9e57e35399b7e2351090ec811b9c0dff6526"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/layout.rs",
+      "bytes": 29553,
+      "sha256": "5b7756abe12d0fe4bbf6b08c3a8116def71f2e37fc07671a3b9012a09a219c24"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/config.rs",
+      "bytes": 7168,
+      "sha256": "36cc1ee575d3fe411d87ccca8a9ebc859ce92dfc2e353eafa48d8cff967ea3c9"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/lib.rs",
+      "bytes": 774,
+      "sha256": "832c5d5af5d3dff014de0d1b433ff97cab6e6386e4a0cc872a6454c650774a8c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/detect.rs",
+      "bytes": 16662,
+      "sha256": "aaf85fed9cadc134a76e497c478c98c2f5a9246814160bddfd281c1f62c84264"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/buffer.rs",
+      "bytes": 8415,
+      "sha256": "b14cd768c1f676bf3107e7b5cbfd28de3484565140018f6649939520f48e371f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/input.rs",
+      "bytes": 3311,
+      "sha256": "b88b49562235df3f7c2e966f86bfe9dc1e7ab878c0e8e57cccedea2245ecf83e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/model.rs",
+      "bytes": 15664,
+      "sha256": "523f0f079a4941774008d0a546e38e65f079a520b78959d32d4428ebb1b6d844"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-core/src/engine.rs",
+      "bytes": 48969,
+      "sha256": "e03c6392c61040ce528e769cecf501ca27c6505b8efbec0bc84811a592e917dc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/Cargo.toml",
+      "bytes": 929,
+      "sha256": "82cbac984c87fdd22676d0a45e9272bc213e4bc57bcd6ec3563228468340fade"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/examples/inject-selftest.rs",
+      "bytes": 16706,
+      "sha256": "ae5f7b46ec4793667be5bbdaad8eeb7eca509b3ecb95f6d3b09e79bc0e720a3d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/examples/doctor.rs",
+      "bytes": 1879,
+      "sha256": "aa2af473f8e820c6a33f44815fb1a2d4919418936d23d1b0a88b8a1ce8110762"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/examples/listen.rs",
+      "bytes": 1841,
+      "sha256": "3844437e33ac0fc46aaad5537985918896637b849c43c1f837bf2329927079fc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/src/macos.rs",
+      "bytes": 28931,
+      "sha256": "ca9b771aecd2d11db5a7c625b3fa43a7f98cd9fe26c0a2f3b0aeecdcd0e9a5ea"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/src/lib.rs",
+      "bytes": 1988,
+      "sha256": "1eeb5c7b5db226408e63efe28d005c47a5fab40570d0e96f6a570c3af5be2232"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/src/focus.rs",
+      "bytes": 21835,
+      "sha256": "b288c9e0d1704de9f26ad408f4f3a2d313970a30ae238323bba1293fad8b3de8"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/src/windows.rs",
+      "bytes": 14726,
+      "sha256": "c62e9c0c089017c4789ff70e8481434a0086350414d0bf89e7d4bd62c4393781"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/crates/rekey-hook/src/noop.rs",
+      "bytes": 1498,
+      "sha256": "382a03a089e15e49a7e26f7e39a31fd49c9cae6e04a9fd550ad1b5d6fe04a79c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/index.html",
+      "bytes": 7833,
+      "sha256": "4c8eb8bec70f677623929c493392555c8d904cf10397d09ef849824c4dd4c115"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/save-queue.js",
+      "bytes": 685,
+      "sha256": "137668dcb545b6eb9f8b7c3406d95e8db6ba78facbd6fd78a60e173fd1c9f0f5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/style.css",
+      "bytes": 17253,
+      "sha256": "ad196996c2d25fff6672f68ae249439be94cda6a1eb21a8ba3f793f8d2da00cc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/dev-mock.js",
+      "bytes": 4432,
+      "sha256": "dbd8b62ab0155d5330ef8a4c8f995cb82be3ec78c84858353c28f75ac33df28e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/app.js",
+      "bytes": 16748,
+      "sha256": "f4b3f2b33379c7a5b548a6fc089a9cad47db0a299ec7dd4d84d07a43ca4a3342"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/test/save-queue.test.mjs",
+      "bytes": 1558,
+      "sha256": "cef2d5ec1f3b3636cdb4702b23953b9cdf503c20de14b4eeecbbcddffef3d953"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/ui/test/dev-mock.test.mjs",
+      "bytes": 2729,
+      "sha256": "7f9a5ec6f9c40c722342d15194c104eafefa0aa9fc34b276fc86dca1b85d95b1"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/Cargo.toml",
+      "bytes": 1185,
+      "sha256": "ab5714f0464bb516524ca5e7d005ed6be68d3f5d57ccd2b1d442bae4cc3331e6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/tauri.conf.json",
+      "bytes": 1578,
+      "sha256": "0786684d5bec8f040edc38f25523c63884f9e5d5cdaad91f516a2168d5df4ece"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/build.rs",
+      "bytes": 39,
+      "sha256": "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/Info.plist",
+      "bytes": 595,
+      "sha256": "34fdc0658a9d5fc07e4e49051b73f92da20aa9527d8e0284879f94004e981175"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/capabilities/default.json",
+      "bytes": 381,
+      "sha256": "a04cc27fde3181ee0f8e3e03c1d3d345aacd3b1bc82d46b3d0deb6bbeb9c190e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/icon.png",
+      "bytes": 6573,
+      "sha256": "110c3e1a4b138bae7a4b46e481c080ed40b614022ba357377605f524dea2f4e6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/icon.icns",
+      "bytes": 81473,
+      "sha256": "8a6be91f064e9caa22a8430797791770fa2052b039aa1e6f6f42ff7a558c5f22"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/trayTemplate@2x.png",
+      "bytes": 269,
+      "sha256": "c7695534c776eb24f257610d50cff5e1ae238a309433b72497976e4a0352dccf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/icon.ico",
+      "bytes": 7598,
+      "sha256": "4a806f71a7dc4ac40f408bf31c2e0367c22016624b42027642b3f43014a6240f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/trayTemplate.png",
+      "bytes": 158,
+      "sha256": "7e38ec1f5f4e2c0d0dcda0d7ecaedaf539182c386938f2efda6917848e28f1fd"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/128x128.png",
+      "bytes": 1622,
+      "sha256": "434d3b33a772cfa4d9831aef00bd8e1f04c7f9ebeee815ccc60951a3fdad3763"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/32x32.png",
+      "bytes": 501,
+      "sha256": "153626a1ca91c6c0c0eb3eb45e2db6050421faa4d39ffb992348952cab55150a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/icons/128x128@2x.png",
+      "bytes": 2978,
+      "sha256": "b6de622e129bfeeee3ade27485ad88a57eb175a3575cfed88c7eba1eb811bf74"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/assist.rs",
+      "bytes": 1880,
+      "sha256": "ec5fc9a9d2a2c9118c29c0b1e02622d86facc227c9897960aeb72bc1112bfe11"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/runtime_state.rs",
+      "bytes": 3138,
+      "sha256": "982e313bbd7732086ba85340f3d06e65f7c6f40696f3900990afbd6122593413"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/transaction.rs",
+      "bytes": 7624,
+      "sha256": "5b875e531640d2c382648b9407016fe28958fe68ced30f708473cdb67b242678"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/queued_input.rs",
+      "bytes": 21775,
+      "sha256": "80b80d390e4a24160ed15458bfe60bb0ec7284a536b7915b8790189f73663090"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/input_phase.rs",
+      "bytes": 17753,
+      "sha256": "1c92b6f9d654d3c65a51cac0e95412ce5b85a5dc71dc6634dd4e47f502e3b3fe"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/service.rs",
+      "bytes": 11385,
+      "sha256": "605d82f80b38500233bee5494d3624e29c9d4f171fd557fb28bf876b6f2cbc72"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/safe_service.rs",
+      "bytes": 41509,
+      "sha256": "ddb1839d3848e6b5f1be225436e7ba1c983e979cd5b5c2a84722413df257358a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/main.rs",
+      "bytes": 21445,
+      "sha256": "e25daff95a83051d37e96d3f00b7a30d93043394ce7d40999255c7a2eaaf9cc6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/app/src-tauri/src/settings.rs",
+      "bytes": 4684,
+      "sha256": "778c1ab2bb0dd37faa8860e54c5eaa9270c2756d4a66ca67a21e0ec0106ddf5c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/web/index.html",
+      "bytes": 6963,
+      "sha256": "7e19860a3bbee31f562fffe4294ea3e5150fda1b9983dbee877987422590c6b7"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/web/demo.js",
+      "bytes": 1675,
+      "sha256": "90a556ba5cc22527377a220d845941f9f8e459132bfcb43a8acd5a761ec98058"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/web/favicon.png",
+      "bytes": 501,
+      "sha256": "153626a1ca91c6c0c0eb3eb45e2db6050421faa4d39ffb992348952cab55150a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/web/style.css",
+      "bytes": 6630,
+      "sha256": "e27e2d79293255b0a5478390697b3d7756fb7b110428650285f1af9e60a91133"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/.github/workflows/release.yml",
+      "bytes": 2278,
+      "sha256": "8f663e189b8ccb71e311cebc86dd921aa788d9bc917ed789b0df24dff0c49d04"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/.github/workflows/pages.yml",
+      "bytes": 690,
+      "sha256": "68b333428c5602e9cd7ef5f361d1271d32d7c7ef9d10425215c74bd78e68f63a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/.github/workflows/ci.yml",
+      "bytes": 2257,
+      "sha256": "d0b35bf1ad4ef9acf8b7dd1b6d2b356f75fc792593b1a0df5a84e79bbdb58ec6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/.github/workflows/post.yml",
+      "bytes": 2094,
+      "sha256": "4bbe7e19c20493b7d2f0531adc760df4b921d7263db40c7f1f6c254341a44ab5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/content.json",
+      "bytes": 3780,
+      "sha256": "166f74307cbce5849e62f0b49db1b0ad67c07da4792b408d77befefa695b9d6e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/check_content.py",
+      "bytes": 1297,
+      "sha256": "b3b0f183eb35cf0ca6eaf019a102559ea9c999ed077fd8a91f138a0afe45959c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/x_client.py",
+      "bytes": 5950,
+      "sha256": "a61889b5e4cf4da20404f1a9293d82e38463fca7ccfab1d80df57c7337c602d5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/post.py",
+      "bytes": 4403,
+      "sha256": "ddc288e81d5e6e5d5dbecd6351c2a892e383a3cfbd31476a49a00897522338cf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/README.md",
+      "bytes": 2595,
+      "sha256": "b770c99c71fbef1dc1a6b1635c3f94c3e9bc9526ecfeae34669568d83ea351dd"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/make_cards.py",
+      "bytes": 6020,
+      "sha256": "d956c80d5df2095a351f982c4027a5d639a1290954319686f48e47b3dbc5b460"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/rekey-rescue/source/automation/cards/card.html",
+      "bytes": 4259,
+      "sha256": "ea897df0979187496610006d25f3c64e91ce1160cbd1f97da516ca8db7f0b47a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/cloud-export-20261002/library-helper/library_file_transfer.py",
+      "bytes": 11085,
+      "sha256": "5c81478cd94a59d721a1677d0bd36f7cec23c18a21b48740b1c9ff94d27fb26f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/Cargo.toml",
+      "bytes": 684,
+      "sha256": "48c112e40d01706028a09f9e2aa99516dfe7b41b725ef69ff2c22915a8f8e30c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/LICENSE",
+      "bytes": 1073,
+      "sha256": "46bc22d710a7fe79e4b12ee5e24bf7330004fca8b90622880713ba26965e4d78"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/Cargo.lock",
+      "bytes": 133960,
+      "sha256": "bea132fa1849d5d43e798d61a434e63fbc76291809b55c21ce6abca3ce2e34a4"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/README.md",
+      "bytes": 10645,
+      "sha256": "e1195838d77fd690d115d3e9527cd4afe1e66b5549fc99f58e0e6b08125a24ea"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/.gitignore",
+      "bytes": 654,
+      "sha256": "bc5ae0ed07892fd6ed20e4ec5934951a8e3074d50532237fd0c736625a3d1a86"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/tools/fetch_corpora.sh",
+      "bytes": 943,
+      "sha256": "babaf181fb38a518ef9d6f380f9240e751bc9773fd7b0c6ac5bade50dcd967b8"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/tools/make_icons.py",
+      "bytes": 7922,
+      "sha256": "99a9c2b17547ef5abb7f3ffd392afab2201530d14302a4ca3d7707215dcb6148"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/tools/modelgen/Cargo.toml",
+      "bytes": 250,
+      "sha256": "7d3381337ebefe011ab85b3a3c900f0ddd5cd87ff1070603d40ad41b7e8a0160"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/tools/modelgen/src/main.rs",
+      "bytes": 3981,
+      "sha256": "c85f106aa064aec73ea424a150c58c0b8e8c655e7ee701e2037d413c8cccdbf5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/tools/eval/Cargo.toml",
+      "bytes": 259,
+      "sha256": "e5b8c1d04b9d6ebaa15ed3e1a1a299b030f4400f6e9e1e2d9147b410c2d2064a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/tools/eval/src/main.rs",
+      "bytes": 5710,
+      "sha256": "91b55db2036d3ca8c8e51579fd130610eb689ac13365696a0373d8bf9b674fde"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-ai/Cargo.toml",
+      "bytes": 411,
+      "sha256": "beef4ba9d9288d9e9f897572cbfa565154ec5d8c3e837d9f9b10423b88625adf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-ai/src/lib.rs",
+      "bytes": 12326,
+      "sha256": "07fccc60adb845d24bd6763833482226a74e3121cfd7b2b7172a532805ec6239"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/Cargo.toml",
+      "bytes": 351,
+      "sha256": "814b02633168bd6a5dbadc0d67e9e8cf107df753186d3da357909cfb6741572b"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/tests/real_models.rs",
+      "bytes": 10917,
+      "sha256": "a77a402948ef4cde6083de2c3fabca573b0a5f2fc563d9bbb94186e2080b2a9f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/examples/explain.rs",
+      "bytes": 2061,
+      "sha256": "45c0a1bf5a8c5f1b5acbb76a48bab9214fc6ed3eee1e70affadcc94292d7e9b7"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/assist.rs",
+      "bytes": 3013,
+      "sha256": "36e87fc96b4473833f7c4c53cbfe9e57e35399b7e2351090ec811b9c0dff6526"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/layout.rs",
+      "bytes": 29553,
+      "sha256": "5b7756abe12d0fe4bbf6b08c3a8116def71f2e37fc07671a3b9012a09a219c24"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/config.rs",
+      "bytes": 7168,
+      "sha256": "36cc1ee575d3fe411d87ccca8a9ebc859ce92dfc2e353eafa48d8cff967ea3c9"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/lib.rs",
+      "bytes": 774,
+      "sha256": "832c5d5af5d3dff014de0d1b433ff97cab6e6386e4a0cc872a6454c650774a8c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/detect.rs",
+      "bytes": 16662,
+      "sha256": "aaf85fed9cadc134a76e497c478c98c2f5a9246814160bddfd281c1f62c84264"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/buffer.rs",
+      "bytes": 8415,
+      "sha256": "b14cd768c1f676bf3107e7b5cbfd28de3484565140018f6649939520f48e371f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/input.rs",
+      "bytes": 3311,
+      "sha256": "b88b49562235df3f7c2e966f86bfe9dc1e7ab878c0e8e57cccedea2245ecf83e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/model.rs",
+      "bytes": 15664,
+      "sha256": "523f0f079a4941774008d0a546e38e65f079a520b78959d32d4428ebb1b6d844"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core/src/engine.rs",
+      "bytes": 48969,
+      "sha256": "e03c6392c61040ce528e769cecf501ca27c6505b8efbec0bc84811a592e917dc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/Cargo.toml",
+      "bytes": 929,
+      "sha256": "82cbac984c87fdd22676d0a45e9272bc213e4bc57bcd6ec3563228468340fade"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/examples/inject-selftest.rs",
+      "bytes": 16706,
+      "sha256": "ae5f7b46ec4793667be5bbdaad8eeb7eca509b3ecb95f6d3b09e79bc0e720a3d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/examples/doctor.rs",
+      "bytes": 1879,
+      "sha256": "aa2af473f8e820c6a33f44815fb1a2d4919418936d23d1b0a88b8a1ce8110762"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/examples/listen.rs",
+      "bytes": 1841,
+      "sha256": "3844437e33ac0fc46aaad5537985918896637b849c43c1f837bf2329927079fc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/src/macos.rs",
+      "bytes": 28931,
+      "sha256": "ca9b771aecd2d11db5a7c625b3fa43a7f98cd9fe26c0a2f3b0aeecdcd0e9a5ea"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/src/lib.rs",
+      "bytes": 1988,
+      "sha256": "1eeb5c7b5db226408e63efe28d005c47a5fab40570d0e96f6a570c3af5be2232"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/src/focus.rs",
+      "bytes": 21835,
+      "sha256": "b288c9e0d1704de9f26ad408f4f3a2d313970a30ae238323bba1293fad8b3de8"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/src/windows.rs",
+      "bytes": 14726,
+      "sha256": "c62e9c0c089017c4789ff70e8481434a0086350414d0bf89e7d4bd62c4393781"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook/src/noop.rs",
+      "bytes": 1498,
+      "sha256": "382a03a089e15e49a7e26f7e39a31fd49c9cae6e04a9fd550ad1b5d6fe04a79c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/index.html",
+      "bytes": 7833,
+      "sha256": "4c8eb8bec70f677623929c493392555c8d904cf10397d09ef849824c4dd4c115"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/save-queue.js",
+      "bytes": 685,
+      "sha256": "137668dcb545b6eb9f8b7c3406d95e8db6ba78facbd6fd78a60e173fd1c9f0f5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/style.css",
+      "bytes": 17253,
+      "sha256": "ad196996c2d25fff6672f68ae249439be94cda6a1eb21a8ba3f793f8d2da00cc"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/dev-mock.js",
+      "bytes": 4432,
+      "sha256": "dbd8b62ab0155d5330ef8a4c8f995cb82be3ec78c84858353c28f75ac33df28e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/app.js",
+      "bytes": 16748,
+      "sha256": "f4b3f2b33379c7a5b548a6fc089a9cad47db0a299ec7dd4d84d07a43ca4a3342"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/test/save-queue.test.mjs",
+      "bytes": 1558,
+      "sha256": "cef2d5ec1f3b3636cdb4702b23953b9cdf503c20de14b4eeecbbcddffef3d953"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/ui/test/dev-mock.test.mjs",
+      "bytes": 2729,
+      "sha256": "7f9a5ec6f9c40c722342d15194c104eafefa0aa9fc34b276fc86dca1b85d95b1"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/Cargo.toml",
+      "bytes": 1185,
+      "sha256": "ab5714f0464bb516524ca5e7d005ed6be68d3f5d57ccd2b1d442bae4cc3331e6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/tauri.conf.json",
+      "bytes": 1578,
+      "sha256": "0786684d5bec8f040edc38f25523c63884f9e5d5cdaad91f516a2168d5df4ece"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/build.rs",
+      "bytes": 39,
+      "sha256": "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/Info.plist",
+      "bytes": 595,
+      "sha256": "34fdc0658a9d5fc07e4e49051b73f92da20aa9527d8e0284879f94004e981175"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/capabilities/default.json",
+      "bytes": 381,
+      "sha256": "a04cc27fde3181ee0f8e3e03c1d3d345aacd3b1bc82d46b3d0deb6bbeb9c190e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/icon.png",
+      "bytes": 6573,
+      "sha256": "110c3e1a4b138bae7a4b46e481c080ed40b614022ba357377605f524dea2f4e6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/icon.icns",
+      "bytes": 81473,
+      "sha256": "8a6be91f064e9caa22a8430797791770fa2052b039aa1e6f6f42ff7a558c5f22"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/trayTemplate@2x.png",
+      "bytes": 269,
+      "sha256": "c7695534c776eb24f257610d50cff5e1ae238a309433b72497976e4a0352dccf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/icon.ico",
+      "bytes": 7598,
+      "sha256": "4a806f71a7dc4ac40f408bf31c2e0367c22016624b42027642b3f43014a6240f"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/trayTemplate.png",
+      "bytes": 158,
+      "sha256": "7e38ec1f5f4e2c0d0dcda0d7ecaedaf539182c386938f2efda6917848e28f1fd"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/128x128.png",
+      "bytes": 1622,
+      "sha256": "434d3b33a772cfa4d9831aef00bd8e1f04c7f9ebeee815ccc60951a3fdad3763"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/32x32.png",
+      "bytes": 501,
+      "sha256": "153626a1ca91c6c0c0eb3eb45e2db6050421faa4d39ffb992348952cab55150a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/icons/128x128@2x.png",
+      "bytes": 2978,
+      "sha256": "b6de622e129bfeeee3ade27485ad88a57eb175a3575cfed88c7eba1eb811bf74"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/assist.rs",
+      "bytes": 1880,
+      "sha256": "ec5fc9a9d2a2c9118c29c0b1e02622d86facc227c9897960aeb72bc1112bfe11"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/runtime_state.rs",
+      "bytes": 3138,
+      "sha256": "982e313bbd7732086ba85340f3d06e65f7c6f40696f3900990afbd6122593413"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/transaction.rs",
+      "bytes": 7624,
+      "sha256": "5b875e531640d2c382648b9407016fe28958fe68ced30f708473cdb67b242678"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/queued_input.rs",
+      "bytes": 21775,
+      "sha256": "80b80d390e4a24160ed15458bfe60bb0ec7284a536b7915b8790189f73663090"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/input_phase.rs",
+      "bytes": 17753,
+      "sha256": "1c92b6f9d654d3c65a51cac0e95412ce5b85a5dc71dc6634dd4e47f502e3b3fe"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/service.rs",
+      "bytes": 11385,
+      "sha256": "605d82f80b38500233bee5494d3624e29c9d4f171fd557fb28bf876b6f2cbc72"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/safe_service.rs",
+      "bytes": 41509,
+      "sha256": "ddb1839d3848e6b5f1be225436e7ba1c983e979cd5b5c2a84722413df257358a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/main.rs",
+      "bytes": 21445,
+      "sha256": "e25daff95a83051d37e96d3f00b7a30d93043394ce7d40999255c7a2eaaf9cc6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri/src/settings.rs",
+      "bytes": 4684,
+      "sha256": "778c1ab2bb0dd37faa8860e54c5eaa9270c2756d4a66ca67a21e0ec0106ddf5c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/web/index.html",
+      "bytes": 6963,
+      "sha256": "7e19860a3bbee31f562fffe4294ea3e5150fda1b9983dbee877987422590c6b7"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/web/demo.js",
+      "bytes": 1675,
+      "sha256": "90a556ba5cc22527377a220d845941f9f8e459132bfcb43a8acd5a761ec98058"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/web/favicon.png",
+      "bytes": 501,
+      "sha256": "153626a1ca91c6c0c0eb3eb45e2db6050421faa4d39ffb992348952cab55150a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/web/style.css",
+      "bytes": 6630,
+      "sha256": "e27e2d79293255b0a5478390697b3d7756fb7b110428650285f1af9e60a91133"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/.github/workflows/release.yml",
+      "bytes": 2278,
+      "sha256": "8f663e189b8ccb71e311cebc86dd921aa788d9bc917ed789b0df24dff0c49d04"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/.github/workflows/pages.yml",
+      "bytes": 690,
+      "sha256": "68b333428c5602e9cd7ef5f361d1271d32d7c7ef9d10425215c74bd78e68f63a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/.github/workflows/ci.yml",
+      "bytes": 2257,
+      "sha256": "d0b35bf1ad4ef9acf8b7dd1b6d2b356f75fc792593b1a0df5a84e79bbdb58ec6"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/.github/workflows/post.yml",
+      "bytes": 2094,
+      "sha256": "4bbe7e19c20493b7d2f0531adc760df4b921d7263db40c7f1f6c254341a44ab5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/content.json",
+      "bytes": 3780,
+      "sha256": "166f74307cbce5849e62f0b49db1b0ad67c07da4792b408d77befefa695b9d6e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/check_content.py",
+      "bytes": 1297,
+      "sha256": "b3b0f183eb35cf0ca6eaf019a102559ea9c999ed077fd8a91f138a0afe45959c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/x_client.py",
+      "bytes": 5950,
+      "sha256": "a61889b5e4cf4da20404f1a9293d82e38463fca7ccfab1d80df57c7337c602d5"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/post.py",
+      "bytes": 4403,
+      "sha256": "ddc288e81d5e6e5d5dbecd6351c2a892e383a3cfbd31476a49a00897522338cf"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/README.md",
+      "bytes": 2595,
+      "sha256": "b770c99c71fbef1dc1a6b1635c3f94c3e9bc9526ecfeae34669568d83ea351dd"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/make_cards.py",
+      "bytes": 6020,
+      "sha256": "d956c80d5df2095a351f982c4027a5d639a1290954319686f48e47b3dbc5b460"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/rekey-source/automation/cards/card.html",
+      "bytes": 4259,
+      "sha256": "ea897df0979187496610006d25f3c64e91ce1160cbd1f97da516ca8db7f0b47a"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V3.app/Contents/Info.plist",
+      "bytes": 1167,
+      "sha256": "dba736205f8233a5f74c72d7de46146aade7519dd5e341a1d1fb49b9fdd0862d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V3.app/Contents/_CodeSignature/CodeResources",
+      "bytes": 4760,
+      "sha256": "32cc8884b2527cfba7c363254e1ed7ba55700abc7ce8202177d6522f8b361a3e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V3.app/Contents/MacOS/rekey",
+      "bytes": 6989888,
+      "sha256": "91aa58a1736c90247ffd05f0eb593c78673af72f2d0251d74a26aabd6cadfe8c"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V3.app/Contents/Resources/icon.icns",
+      "bytes": 81473,
+      "sha256": "8a6be91f064e9caa22a8430797791770fa2052b039aa1e6f6f42ff7a558c5f22"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V4-r4.app/Contents/Info.plist",
+      "bytes": 1167,
+      "sha256": "dba736205f8233a5f74c72d7de46146aade7519dd5e341a1d1fb49b9fdd0862d"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V4-r4.app/Contents/_CodeSignature/CodeResources",
+      "bytes": 4760,
+      "sha256": "32cc8884b2527cfba7c363254e1ed7ba55700abc7ce8202177d6522f8b361a3e"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V4-r4.app/Contents/MacOS/rekey",
+      "bytes": 7006320,
+      "sha256": "4651cb3046afbe62236e69deb4c4eddfad29ad4e077aa1db64102a9f38e26fde"
+    },
+    {
+      "path": "/Users/stepan/Documents/Codex/2026-10-01/task-3/backups/Rekey-V4-r4.app/Contents/Resources/icon.icns",
+      "bytes": 81473,
+      "sha256": "8a6be91f064e9caa22a8430797791770fa2052b039aa1e6f6f42ff7a558c5f22"
+    },
+    {
+      "path": "/Users/stepan/Applications/Rekey.app/Contents/Info.plist",
+      "bytes": 1167,
+      "sha256": "dba736205f8233a5f74c72d7de46146aade7519dd5e341a1d1fb49b9fdd0862d"
+    },
+    {
+      "path": "/Users/stepan/Applications/Rekey.app/Contents/_CodeSignature/CodeResources",
+      "bytes": 4760,
+      "sha256": "32cc8884b2527cfba7c363254e1ed7ba55700abc7ce8202177d6522f8b361a3e"
+    },
+    {
+      "path": "/Users/stepan/Applications/Rekey.app/Contents/MacOS/rekey",
+      "bytes": 7022768,
+      "sha256": "930b97643fd252665098438fd6c99cb678aa3dd23dcb03d7929a145fa285bcf8"
+    },
+    {
+      "path": "/Users/stepan/Applications/Rekey.app/Contents/Resources/icon.icns",
+      "bytes": 81473,
+      "sha256": "8a6be91f064e9caa22a8430797791770fa2052b039aa1e6f6f42ff7a558c5f22"
+    },
+    {
+      "path": "/Users/stepan/Library/Application Support/app.rekey.desktop/rekey.log",
+      "bytes": 51702448
+    },
+    {
+      "path": "/Users/stepan/Library/Application Support/app.rekey.desktop/settings.json",
+      "bytes": 655
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/MediaKeys/v1/salt",
+      "bytes": 8
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/Default/salt",
+      "bytes": 8
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/ResourceLoadStatistics/pcm.db-shm",
+      "bytes": 32768
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/ResourceLoadStatistics/pcm.db-wal",
+      "bytes": 0
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/ResourceLoadStatistics/observations.db-wal",
+      "bytes": 32992
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/ResourceLoadStatistics/pcm.db",
+      "bytes": 28672
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/ResourceLoadStatistics/observations.db-shm",
+      "bytes": 32768
+    },
+    {
+      "path": "/Users/stepan/Library/WebKit/app.rekey.desktop/WebsiteData/ResourceLoadStatistics/observations.db",
+      "bytes": 118784
+    }
+  ],
+  "excluded_directory_names": [
+    ".git",
+    "target",
+    "toolchain",
+    "downloads",
+    "node_modules",
+    ".cache",
+    "models",
+    "gen"
+  ],
+  "runtime_settings": "paths and sizes only; contents not uploaded"
+}

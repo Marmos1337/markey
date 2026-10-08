@@ -1,0 +1,110 @@
+    Checking rekey-core v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core)
+    Checking rekey-hook v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-hook)
+warning: fields `bootstrap`, `expected`, and `policy` are never read
+   --> crates/rekey-hook/src/focus.rs:382:5
+    |
+381 | struct WatchState {
+    |        ---------- fields in this struct
+382 |     bootstrap: Arc<BootstrapState>,
+    |     ^^^^^^^^^
+...
+387 |     expected: Arc<Mutex<Vec<Expected>>>,
+    |     ^^^^^^^^
+388 |     policy: Arc<dyn Fn(u64) -> bool + Send + Sync>,
+    |     ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rekey-hook` (lib) generated 1 warning
+    Checking rekey-ai v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-ai)
+    Checking rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+warning: unused imports: `KeyEvent` and `Key`
+ --> app/src-tauri/src/safe_service.rs:5:22
+  |
+5 |     input::{Context, Key, KeyEvent},
+  |                      ^^^  ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: enum `Phase` is never used
+ --> app/src-tauri/src/input_phase.rs:9:10
+  |
+9 | pub enum Phase {
+  |          ^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `advance` is never used
+  --> app/src-tauri/src/input_phase.rs:15:8
+   |
+15 | pub fn advance(before: &State, event: &KeyEvent) -> Option<State> {
+   |        ^^^^^^^
+
+warning: function `reconcile` is never used
+  --> app/src-tauri/src/input_phase.rs:40:8
+   |
+40 | pub fn reconcile(
+   |        ^^^^^^^^^
+
+warning: struct `Fence` is never constructed
+  --> app/src-tauri/src/input_phase.rs:55:12
+   |
+55 | pub struct Fence {
+   |            ^^^^^
+
+warning: function `deliver` is never used
+  --> app/src-tauri/src/input_phase.rs:64:8
+   |
+64 | pub fn deliver<T>(fence: Fence, receive: impl FnOnce() -> T) -> Option<T> {
+   |        ^^^^^^^
+
+warning: function `after_probe` is never used
+  --> app/src-tauri/src/input_phase.rs:76:8
+   |
+76 | pub fn after_probe(probe: impl FnOnce() -> bool, sample: impl FnOnce() -> Fence) -> Fence {
+   |        ^^^^^^^^^^^
+
+warning: function `bootstrap` is never used
+  --> app/src-tauri/src/input_phase.rs:82:8
+   |
+82 | pub fn bootstrap(
+   |        ^^^^^^^^^
+
+warning: function `confirm_bootstrap` is never used
+   --> app/src-tauri/src/input_phase.rs:119:8
+    |
+119 | pub fn confirm_bootstrap(
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: static `CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:23:8
+   |
+23 | static CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^
+
+warning: static `OTHER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:24:8
+   |
+24 | static OTHER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^
+
+warning: static `EMPTY_CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:25:8
+   |
+25 | static EMPTY_CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: `rekey-app` (bin "rekey") generated 12 warnings (run `cargo fix --bin "rekey" -p rekey-app` to apply 1 suggestion)
+warning: static `CHARACTER_COUNT` is never used
+  --> app/src-tauri/src/safe_service.rs:23:8
+   |
+23 | static CHARACTER_COUNT: AtomicU64 = AtomicU64::new(0);
+   |        ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rekey-app` (bin "rekey" test) generated 4 warnings (3 duplicates)
+warning: `rekey-hook` (lib test) generated 1 warning (1 duplicate)
+    Checking eval v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/eval)
+    Checking modelgen v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/modelgen)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.74s

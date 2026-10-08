@@ -158,6 +158,7 @@ fn apply(handle: &AppHandle, injector: &dyn TextWriter, action: &Action) {
         delete,
         text,
         switch_to,
+        ..
     } = action
     else {
         return;

@@ -70,3 +70,64 @@ pub fn models_dir(app: &tauri::AppHandle) -> PathBuf {
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/rekey-core/data/models")
 }
+
+/// Canonical bundle IDs/executable IDs, preserving the user's existing list.
+pub fn normalize_exclusions(ids: Vec<String>) -> Result<Vec<String>, String> {
+    if ids.len() > 512 {
+        return Err("Too many app exceptions".into());
+    }
+    let mut out = Vec::<String>::new();
+    for id in ids {
+        let id = id.trim();
+        if id.is_empty() || id.len() > 256 || id.chars().any(char::is_control) {
+            return Err("Invalid app identifier".into());
+        }
+        if !out.iter().any(|old| old.eq_ignore_ascii_case(id)) {
+            out.push(id.to_string());
+        }
+    }
+    Ok(out)
+}
+#[cfg(test)]
+mod exclusion_tests {
+    use super::*;
+    #[test]
+    fn identifiers_round_trip_and_deduplicate_without_touching_other_settings() {
+        let mut settings = Settings {
+            api_key: "test-only-placeholder".into(),
+            launch_at_login: false,
+            ..Settings::default()
+        };
+        settings.config.excluded_apps = normalize_exclusions(vec![
+            " com.apple.TextEdit ".into(),
+            "COM.APPLE.TEXTEDIT".into(),
+            "org.mozilla.firefox".into(),
+        ])
+        .unwrap();
+        let loaded: Settings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(
+            loaded.config.excluded_apps,
+            vec!["com.apple.TextEdit", "org.mozilla.firefox"]
+        );
+        assert_eq!(loaded.api_key, "test-only-placeholder");
+        assert!(!loaded.launch_at_login);
+        assert!(!loaded.config.ai_assist);
+        assert!(loaded.config.is_excluded_app("COM.APPLE.TEXTEDIT"));
+    }
+    #[test]
+    fn invalid_identifiers_are_rejected() {
+        for id in ["", " ", "a\nb"] {
+            assert!(normalize_exclusions(vec![id.into()]).is_err());
+        }
+        assert!(normalize_exclusions(vec!["x".repeat(257)]).is_err());
+    }
+    #[test]
+    fn removing_exception_enables_only_selected_app() {
+        let mut config = Config::default();
+        config.excluded_apps = vec!["com.apple.TextEdit".into(), "org.mozilla.firefox".into()];
+        config.excluded_apps.retain(|id| id != "com.apple.TextEdit");
+        assert!(!config.is_excluded_app("com.apple.TextEdit"));
+        assert!(config.is_excluded_app("org.mozilla.firefox"));
+    }
+}

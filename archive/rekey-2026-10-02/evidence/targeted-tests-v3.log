@@ -1,0 +1,20 @@
+   Compiling rekey-app v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/app/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running unittests src/main.rs (rekey-source/target/debug/deps/rekey-e94e95b5884b4fc5)
+
+running 12 tests
+test service::tests::empty_field_is_a_known_boundary ... ok
+test service::tests::missed_prefix_requires_whitespace_before_tracking ... ok
+test service::tests::overflow_reset_does_not_license_suffix_correction ... ok
+test transaction::tests::adversarial_transitions_at_every_check ... ok
+test transaction::tests::cancellation_does_not_blindly_restore ... ok
+test transaction::tests::collapsed_selection_never_inserts ... ok
+test transaction::tests::config_only_cancel_collapses_owned_selection_without_new_capture ... ok
+test transaction::tests::exact_origin_replaces ... ok
+test transaction::tests::host_input_in_selection_window_is_detected_without_more_writes ... ok
+test transaction::tests::original_fragment_mismatch_skips ... ok
+test transaction::tests::replace_failure_restores_only_unchanged_selection ... ok
+test transaction::tests::selection_failure_has_no_writes ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

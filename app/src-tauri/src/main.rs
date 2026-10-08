@@ -5,8 +5,20 @@
 //! Rekey — fixes text typed on the wrong keyboard layout.
 
 mod assist;
+#[cfg(target_os = "macos")]
+mod input_phase;
+#[cfg(target_os = "macos")]
+mod queued_input;
+#[cfg(target_os = "macos")]
+mod runtime_state;
+#[cfg(not(target_os = "macos"))]
+mod service;
+#[cfg(target_os = "macos")]
+#[path = "safe_service.rs"]
 mod service;
 mod settings;
+#[cfg(target_os = "macos")]
+mod transaction;
 
 use rekey_core::config::{Config, Modifier, Sensitivity, Shortcut};
 use rekey_core::engine::Engine;
@@ -34,6 +46,8 @@ struct AppState {
 /// A snapshot for the settings window.
 #[derive(serde::Serialize)]
 struct UiState {
+    runtime_status: String,
+    diagnostic_counts: [u64; 4],
     enabled: bool,
     layouts: Vec<String>,
     sensitivity: String,
@@ -109,12 +123,40 @@ fn layout_catalog() -> Vec<LayoutInfo> {
 
 #[tauri::command]
 fn get_state(state: State<'_, AppState>) -> UiState {
-    let engine = state.engine.lock().expect("engine lock");
+    // Never hold engine and settings locks together in opposite orders.
+    let (config, stats, assist_active, assist_learned, models_loaded) = {
+        let engine = state.engine.lock().expect("engine lock");
+        let mut langs: Vec<String> = engine
+            .detector
+            .models
+            .langs()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        langs.sort();
+        (
+            engine.config().clone(),
+            engine.stats(),
+            engine.has_assist(),
+            engine.assist_learned(),
+            langs,
+        )
+    };
     let settings = state.settings.lock().expect("settings lock");
-    let config = engine.config();
-    let stats = engine.stats();
 
+    let permission = rekey_hook::platform::has_permission();
+    let running = state.hook_running.load(Ordering::Relaxed);
+    #[cfg(target_os = "macos")]
+    let runtime_status = service::runtime_status(config.enabled, permission, running).to_string();
+    #[cfg(not(target_os = "macos"))]
+    let runtime_status = if config.enabled { "waiting" } else { "paused" }.to_string();
+    #[cfg(target_os = "macos")]
+    let diagnostic_counts = service::diagnostic_counts();
+    #[cfg(not(target_os = "macos"))]
+    let diagnostic_counts = [0; 4];
     UiState {
+        runtime_status,
+        diagnostic_counts,
         enabled: config.enabled,
         layouts: config.layouts.clone(),
         sensitivity: match config.sensitivity {
@@ -130,57 +172,88 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         excluded_apps: config.excluded_apps.clone(),
         exceptions: config.exceptions.clone(),
         shortcut: shortcut_to_string(config.shortcut),
-        assist_active: engine.has_assist(),
-        assist_learned: engine.assist_learned(),
+        assist_active,
+        assist_learned,
         vibrancy: *state.vibrancy.lock().expect("vibrancy lock"),
-        corrections: stats.corrections,
+        corrections: {
+            #[cfg(target_os = "macos")]
+            {
+                diagnostic_counts[3]
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                stats.corrections
+            }
+        },
         undos: stats.undos,
         has_permission: rekey_hook::platform::has_permission(),
         hook_running: state.hook_running.load(Ordering::Relaxed),
         available_layouts: layout_catalog(),
-        models_loaded: {
-            let mut langs: Vec<String> = engine
-                .detector
-                .models
-                .langs()
-                .iter()
-                .map(|s| s.to_string())
-                .collect();
-            langs.sort();
-            langs
-        },
+        models_loaded,
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: std::env::consts::OS.to_string(),
     }
 }
 
+#[derive(serde::Serialize)]
+struct AppChoice {
+    name: String,
+    bundle_id: String,
+}
+#[tauri::command]
+fn list_apps() -> Vec<AppChoice> {
+    #[cfg(target_os = "macos")]
+    {
+        rekey_hook::platform::running_applications()
+            .into_iter()
+            .map(|(name, bundle_id)| AppChoice { name, bundle_id })
+            .collect()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Vec::new()
+    }
+}
 /// Settings changed in the UI. The whole config is replaced at once, which
 /// keeps the UI and the engine from drifting apart field by field.
 #[tauri::command]
 fn set_config(
     app: AppHandle,
     state: State<'_, AppState>,
-    config: Config,
+    mut config: Config,
     api_key: Option<String>,
     launch_at_login: Option<bool>,
 ) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    service::invalidate_pending();
+    config.excluded_apps = settings::normalize_exclusions(config.excluded_apps)?;
     let mut settings = state.settings.lock().map_err(|e| e.to_string())?;
-    settings.config = config.clone();
+    let mut next = settings.clone();
+    next.config = config.clone();
     if let Some(key) = api_key {
-        settings.api_key = key;
-    }
-    {
-        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
-        engine.set_config(config);
-        // The assist is rebuilt rather than toggled, so switching it off drops
-        // the worker and its cache instead of leaving them idling.
-        attach_assist(&mut engine, &settings);
+        next.api_key = key;
     }
     if let Some(launch) = launch_at_login {
-        settings.launch_at_login = launch;
+        next.launch_at_login = launch;
+    }
+    next.save().map_err(|e| e.to_string())?;
+    *settings = next;
+    let settings_snapshot = settings.clone();
+    drop(settings);
+    {
+        let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")]
+        service::set_capture_enabled(config.enabled);
+        engine.set_config(config);
+        engine.invalidate_caret();
+        // The assist is rebuilt rather than toggled, so switching it off drops
+        // the worker and its cache instead of leaving them idling.
+        attach_assist(&mut engine, &settings_snapshot);
+    }
+    if let Some(launch) = launch_at_login {
         apply_launch_at_login(&app, launch);
     }
-    settings.save().map_err(|e| e.to_string())
+    Ok(())
 }
 
 /// Attach or remove the Claude assist to match the current settings.
@@ -344,10 +417,15 @@ fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "toggle" => {
+                #[cfg(target_os = "macos")]
+                service::invalidate_pending();
                 let mut engine = tray_engine.lock().expect("engine lock");
                 let mut config = engine.config().clone();
                 config.enabled = !config.enabled;
+                #[cfg(target_os = "macos")]
+                service::set_capture_enabled(config.enabled);
                 engine.set_config(config.clone());
+                engine.invalidate_caret();
                 if let Some(state) = app.try_state::<AppState>() {
                     if let Ok(mut settings) = state.settings.lock() {
                         settings.config = config;
@@ -439,6 +517,7 @@ fn main() {
         ))
         .invoke_handler(tauri::generate_handler![
             get_state,
+            list_apps,
             set_config,
             request_permission,
             open_accessibility_settings,

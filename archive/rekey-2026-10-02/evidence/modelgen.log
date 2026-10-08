@@ -1,0 +1,26 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling tinyvec_macros v0.1.1
+   Compiling log v0.4.34
+   Compiling tinyvec v1.13.2
+   Compiling unicode-normalization v0.1.25
+   Compiling syn v3.0.5
+   Compiling serde_derive v1.0.229
+   Compiling rekey-core v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/crates/rekey-core)
+   Compiling modelgen v0.1.0 ($USER_HOME/Documents/Codex/2026-10-01/task-3/rekey-source/tools/modelgen)
+    Finished `release` profile [optimized] target(s) in 26.40s
+     Running `rekey-source/target/release/modelgen rekey-source/tools/.cache rekey-source/crates/rekey-core/data/models`
+ar:  49814 words,  14952 trigrams,   506 KB
+de:  49498 words,   9455 trigrams,   460 KB
+el:  49556 words,  14325 trigrams,   499 KB
+en:  46968 words,   8293 trigrams,   431 KB
+es:  49614 words,   8633 trigrams,   455 KB
+fr:  46794 words,   8356 trigrams,   430 KB
+he:  49386 words,  10015 trigrams,   464 KB
+ru:  49294 words,  11113 trigrams,   471 KB
+tr:  49210 words,   8112 trigrams,   447 KB
+uk:  49387 words,  15415 trigrams,   506 KB
+total: 4673 KB

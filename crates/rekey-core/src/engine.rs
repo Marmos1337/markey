@@ -24,6 +24,8 @@ pub enum Action {
     Replace {
         delete: usize,
         text: String,
+        /// Exact originating fragment. Retained only in memory for guarded AX replacement.
+        original: String,
         /// The layout the corrected text belongs to, when it differs from the
         /// one in use.
         ///
@@ -122,6 +124,19 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// Invalidate text behind the caret after any external focus/selection change.
+    pub fn invalidate_caret(&mut self) {
+        self.buffer.push(Input::Reset);
+        self.last_word = None;
+        self.expected_layout = None;
+        self.modifier_down_at = None;
+    }
+    /// A proposal was never written. Preserve new typed input, while removing
+    /// the speculative corrected-word/manual-cycle and source-switch state.
+    pub fn cancel_proposal(&mut self) {
+        self.last_word = None;
+        self.expected_layout = None;
+    }
     pub fn new(models: Models, config: Config) -> Engine {
         Engine {
             detector: Detector::new(models, config),
@@ -350,6 +365,10 @@ impl Engine {
         Action::Replace {
             delete,
             text: replacement,
+            original: format!(
+                "{text}{}",
+                terminator.map(|c| c.to_string()).unwrap_or_default()
+            ),
             switch_to: Some(candidate.to_layout.to_string()),
         }
     }
@@ -512,6 +531,7 @@ impl Engine {
             return Action::None;
         };
         let delete = cycle.on_screen_len();
+        let previous_text = cycle.text_with_terminator(cycle.index);
         let variant_count = cycle.variants.len();
         let next = (cycle.index + 1) % variant_count;
         cycle.index = next;
@@ -542,6 +562,7 @@ impl Engine {
             delete,
             text,
             switch_to,
+            original: previous_text,
         }
     }
 
@@ -580,6 +601,7 @@ impl Engine {
         // Step straight back to what the user typed.
         let delete = cycle.on_screen_len();
         let text = cycle.text_with_terminator(0);
+        let previous_text = cycle.text_with_terminator(cycle.index);
         let switch_to = cycle.layouts.first().cloned();
         let original = cycle.variants[0].clone();
         let was_auto = cycle.auto;
@@ -598,6 +620,7 @@ impl Engine {
             delete,
             text,
             switch_to,
+            original: previous_text,
         }
     }
 
@@ -617,6 +640,7 @@ impl Engine {
         Action::Replace {
             delete: word.text.chars().count(),
             text: converted,
+            original: word.text,
             switch_to: Some(target.to_string()),
         }
     }
@@ -626,6 +650,21 @@ impl Engine {
 mod tests {
     use super::*;
     use crate::input::{Key, Modifiers};
+    #[test]
+    fn cancelled_proposal_drops_speculative_metadata_but_preserves_new_prefix() {
+        let mut e = engine();
+        assert!(matches!(
+            type_str(&mut e, "ghbdtn ", "us"),
+            Action::Replace { .. }
+        ));
+        type_str(&mut e, "ghb", "us");
+        e.cancel_proposal();
+        assert!(e.last_word.is_none());
+        assert!(e.expected_layout.is_none());
+        assert!(
+            matches!(type_str(&mut e,"dtn ","us"),Action::Replace{original,..} if original=="ghbdtn ")
+        );
+    }
 
     fn key(c: char) -> KeyEvent {
         KeyEvent {
@@ -715,6 +754,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn external_caret_invalidation_forgets_a_completed_word() {
+        let mut e = engine();
+        let _ = type_str(&mut e, "ghbdtn ", "us");
+        e.invalidate_caret();
+        assert_eq!(e.cycle_last_word(), Action::None);
+    }
+
+    #[test]
+    fn external_caret_invalidation_forgets_a_partial_word() {
+        let mut e = engine();
+        let _ = type_str(&mut e, "ghbdtn", "us");
+        e.invalidate_caret();
+        assert_eq!(type_str(&mut e, " ", "us"), Action::None);
+    }
+
     fn engine() -> Engine {
         let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/models");
         let models = Models::load_dir(&dir).expect("models");
@@ -755,6 +810,7 @@ mod tests {
             Action::Replace {
                 delete: 7,
                 text: "привет ".into(),
+                original: "ghbdtn ".into(),
                 switch_to: Some("ru".into()),
             }
         );
@@ -778,6 +834,7 @@ mod tests {
             Action::Replace {
                 delete: 8,
                 text: "привет! ".into(),
+                original: "ghbdtn! ".into(),
                 switch_to: Some("ru".into()),
             }
         );
@@ -913,6 +970,7 @@ mod tests {
             Action::Replace {
                 delete: 7,
                 text: "ghbdtn ".into(),
+                original: "привет ".into(),
                 switch_to: Some("us".into()),
             }
         );

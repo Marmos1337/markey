@@ -1,0 +1,14 @@
+V4 source-only review checkpoint
+Full patch SHA256: 5fedc55d2116817d05f8ab8add50e91267a1433790d6e87802e395e6b4425e8f
+Files: input_phase.rs (new), safe_service.rs callback/candidate/bootstrap, main.rs module registration.
+Reducer computes one after-state from prior Track. Exact before/after expectations are published before policy_context main-thread wait. Snapshot-after is accepted without advancing twice; unsupported or unknown phase cancels. Bootstrap accepts only one phase with a proven boundary; post phase also proves inserted fragment.
+Fresh production delivery fence gates core calls on generation, revision, secure input, field focus and config policy.
+Tests authored, NOT RUN: pre/pre vs pre/post space origin equality; post/post + mixed sequences; observer before/after and third state rejection; two already delivered characters; foreign content; actual production fence suppresses receiver for each mutation; real core all-pre/all-post/mixed ghbdtn Space yields exactly seven deliveries, one Replace with original ghbdtn Space and caret7; phase-specific bootstrap boundary; unchanged modifiers; ambiguity/overflow/shortcut.
+rustfmt completed with isolated toolchain. No compilation/tests/builds/GUI/install changes during MarMic heavy slot. Installed V3 remains closed/master off. Secure Input guard not weakened. Runtime still unverified.
+Independent review requested from existing reviewer thread 01a0f54b-551b-766e-b760-03111ddd20c1.
+
+Final V4-r4 validation
+Base commit b4928649e07a1fea7e91c8f469a97215eb54b712. Full patch local-safety-v4-r4-review.patch SHA256 a5b9ad75e70ee5008c05bc675892ee7516e636108a62c5004fe1ac82f8b1d59b.
+Independent targeted source review PASS from thread 01a0f54b-551b-766e-b760-03111ddd20c1. Previous review blockers fixed: scoped bootstrap hint reconciliation with final boundary proof, atomic fence sampled after AX probe, persistent whole-word boundary checked by observer/reducer and replacement preflight.
+Targeted phase tests 13 PASS. Full workspace 139 PASS (9AI+25app+77core+20models+8hook); all-target check PASS. Logs tests-v4-phase-r4.log, tests-v4-full-r4.log, check-v4-r4.log. Full/final validation actual nice10 one-job and test-threads1. Early short sandbox targeted r2 printed setpriority denied; subsequent chains used reviewed escalation to preserve actual low priority.
+No installed bundle changes, no GUI, no Secure Input bypass. Heavy slot released. Remaining: real foreground runtime and source switching unverified, persistent system Secure Input state, irreducible AX check/set race and conditional selection rollback caveats. Code-only review is not runtime PASS/daily-use certification.

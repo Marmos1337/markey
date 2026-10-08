@@ -1,0 +1,1683 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index d4e9019..aace969 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1086,7 +1086,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+ dependencies = [
+  "libc",
+- "windows-sys 0.52.0",
++ "windows-sys 0.61.2",
+ ]
+ 
+ [[package]]
+@@ -3151,14 +3151,14 @@ dependencies = [
+  "errno",
+  "libc",
+  "linux-raw-sys",
+- "windows-sys 0.52.0",
++ "windows-sys 0.61.2",
+ ]
+ 
+ [[package]]
+ name = "rustls"
+-version = "0.23.44"
++version = "0.23.45"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "6725596c3f2c3a0aef021139e145d4eafe314a6623e4680ca83852b2c67ab2ba"
++checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
+ dependencies = [
+  "log",
+  "once_cell",
+@@ -3735,9 +3735,9 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
+ 
+ [[package]]
+ name = "tauri"
+-version = "2.11.5"
++version = "2.11.6"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "667b20e2726d572dea2de7370da16e188eb06008faf9a92fab7cdc46791190b5"
++checksum = "6fa5bacdb9bbad5954af3d1bd6cf6ae9192cab1b2e270f4a07f904610b9e85f4"
+ dependencies = [
+  "anyhow",
+  "bytes",
+@@ -4009,7 +4009,7 @@ dependencies = [
+  "getrandom 0.4.3",
+  "once_cell",
+  "rustix",
+- "windows-sys 0.52.0",
++ "windows-sys 0.61.2",
+ ]
+ 
+ [[package]]
+@@ -4812,7 +4812,7 @@ version = "0.1.11"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
+ dependencies = [
+- "windows-sys 0.52.0",
++ "windows-sys 0.61.2",
+ ]
+ 
+ [[package]]
+diff --git a/app/src-tauri/Cargo.toml b/app/src-tauri/Cargo.toml
+index c4dd510..f26e4a7 100644
+--- a/app/src-tauri/Cargo.toml
++++ b/app/src-tauri/Cargo.toml
+@@ -22,7 +22,7 @@ rekey-ai = { workspace = true }
+ # lets the system's vibrancy material show behind the content. It rules out the
+ # Mac App Store — which Rekey cannot ship to anyway, since App Store sandboxing
+ # forbids the keyboard access the whole app depends on.
+-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
++tauri = { version = "=2.11.6", features = ["tray-icon", "image-png", "macos-private-api"] }
+ tauri-plugin-autostart = "2"
+ tauri-plugin-opener = "2"
+ serde = { workspace = true }
+diff --git a/app/src-tauri/src/main.rs b/app/src-tauri/src/main.rs
+index d4572a2..d4015b2 100644
+--- a/app/src-tauri/src/main.rs
++++ b/app/src-tauri/src/main.rs
+@@ -5,8 +5,14 @@
+ //! Rekey — fixes text typed on the wrong keyboard layout.
+ 
+ mod assist;
++#[cfg(not(target_os = "macos"))]
++mod service;
++#[cfg(target_os = "macos")]
++#[path = "safe_service.rs"]
+ mod service;
+ mod settings;
++#[cfg(target_os = "macos")]
++mod transaction;
+ 
+ use rekey_core::config::{Config, Modifier, Sensitivity, Shortcut};
+ use rekey_core::engine::Engine;
+@@ -164,6 +170,8 @@ fn set_config(
+     api_key: Option<String>,
+     launch_at_login: Option<bool>,
+ ) -> Result<(), String> {
++    #[cfg(target_os = "macos")]
++    service::invalidate_pending();
+     let mut settings = state.settings.lock().map_err(|e| e.to_string())?;
+     settings.config = config.clone();
+     if let Some(key) = api_key {
+@@ -172,6 +180,7 @@ fn set_config(
+     {
+         let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+         engine.set_config(config);
++        engine.invalidate_caret();
+         // The assist is rebuilt rather than toggled, so switching it off drops
+         // the worker and its cache instead of leaving them idling.
+         attach_assist(&mut engine, &settings);
+@@ -344,10 +353,13 @@ fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
+         .show_menu_on_left_click(true)
+         .on_menu_event(move |app, event| match event.id().as_ref() {
+             "toggle" => {
++                #[cfg(target_os = "macos")]
++                service::invalidate_pending();
+                 let mut engine = tray_engine.lock().expect("engine lock");
+                 let mut config = engine.config().clone();
+                 config.enabled = !config.enabled;
+                 engine.set_config(config.clone());
++                engine.invalidate_caret();
+                 if let Some(state) = app.try_state::<AppState>() {
+                     if let Ok(mut settings) = state.settings.lock() {
+                         settings.config = config;
+diff --git a/app/src-tauri/src/service.rs b/app/src-tauri/src/service.rs
+index bbf950c..b3824bf 100644
+--- a/app/src-tauri/src/service.rs
++++ b/app/src-tauri/src/service.rs
+@@ -158,6 +158,7 @@ fn apply(handle: &AppHandle, injector: &dyn TextWriter, action: &Action) {
+         delete,
+         text,
+         switch_to,
++        ..
+     } = action
+     else {
+         return;
+diff --git a/app/ui/index.html b/app/ui/index.html
+index e07dc13..0b1a3c9 100644
+--- a/app/ui/index.html
++++ b/app/ui/index.html
+@@ -32,6 +32,7 @@
+   <p id="save-error" class="banner banner-error" hidden></p>
+ 
+   <main>
++    <p class="group-footnote">Local safety build: automatic corrections work only in compatible accessible text fields. Unsupported fields are skipped. AI and launch at login are off.</p>
+     <section class="group">
+       <div class="row">
+         <div class="row-text">
+diff --git a/crates/rekey-core/src/engine.rs b/crates/rekey-core/src/engine.rs
+index d3da666..0af24bb 100644
+--- a/crates/rekey-core/src/engine.rs
++++ b/crates/rekey-core/src/engine.rs
+@@ -24,6 +24,8 @@ pub enum Action {
+     Replace {
+         delete: usize,
+         text: String,
++        /// Exact originating fragment. Retained only in memory for guarded AX replacement.
++        original: String,
+         /// The layout the corrected text belongs to, when it differs from the
+         /// one in use.
+         ///
+@@ -122,6 +124,13 @@ pub struct Engine {
+ }
+ 
+ impl Engine {
++    /// Invalidate text behind the caret after any external focus/selection change.
++    pub fn invalidate_caret(&mut self) {
++        self.buffer.push(Input::Reset);
++        self.last_word = None;
++        self.expected_layout = None;
++        self.modifier_down_at = None;
++    }
+     pub fn new(models: Models, config: Config) -> Engine {
+         Engine {
+             detector: Detector::new(models, config),
+@@ -350,6 +359,10 @@ impl Engine {
+         Action::Replace {
+             delete,
+             text: replacement,
++            original: format!(
++                "{text}{}",
++                terminator.map(|c| c.to_string()).unwrap_or_default()
++            ),
+             switch_to: Some(candidate.to_layout.to_string()),
+         }
+     }
+@@ -512,6 +525,7 @@ impl Engine {
+             return Action::None;
+         };
+         let delete = cycle.on_screen_len();
++        let previous_text = cycle.text_with_terminator(cycle.index);
+         let variant_count = cycle.variants.len();
+         let next = (cycle.index + 1) % variant_count;
+         cycle.index = next;
+@@ -542,6 +556,7 @@ impl Engine {
+             delete,
+             text,
+             switch_to,
++            original: previous_text,
+         }
+     }
+ 
+@@ -580,6 +595,7 @@ impl Engine {
+         // Step straight back to what the user typed.
+         let delete = cycle.on_screen_len();
+         let text = cycle.text_with_terminator(0);
++        let previous_text = cycle.text_with_terminator(cycle.index);
+         let switch_to = cycle.layouts.first().cloned();
+         let original = cycle.variants[0].clone();
+         let was_auto = cycle.auto;
+@@ -598,6 +614,7 @@ impl Engine {
+             delete,
+             text,
+             switch_to,
++            original: previous_text,
+         }
+     }
+ 
+@@ -617,6 +634,7 @@ impl Engine {
+         Action::Replace {
+             delete: word.text.chars().count(),
+             text: converted,
++            original: word.text,
+             switch_to: Some(target.to_string()),
+         }
+     }
+@@ -715,6 +733,22 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn external_caret_invalidation_forgets_a_completed_word() {
++        let mut e = engine();
++        let _ = type_str(&mut e, "ghbdtn ", "us");
++        e.invalidate_caret();
++        assert_eq!(e.cycle_last_word(), Action::None);
++    }
++
++    #[test]
++    fn external_caret_invalidation_forgets_a_partial_word() {
++        let mut e = engine();
++        let _ = type_str(&mut e, "ghbdtn", "us");
++        e.invalidate_caret();
++        assert_eq!(type_str(&mut e, " ", "us"), Action::None);
++    }
++
+     fn engine() -> Engine {
+         let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/models");
+         let models = Models::load_dir(&dir).expect("models");
+@@ -755,6 +789,7 @@ mod tests {
+             Action::Replace {
+                 delete: 7,
+                 text: "привет ".into(),
++                original: "ghbdtn ".into(),
+                 switch_to: Some("ru".into()),
+             }
+         );
+@@ -778,6 +813,7 @@ mod tests {
+             Action::Replace {
+                 delete: 8,
+                 text: "привет! ".into(),
++                original: "ghbdtn! ".into(),
+                 switch_to: Some("ru".into()),
+             }
+         );
+@@ -913,6 +949,7 @@ mod tests {
+             Action::Replace {
+                 delete: 7,
+                 text: "ghbdtn ".into(),
++                original: "привет ".into(),
+                 switch_to: Some("us".into()),
+             }
+         );
+diff --git a/crates/rekey-hook/src/lib.rs b/crates/rekey-hook/src/lib.rs
+index 23d22a4..dfcddf1 100644
+--- a/crates/rekey-hook/src/lib.rs
++++ b/crates/rekey-hook/src/lib.rs
+@@ -14,6 +14,8 @@ pub use rekey_core::input::{Context, Key, KeyEvent, Modifiers, TextWriter as Inj
+ 
+ pub mod noop;
+ 
++#[cfg(target_os = "macos")]
++pub mod focus;
+ #[cfg(target_os = "macos")]
+ pub mod macos;
+ #[cfg(target_os = "macos")]
+diff --git a/crates/rekey-hook/src/macos.rs b/crates/rekey-hook/src/macos.rs
+index 5a95871..7a8deae 100644
+--- a/crates/rekey-hook/src/macos.rs
++++ b/crates/rekey-hook/src/macos.rs
+@@ -243,6 +243,20 @@ pub fn current_context() -> Context {
+     }
+ }
+ 
++/// Read bundle id and pid from the same frontmost application object.
++/// Must be called on the main thread, like current_context.
++pub fn current_context_with_pid() -> Option<(Context, i32)> {
++    let app = objc2_app_kit::NSWorkspace::sharedWorkspace().frontmostApplication()?;
++    Some((
++        Context {
++            app: app.bundleIdentifier().map(|id| id.to_string()),
++            layout: current_layout(),
++            secure_input: secure_input_active(),
++        },
++        app.processIdentifier(),
++    ))
++}
++
+ // -- injection --------------------------------------------------------------
+ 
+ pub struct MacInjector {
+@@ -493,7 +507,15 @@ where
+         CGEventTapPlacement::HeadInsertEventTap,
+         // Listen-only: the user's keystroke is never delayed or swallowed.
+         CGEventTapOptions::ListenOnly,
+-        vec![CGEventType::KeyDown, CGEventType::FlagsChanged],
++        vec![
++            CGEventType::KeyDown,
++            CGEventType::FlagsChanged,
++            CGEventType::LeftMouseDown,
++            CGEventType::RightMouseDown,
++            CGEventType::OtherMouseDown,
++            CGEventType::LeftMouseDragged,
++            CGEventType::ScrollWheel,
++        ],
+         move |_proxy, event_type, event| {
+             // macOS switches a tap off if its callback is ever too slow, or if
+             // the user's own input trips the watchdog, and it stays off until
+@@ -506,6 +528,15 @@ where
+             ) {
+                 let port = callback_port.load(Ordering::Relaxed);
+                 if port != 0 {
++                    // A lost tap invalidates every buffered/queued correction before rearm.
++                    if let Ok(mut handler) = on_key.lock() {
++                        handler(KeyEvent {
++                            character: None,
++                            key: Key::Navigation,
++                            modifiers: Modifiers::default(),
++                            synthetic: false,
++                        });
++                    }
+                     log::warn!("keyboard tap was disabled by the system; re-arming");
+                     unsafe { CGEventTapEnable(port as *mut c_void, true) };
+                 }
+@@ -536,6 +567,16 @@ where
+                     modifiers: modifiers_of(event),
+                     synthetic,
+                 }),
++                CGEventType::LeftMouseDown
++                | CGEventType::RightMouseDown
++                | CGEventType::OtherMouseDown
++                | CGEventType::LeftMouseDragged
++                | CGEventType::ScrollWheel => Some(KeyEvent {
++                    character: None,
++                    key: Key::Navigation,
++                    modifiers: modifiers_of(event),
++                    synthetic,
++                }),
+                 _ => None,
+             };
+ 
+
+diff --git a/app/src-tauri/src/safe_service.rs b/app/src-tauri/src/safe_service.rs
+new file mode 100644
+--- /dev/null
++++ b/app/src-tauri/src/safe_service.rs
+@@ -0,0 +1,577 @@
++//! Local safety fork: observed AX targets only; no global synthetic-key fallback.
++use crate::transaction::{self, Outcome, Phase, Target};
++use rekey_core::{
++    engine::{Action, Engine},
++    input::{Context, Key, KeyEvent},
++};
++use rekey_hook::{
++    focus::{Expected, Focus, Range, Watch},
++    platform,
++};
++use std::{
++    sync::{
++        atomic::{AtomicBool, AtomicU64, Ordering},
++        mpsc, Arc, Mutex, OnceLock,
++    },
++    time::Duration,
++};
++use tauri::AppHandle;
++pub type SharedEngine = Arc<Mutex<Engine>>;
++static SETTINGS_REVISION: AtomicU64 = AtomicU64::new(0);
++static WATCHES: OnceLock<Mutex<Vec<Watch>>> = OnceLock::new();
++pub fn invalidate_pending() {
++    SETTINGS_REVISION.fetch_add(1, Ordering::SeqCst);
++    if let Some(ws) = WATCHES.get() {
++        if let Ok(ws) = ws.lock() {
++            for w in ws.iter() {
++                w.clear();
++                w.invalidated.store(true, Ordering::SeqCst);
++            }
++        }
++    }
++}
++// A timed-out queued main-thread task is marked cancelled before it can mutate layout.
++fn on_main<T: Send + 'static>(
++    app: &AppHandle,
++    f: impl FnOnce(Arc<AtomicBool>) -> T + Send + 'static,
++) -> Option<T> {
++    let (tx, rx) = mpsc::channel();
++    let live = Arc::new(AtomicBool::new(true));
++    let active = live.clone();
++    app.run_on_main_thread(move || {
++        if active.load(Ordering::SeqCst) {
++            let result = f(active.clone());
++            let _ = tx.send(result);
++        }
++    })
++    .ok()?;
++    let result = rx.recv_timeout(Duration::from_millis(100)).ok();
++    if result.is_none() {
++        live.store(false, Ordering::SeqCst);
++    }
++    result
++}
++fn policy_context(app: &AppHandle) -> Option<(Context, i32)> {
++    on_main(app, |_| platform::current_context_with_pid()).flatten()
++}
++fn allowed(engine: &SharedEngine, ctx: &Context) -> bool {
++    let Ok(e) = engine.lock() else {
++        return false;
++    };
++    e.config().enabled
++        && !ctx.secure_input
++        && ctx
++            .app
++            .as_ref()
++            .is_some_and(|a| !e.config().is_excluded_app(a))
++}
++fn known_boundary(previous: bool, caret: usize, predecessor: Option<&str>) -> bool {
++    previous
++        || caret == 0
++        || predecessor.is_some_and(|s| !s.is_empty() && s.chars().all(char::is_whitespace))
++}
++#[derive(Clone)]
++struct Track {
++    focus: Focus,
++    tail: String,
++    revision: u64,
++    synchronized: bool,
++}
++fn expectation(t: &Track) -> Option<Expected> {
++    let length = t.tail.encode_utf16().count();
++    if length > 128 || t.focus.caret < length {
++        return None;
++    }
++    Some(Expected {
++        focus: t.focus.clone(),
++        fragment_range: Range {
++            location: (t.focus.caret - length) as isize,
++            length: length as isize,
++        },
++        fragment: t.tail.clone(),
++        revision: t.revision,
++    })
++}
++fn next(
++    t: Option<&Track>,
++    focus: &Focus,
++    event: &KeyEvent,
++    revision: u64,
++    boundary: bool,
++) -> Option<Track> {
++    if focus.selected != 0 || event.modifiers.is_shortcut() {
++        return None;
++    }
++    let mut tail = t
++        .filter(|old| old.focus.same_field(focus) && old.focus.caret == focus.caret)
++        .map(|old| old.tail.clone())
++        .unwrap_or_default();
++    let mut f = focus.clone();
++    match event.key {
++        Key::Character => {
++            let c = event.character?;
++            if c.len_utf16() != 1 {
++                return None;
++            }
++            if tail.ends_with(' ') {
++                tail.clear();
++            }
++            tail.push(c);
++            f.caret += 1;
++        }
++        Key::Space => {
++            tail.push(' ');
++            f.caret += 1;
++        }
++        Key::ModifiersChanged => {}
++        _ => return None,
++    }
++    if tail.encode_utf16().count() > 128 {
++        return None;
++    }
++    Some(Track {
++        focus: f,
++        tail,
++        revision,
++        synchronized: boundary || t.is_some_and(|x| x.synchronized) || event.key == Key::Space,
++    })
++}
++fn reset(engine: &SharedEngine, tracking: &Arc<Mutex<Option<Track>>>, watch: &Watch) {
++    if let Ok(mut e) = engine.lock() {
++        e.invalidate_caret();
++    }
++    if let Ok(mut t) = tracking.lock() {
++        *t = None;
++    }
++    watch.clear();
++}
++struct Pending {
++    action: Action,
++    origin: Focus,
++    generation: u64,
++    revision: u64,
++}
++struct AxTarget<'a> {
++    pending: &'a Pending,
++    range: Range,
++    text: &'a str,
++    original: &'a str,
++    app: &'a AppHandle,
++    engine: &'a SharedEngine,
++    generation: &'a AtomicU64,
++    running: &'a AtomicBool,
++    source_verified: bool,
++    selected_owned: bool,
++}
++impl Target for AxTarget<'_> {
++    fn guard(&mut self, phase: Phase) -> bool {
++        // Cleanup retains narrow authorization to restore our already-selected fragment.
++        // A settings change cancels writing but alone does not transfer caret ownership.
++        let owner = self.running.load(Ordering::SeqCst)
++            && self.generation.load(Ordering::SeqCst) == self.pending.generation
++            && !platform::secure_input_active();
++        if !owner {
++            return false;
++        }
++        if phase != Phase::Rollback
++            && SETTINGS_REVISION.load(Ordering::SeqCst) != self.pending.revision
++        {
++            return false;
++        }
++        if phase == Phase::BeforeSelection {
++            let Some((ctx, pid)) = policy_context(self.app) else {
++                return false;
++            };
++            if !allowed(self.engine, &ctx) || pid != self.pending.origin.pid {
++                return false;
++            }
++            let Some(now) = Focus::capture() else {
++                return false;
++            };
++            now.same_field(&self.pending.origin)
++                && now.selected == 0
++                && now.caret == self.pending.origin.caret
++                && self.generation.load(Ordering::SeqCst) == self.pending.generation
++                && SETTINGS_REVISION.load(Ordering::SeqCst) == self.pending.revision
++        } else {
++            // No main-thread wait, TIS/AppKit, engine mutex, or full role/window capture after selection.
++            self.pending.origin.still_focused()
++                && self.pending.origin.current_range() == Some(self.range)
++                && self.generation.load(Ordering::SeqCst) == self.pending.generation
++                && (phase == Phase::Rollback
++                    || SETTINGS_REVISION.load(Ordering::SeqCst) == self.pending.revision)
++        }
++    }
++    fn fragment(&mut self) -> Option<String> {
++        if SETTINGS_REVISION.load(Ordering::SeqCst) != self.pending.revision {
++            return None;
++        }
++        let source = self.pending.origin.fragment(self.range);
++        self.source_verified = source.as_deref() == Some(self.original);
++        source
++    }
++    fn select(&mut self) -> bool {
++        let ok =
++            self.guard(Phase::BeforeSelection) && self.pending.origin.set_selection(self.range);
++        self.selected_owned = ok;
++        ok
++    }
++    fn replace(&mut self) -> bool {
++        self.guard(Phase::BeforeReplacement)
++            && self.fragment().as_deref() == Some(self.original)
++            && self.guard(Phase::BeforeReplacement)
++            && self.pending.origin.set_selected_text(self.text)
++    }
++    fn rollback(&mut self) -> bool {
++        if !self.selected_owned || !self.source_verified || !self.guard(Phase::Rollback) {
++            return false;
++        }
++        if SETTINGS_REVISION.load(Ordering::SeqCst) == self.pending.revision {
++            if self.fragment().as_deref() != Some(self.original) || !self.guard(Phase::Rollback) {
++                return false;
++            }
++        }
++        // A config-only cancellation may collapse our exact owned range using metadata
++        // and the previously verified source, without any new text read while OFF.
++        // This never writes/deletes characters; focus/input/range changes prevent it.
++        self.guard(Phase::Rollback)
++            && self.pending.origin.set_selection(Range {
++                location: self.range.location + self.range.length,
++                length: 0,
++            })
++    }
++}
++pub fn spawn(
++    app: &AppHandle,
++    engine: SharedEngine,
++) -> Result<Arc<AtomicBool>, rekey_hook::HookError> {
++    let running = Arc::new(AtomicBool::new(false));
++    let generation = Arc::new(AtomicU64::new(0));
++    let tracking = Arc::new(Mutex::new(None::<Track>));
++    let watch = Watch::start(
++        generation.clone(),
++        Arc::new(|revision| SETTINGS_REVISION.load(Ordering::SeqCst) == revision),
++    )
++    .map_err(|e| rekey_hook::HookError::Os(e.to_string()))?;
++    if let Ok(mut ws) = WATCHES.get_or_init(|| Mutex::new(Vec::new())).lock() {
++        ws.push(watch.clone());
++    }
++    let (tx, rx) = mpsc::channel::<Pending>();
++    let handle = app.clone();
++    let gen = generation.clone();
++    let e = engine.clone();
++    let tracker = tracking.clone();
++    let w = watch.clone();
++    let alive = running.clone();
++    std::thread::Builder::new()
++        .name("rekey-safe-inject".into())
++        .spawn(move || {
++            for pending in rx {
++                std::thread::sleep(Duration::from_millis(25));
++                let Action::Replace {
++                    delete,
++                    text,
++                    switch_to,
++                    original,
++                } = &pending.action
++                else {
++                    continue;
++                };
++                let count = original.encode_utf16().count();
++                // The core deletion count must agree with this exact BMP source fragment.
++                if count != *delete
++                    || pending.origin.caret < count
++                    || count > 128
++                    || !w.ensure(&pending.origin)
++                {
++                    reset(&e, &tracker, &w);
++                    continue;
++                }
++                let range = Range {
++                    location: (pending.origin.caret - count) as isize,
++                    length: count as isize,
++                };
++                let selected = pending.origin.with_range(range);
++                let final_focus = pending.origin.with_range(Range {
++                    location: range.location + text.encode_utf16().count() as isize,
++                    length: 0,
++                });
++                // Allow only the exact original/own-selection/own-replacement transitions.
++                w.expect(vec![
++                    Expected {
++                        focus: pending.origin.clone(),
++                        fragment_range: range,
++                        fragment: original.clone(),
++                        revision: pending.revision,
++                    },
++                    Expected {
++                        focus: selected,
++                        fragment_range: range,
++                        fragment: original.clone(),
++                        revision: pending.revision,
++                    },
++                    Expected {
++                        focus: final_focus.clone(),
++                        fragment_range: Range {
++                            location: range.location,
++                            length: text.encode_utf16().count() as isize,
++                        },
++                        fragment: text.clone(),
++                        revision: pending.revision,
++                    },
++                ]);
++                let mut target = AxTarget {
++                    pending: &pending,
++                    range,
++                    text,
++                    original,
++                    app: &handle,
++                    engine: &e,
++                    generation: &gen,
++                    running: &alive,
++                    source_verified: false,
++                    selected_owned: false,
++                };
++                let outcome = transaction::execute(&mut target, original);
++                if outcome != Outcome::Replaced {
++                    if outcome == Outcome::SelectionNotRestored {
++                        log::warn!(
++                            "AX correction cancelled; selection restoration was unsafe and skipped"
++                        );
++                    }
++                    reset(&e, &tracker, &w);
++                    continue;
++                }
++                let Some(after) = Focus::capture() else {
++                    reset(&e, &tracker, &w);
++                    continue;
++                };
++                if !after.same_field(&final_focus)
++                    || after.selection() != final_focus.selection()
++                    || gen.load(Ordering::SeqCst) != pending.generation
++                    || SETTINGS_REVISION.load(Ordering::SeqCst) != pending.revision
++                {
++                    reset(&e, &tracker, &w);
++                    continue;
++                }
++                let mut layout_ok = switch_to.is_none();
++                if let Some(layout) = switch_to {
++                    let target_focus = after.clone();
++                    let target_text = text.clone();
++                    let start = range.location;
++                    let layout = layout.clone();
++                    let e = e.clone();
++                    let gen = gen.clone();
++                    let alive = alive.clone();
++                    let n = pending.generation;
++                    let revision = pending.revision;
++                    layout_ok = on_main(&handle, move |token| {
++                        let valid = || {
++                            token.load(Ordering::SeqCst)
++                                && alive.load(Ordering::SeqCst)
++                                && gen.load(Ordering::SeqCst) == n
++                                && SETTINGS_REVISION.load(Ordering::SeqCst) == revision
++                        };
++                        if !valid() || !allowed(&e, &platform::current_context()) {
++                            return false;
++                        }
++                        if !Focus::capture().is_some_and(|f| {
++                            f.same_field(&target_focus)
++                                && f.selection() == target_focus.selection()
++                                && f.fragment(Range {
++                                    location: start,
++                                    length: target_text.encode_utf16().count() as isize,
++                                })
++                                .as_deref()
++                                    == Some(target_text.as_str())
++                        }) || !valid()
++                        {
++                            return false;
++                        }
++                        platform::select_layout(&layout)
++                            && valid()
++                            && platform::current_layout().as_deref() == Some(layout.as_str())
++                    })
++                    .unwrap_or(false);
++                }
++                if !layout_ok {
++                    if let Ok(mut engine) = e.lock() {
++                        engine.invalidate_caret();
++                    }
++                    log::info!("text corrected; input-source change was not confirmed");
++                }
++                if gen.load(Ordering::SeqCst) == pending.generation
++                    && SETTINGS_REVISION.load(Ordering::SeqCst) == pending.revision
++                {
++                    let t = Track {
++                        focus: after,
++                        tail: text.clone(),
++                        revision: pending.revision,
++                        synchronized: true,
++                    };
++                    if let Some(x) = expectation(&t) {
++                        w.expect(vec![x]);
++                        if let Ok(mut slot) = tracker.lock() {
++                            *slot = Some(t);
++                        }
++                    }
++                } else {
++                    reset(&e, &tracker, &w);
++                }
++                log::info!(
++                    "AX correction applied ({} chars); compatible observed fields only",
++                    text.chars().count()
++                );
++            }
++        })
++        .map_err(|err| rekey_hook::HookError::Os(err.to_string()))?;
++    let handle = app.clone();
++    let flag = running.clone();
++    let shutdown_engine = engine.clone();
++    let shutdown_track = tracking.clone();
++    let shutdown_watch = watch.clone();
++    let shutdown_gen = generation.clone();
++    std::thread::Builder::new()
++        .name("rekey-safe-hook".into())
++        .spawn(move || {
++            while !platform::has_permission() {
++                std::thread::sleep(Duration::from_secs(1));
++            }
++            flag.store(true, Ordering::SeqCst);
++            let result = platform::run(move |event| {
++                if event.synthetic {
++                    return;
++                }
++                let n = generation.fetch_add(1, Ordering::SeqCst) + 1;
++                let revision = SETTINGS_REVISION.load(Ordering::SeqCst);
++                if watch.invalidated.swap(false, Ordering::SeqCst) {
++                    reset(&engine, &tracking, &watch);
++                }
++                let Some((ctx, pid)) = policy_context(&handle) else {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                };
++                if !allowed(&engine, &ctx) || gen_changed(&generation, n, revision) {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                }
++                let Some(focus) = Focus::capture() else {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                };
++                if focus.pid != pid {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                }
++                if !watch.ensure(&focus) {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                }
++                let old = tracking.lock().ok().and_then(|x| x.clone());
++                let continuous = old.as_ref().is_some_and(|t| {
++                    t.revision == revision
++                        && expectation(t).is_some_and(|x| {
++                            x.matches(&focus, |r| SETTINGS_REVISION.load(Ordering::SeqCst) == r)
++                        })
++                });
++                if !continuous {
++                    reset(&engine, &tracking, &watch);
++                }
++                let previous_boundary = continuous && old.as_ref().is_some_and(|x| x.synchronized);
++                let predecessor = if !previous_boundary
++                    && focus.caret > 0
++                    && SETTINGS_REVISION.load(Ordering::SeqCst) == revision
++                {
++                    focus.fragment(Range {
++                        location: (focus.caret - 1) as isize,
++                        length: 1,
++                    })
++                } else {
++                    None
++                };
++                let boundary =
++                    known_boundary(previous_boundary, focus.caret, predecessor.as_deref());
++                let Some(t) = next(
++                    if continuous { old.as_ref() } else { None },
++                    &focus,
++                    &event,
++                    revision,
++                    boundary,
++                ) else {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                };
++                let Some(expected) = expectation(&t) else {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                };
++                let mut states = vec![expected];
++                if let Some(previous) = old.as_ref().and_then(expectation) {
++                    states.push(previous);
++                }
++                watch.expect(states);
++                if !allowed(&engine, &ctx) {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                }
++                if gen_changed(&generation, n, revision) {
++                    reset(&engine, &tracking, &watch);
++                    return;
++                }
++                let action = match engine.lock() {
++                    Ok(mut e) => {
++                        if boundary {
++                            e.on_key(&event, &ctx)
++                        } else {
++                            e.invalidate_caret();
++                            Action::None
++                        }
++                    }
++                    Err(_) => return,
++                };
++                if let Ok(mut slot) = tracking.lock() {
++                    *slot = Some(t.clone());
++                }
++                if matches!(action, Action::Replace { .. }) {
++                    let _ = tx.send(Pending {
++                        action,
++                        origin: t.focus,
++                        generation: n,
++                        revision,
++                    });
++                }
++            });
++            flag.store(false, Ordering::SeqCst);
++            shutdown_gen.fetch_add(1, Ordering::SeqCst);
++            invalidate_pending();
++            reset(&shutdown_engine, &shutdown_track, &shutdown_watch);
++            if let Err(err) = result {
++                log::error!("safe keyboard hook stopped: {err}");
++            }
++        })
++        .map_err(|err| rekey_hook::HookError::Os(err.to_string()))?;
++    Ok(running)
++}
++fn gen_changed(generation: &AtomicU64, n: u64, revision: u64) -> bool {
++    generation.load(Ordering::SeqCst) != n || SETTINGS_REVISION.load(Ordering::SeqCst) != revision
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn missed_prefix_requires_whitespace_before_tracking() {
++        assert!(!known_boundary(false, 5, Some("g")));
++        assert!(!known_boundary(false, 5, None));
++        assert!(known_boundary(false, 5, Some(" ")));
++    }
++    #[test]
++    fn empty_field_is_a_known_boundary() {
++        assert!(known_boundary(false, 0, None));
++    }
++    #[test]
++    fn overflow_reset_does_not_license_suffix_correction() {
++        assert!(!known_boundary(false, 129, Some("x")));
++        assert!(known_boundary(false, 130, Some(" ")));
++    }
++}
+
+diff --git a/app/src-tauri/src/transaction.rs b/app/src-tauri/src/transaction.rs
+new file mode 100644
+--- /dev/null
++++ b/app/src-tauri/src/transaction.rs
+@@ -0,0 +1,244 @@
++//! Shared transaction orchestration, exercised with a stateful AX mock.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum Phase {
++    BeforeSelection,
++    BeforeReplacement,
++    Rollback,
++}
++pub trait Target {
++    fn guard(&mut self, phase: Phase) -> bool;
++    fn fragment(&mut self) -> Option<String>;
++    fn select(&mut self) -> bool;
++    fn replace(&mut self) -> bool;
++    fn rollback(&mut self) -> bool;
++}
++#[derive(Debug, PartialEq, Eq)]
++pub enum Outcome {
++    Replaced,
++    Skipped,
++    SelectionRestored,
++    SelectionNotRestored,
++}
++pub fn execute(target: &mut impl Target, original: &str) -> Outcome {
++    if !target.guard(Phase::BeforeSelection)
++        || target.fragment().as_deref() != Some(original)
++        || !target.guard(Phase::BeforeSelection)
++    {
++        return Outcome::Skipped;
++    }
++    if !target.select() {
++        return Outcome::Skipped;
++    }
++    // A collapsed original caret is never acceptable once selection has been made.
++    // The backend performs fast combined retained-target/range/fragment guards.
++    if target.replace() {
++        return Outcome::Replaced;
++    }
++    // Restoration needs unchanged originating focus, revision, range and fragment.
++    if target.rollback() {
++        Outcome::SelectionRestored
++    } else {
++        Outcome::SelectionNotRestored
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[derive(Clone, Copy)]
++    enum Change {
++        None,
++        Focus,
++        Collapsed,
++        Settings,
++        TapLost,
++        Timeout,
++        Fragment,
++        Deleted,
++        NewInput,
++        Secure,
++        Toggle,
++        SelectFailure,
++        ReplaceFailure,
++        HostInput,
++    }
++    struct Mock {
++        step: usize,
++        at: usize,
++        change: Change,
++        live: bool,
++        selected: bool,
++        revision: bool,
++        fragment: String,
++        writes: usize,
++        restores: usize,
++        host_replacements: usize,
++    }
++    impl Mock {
++        fn new(change: Change, at: usize) -> Self {
++            Self {
++                step: 0,
++                at,
++                change,
++                live: true,
++                selected: false,
++                revision: true,
++                fragment: "ghbdtn ".into(),
++                writes: 0,
++                restores: 0,
++                host_replacements: 0,
++            }
++        }
++        fn advance(&mut self) {
++            self.step += 1;
++            if self.step == self.at {
++                match self.change {
++                    Change::None => {}
++                    Change::Collapsed => self.selected = false,
++                    Change::Fragment => self.fragment = "different".into(),
++                    Change::Settings => self.revision = false,
++                    Change::HostInput => {
++                        if self.selected {
++                            self.fragment = "z".into();
++                            self.selected = false;
++                            self.host_replacements += 1;
++                        }
++                        self.revision = false;
++                        self.live = false;
++                    }
++                    Change::TapLost | Change::Timeout | Change::NewInput => {
++                        self.revision = false;
++                        self.live = false;
++                    }
++                    _ => self.live = false,
++                }
++            }
++        }
++    }
++    impl Target for Mock {
++        fn guard(&mut self, p: Phase) -> bool {
++            self.advance();
++            self.live
++                && self.revision
++                && if p == Phase::BeforeSelection {
++                    !self.selected
++                } else {
++                    self.selected
++                }
++        }
++        fn fragment(&mut self) -> Option<String> {
++            self.advance();
++            self.live.then(|| self.fragment.clone())
++        }
++        fn select(&mut self) -> bool {
++            self.advance();
++            if matches!(self.change, Change::SelectFailure) {
++                false
++            } else {
++                self.selected = true;
++                true
++            }
++        }
++        fn replace(&mut self) -> bool {
++            self.advance();
++            if !self.live
++                || !self.revision
++                || !self.selected
++                || self.fragment != "ghbdtn "
++                || matches!(self.change, Change::ReplaceFailure)
++            {
++                return false;
++            }
++            self.writes += 1;
++            self.selected = false;
++            true
++        }
++        fn rollback(&mut self) -> bool {
++            self.advance();
++            if !self.live
++                || (!self.revision && !matches!(self.change, Change::Settings))
++                || !self.selected
++                || self.fragment != "ghbdtn "
++            {
++                return false;
++            }
++            self.selected = false;
++            self.restores += 1;
++            true
++        }
++    }
++    #[test]
++    fn exact_origin_replaces() {
++        let mut m = Mock::new(Change::None, usize::MAX);
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::Replaced);
++        assert_eq!(m.writes, 1);
++    }
++    #[test]
++    fn original_fragment_mismatch_skips() {
++        let mut m = Mock::new(Change::None, usize::MAX);
++        m.fragment = "another".into();
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::Skipped);
++        assert_eq!(m.writes, 0);
++    }
++    #[test]
++    fn adversarial_transitions_at_every_check() {
++        for change in [
++            Change::Focus,
++            Change::Settings,
++            Change::TapLost,
++            Change::Timeout,
++            Change::Fragment,
++            Change::Deleted,
++            Change::NewInput,
++            Change::Secure,
++            Change::Toggle,
++        ] {
++            for at in 1..=5 {
++                let mut m = Mock::new(change, at);
++                let _ = execute(&mut m, "ghbdtn ");
++                assert_eq!(m.writes, 0, "write after transition at {at}");
++            }
++        }
++    }
++    #[test]
++    fn collapsed_selection_never_inserts() {
++        for at in 5..=5 {
++            let mut m = Mock::new(Change::Collapsed, at);
++            let _ = execute(&mut m, "ghbdtn ");
++            assert_eq!(m.writes, 0);
++        }
++    }
++    #[test]
++    fn selection_failure_has_no_writes() {
++        let mut m = Mock::new(Change::SelectFailure, usize::MAX);
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::Skipped);
++        assert_eq!(m.writes, 0);
++    }
++    #[test]
++    fn replace_failure_restores_only_unchanged_selection() {
++        let mut m = Mock::new(Change::ReplaceFailure, usize::MAX);
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::SelectionRestored);
++        assert_eq!(m.restores, 1);
++        assert_eq!(m.writes, 0);
++    }
++    #[test]
++    fn cancellation_does_not_blindly_restore() {
++        let mut m = Mock::new(Change::NewInput, 5);
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::SelectionNotRestored);
++        assert_eq!(m.restores, 0);
++    }
++    #[test]
++    fn host_input_in_selection_window_is_detected_without_more_writes() {
++        let mut m = Mock::new(Change::HostInput, 5);
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::SelectionNotRestored);
++        assert_eq!(m.writes, 0);
++        assert_eq!(m.host_replacements, 1);
++        assert_eq!(m.fragment, "z");
++    }
++    #[test]
++    fn config_only_cancel_collapses_owned_selection_without_new_capture() {
++        let mut m = Mock::new(Change::Settings, 5);
++        assert_eq!(execute(&mut m, "ghbdtn "), Outcome::SelectionRestored);
++        assert_eq!(m.writes, 0);
++        assert_eq!(m.restores, 1);
++    }
++}
+
+diff --git a/crates/rekey-hook/src/focus.rs b/crates/rekey-hook/src/focus.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/rekey-hook/src/focus.rs
+@@ -0,0 +1,483 @@
++//! Conservative AX-targeted operations. Reads only bounded originating fragments.
++use core_foundation::{
++    base::{CFEqual, CFGetTypeID, CFRelease, CFTypeRef, TCFType},
++    runloop::{kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopAddSource, CFRunLoopRemoveSource},
++    string::{CFString, CFStringGetTypeID, CFStringRef},
++};
++use std::{
++    ffi::c_void,
++    sync::{
++        atomic::{AtomicBool, AtomicU64, Ordering},
++        mpsc, Arc, Mutex,
++    },
++    time::Duration,
++};
++#[repr(C)]
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct Range {
++    pub location: isize,
++    pub length: isize,
++}
++#[link(name = "ApplicationServices", kind = "framework")]
++unsafe extern "C" {
++    fn AXUIElementCreateSystemWide() -> CFTypeRef;
++    fn AXUIElementCreateApplication(pid: i32) -> CFTypeRef;
++    fn AXUIElementGetTypeID() -> usize;
++    fn AXValueGetTypeID() -> usize;
++    fn AXValueGetType(value: CFTypeRef) -> i32;
++    fn AXUIElementCopyAttributeValue(e: CFTypeRef, attr: CFStringRef, out: *mut CFTypeRef) -> i32;
++    fn AXUIElementCopyParameterizedAttributeValue(
++        e: CFTypeRef,
++        attr: CFStringRef,
++        param: CFTypeRef,
++        out: *mut CFTypeRef,
++    ) -> i32;
++    fn AXUIElementSetAttributeValue(e: CFTypeRef, attr: CFStringRef, value: CFTypeRef) -> i32;
++    fn AXUIElementGetPid(e: CFTypeRef, pid: *mut i32) -> i32;
++    fn AXUIElementSetMessagingTimeout(e: CFTypeRef, seconds: f32) -> i32;
++    fn AXUIElementIsAttributeSettable(e: CFTypeRef, attr: CFStringRef, out: *mut bool) -> i32;
++    fn AXValueGetValue(value: CFTypeRef, kind: i32, out: *mut c_void) -> bool;
++    fn AXValueCreate(kind: i32, value: *const c_void) -> CFTypeRef;
++    fn AXObserverCreate(
++        pid: i32,
++        callback: unsafe extern "C" fn(CFTypeRef, CFTypeRef, CFStringRef, *mut c_void),
++        out: *mut CFTypeRef,
++    ) -> i32;
++    fn AXObserverAddNotification(
++        observer: CFTypeRef,
++        e: CFTypeRef,
++        name: CFStringRef,
++        refcon: *mut c_void,
++    ) -> i32;
++    fn AXObserverGetRunLoopSource(
++        observer: CFTypeRef,
++    ) -> core_foundation::runloop::CFRunLoopSourceRef;
++}
++// Generic owned CF references remain local to the thread; no blanket Send/Sync.
++struct Owned(CFTypeRef);
++impl Drop for Owned {
++    fn drop(&mut self) {
++        if !self.0.is_null() {
++            unsafe { CFRelease(self.0) }
++        }
++    }
++}
++struct AXElement(Owned);
++// Apple AXUIElement references are thread-safe; only validated AX references cross threads.
++unsafe impl Send for AXElement {}
++unsafe impl Sync for AXElement {}
++impl AXElement {
++    fn from_owned(x: Owned) -> Option<Self> {
++        if !x.0.is_null() && unsafe { CFGetTypeID(x.0) == AXUIElementGetTypeID() } {
++            Some(Self(x))
++        } else {
++            None
++        }
++    }
++    fn raw(&self) -> CFTypeRef {
++        self.0 .0
++    }
++}
++fn attr(e: &AXElement, name: &str) -> Option<Owned> {
++    let mut out = std::ptr::null();
++    if unsafe {
++        AXUIElementCopyAttributeValue(e.raw(), CFString::new(name).as_concrete_TypeRef(), &mut out)
++    } == 0
++        && !out.is_null()
++    {
++        Some(Owned(out))
++    } else {
++        None
++    }
++}
++fn optional_attr(e: &AXElement, name: &str) -> Result<Option<Owned>, i32> {
++    let mut out = std::ptr::null();
++    let status = unsafe {
++        AXUIElementCopyAttributeValue(e.raw(), CFString::new(name).as_concrete_TypeRef(), &mut out)
++    };
++    match status {
++        0 if !out.is_null() => Ok(Some(Owned(out))),
++        -25205 | -25212 => Ok(None),
++        other => Err(other),
++    }
++}
++fn string(x: &Owned) -> Option<String> {
++    if unsafe { CFGetTypeID(x.0) != CFStringGetTypeID() } {
++        return None;
++    }
++    Some(unsafe { CFString::wrap_under_get_rule(x.0 as CFStringRef) }.to_string())
++}
++fn range(x: &Owned) -> Option<Range> {
++    if unsafe { CFGetTypeID(x.0) != AXValueGetTypeID() || AXValueGetType(x.0) != 4 } {
++        return None;
++    }
++    let mut r = Range {
++        location: -1,
++        length: -1,
++    };
++    if unsafe { AXValueGetValue(x.0, 4, &mut r as *mut _ as *mut c_void) }
++        && r.location >= 0
++        && r.length >= 0
++    {
++        Some(r)
++    } else {
++        None
++    }
++}
++fn range_value(r: Range) -> Option<Owned> {
++    let x = Owned(unsafe { AXValueCreate(4, &r as *const _ as *const c_void) });
++    (!x.0.is_null()).then_some(x)
++}
++#[derive(Clone)]
++pub struct Focus {
++    field: Arc<AXElement>,
++    window: Arc<AXElement>,
++    pub pid: i32,
++    pub caret: usize,
++    pub selected: usize,
++}
++impl Focus {
++    pub fn same_field(&self, other: &Self) -> bool {
++        self.pid == other.pid
++            && unsafe {
++                CFEqual(self.field.raw(), other.field.raw()) != 0
++                    && CFEqual(self.window.raw(), other.window.raw()) != 0
++            }
++    }
++    pub fn selection(&self) -> Range {
++        Range {
++            location: self.caret as isize,
++            length: self.selected as isize,
++        }
++    }
++    pub fn with_range(&self, r: Range) -> Self {
++        let mut f = self.clone();
++        f.caret = r.location as usize;
++        f.selected = r.length as usize;
++        f
++    }
++    pub fn capture() -> Option<Self> {
++        if super::macos::secure_input_active() {
++            return None;
++        }
++        let root = AXElement::from_owned(Owned(unsafe { AXUIElementCreateSystemWide() }))?;
++        unsafe {
++            AXUIElementSetMessagingTimeout(root.raw(), 0.025);
++        }
++        let field = Arc::new(AXElement::from_owned(attr(&root, "AXFocusedUIElement")?)?);
++        unsafe {
++            AXUIElementSetMessagingTimeout(field.raw(), 0.005);
++        }
++        let role = string(&attr(&field, "AXRole")?)?;
++        if role != "AXTextField" && role != "AXTextArea" {
++            return None;
++        }
++        match optional_attr(&field, "AXSubrole") {
++            Ok(Some(subrole)) => {
++                if string(&subrole)?.contains("Secure") {
++                    return None;
++                }
++            }
++            Ok(None) => {}
++            Err(_) => return None,
++        }
++        for key in ["AXSelectedText", "AXSelectedTextRange"] {
++            let mut yes = false;
++            if unsafe {
++                AXUIElementIsAttributeSettable(
++                    field.raw(),
++                    CFString::new(key).as_concrete_TypeRef(),
++                    &mut yes,
++                )
++            } != 0
++                || !yes
++            {
++                return None;
++            }
++        }
++        let selection = range(&attr(&field, "AXSelectedTextRange")?)?;
++        let window = Arc::new(AXElement::from_owned(attr(&field, "AXWindow")?)?);
++        let mut pid = 0;
++        if unsafe { AXUIElementGetPid(field.raw(), &mut pid) } != 0 || pid <= 0 {
++            return None;
++        }
++        Some(Self {
++            field,
++            window,
++            pid,
++            caret: selection.location as usize,
++            selected: selection.length as usize,
++        })
++    }
++    /// Reads only the exact requested fragment (max128UTF16units), never AXValue.
++    pub fn fragment(&self, r: Range) -> Option<String> {
++        if r.location < 0 || r.length < 0 || r.length > 128 {
++            return None;
++        }
++        let parameter = range_value(r)?;
++        let mut out = std::ptr::null();
++        if unsafe {
++            AXUIElementCopyParameterizedAttributeValue(
++                self.field.raw(),
++                CFString::new("AXStringForRange").as_concrete_TypeRef(),
++                parameter.0,
++                &mut out,
++            )
++        } != 0
++            || out.is_null()
++        {
++            return None;
++        }
++        string(&Owned(out))
++    }
++    /// Fast post-selection checks avoid main-thread dispatch and full metadata capture.
++    pub fn still_focused(&self) -> bool {
++        if super::macos::secure_input_active() {
++            return false;
++        }
++        let Some(root) = AXElement::from_owned(Owned(unsafe { AXUIElementCreateSystemWide() }))
++        else {
++            return false;
++        };
++        unsafe {
++            AXUIElementSetMessagingTimeout(root.raw(), 0.005);
++        }
++        let Some(raw) = attr(&root, "AXFocusedUIElement") else {
++            return false;
++        };
++        let Some(current) = AXElement::from_owned(raw) else {
++            return false;
++        };
++        unsafe { CFEqual(current.raw(), self.field.raw()) != 0 }
++    }
++    pub fn current_range(&self) -> Option<Range> {
++        range(&attr(&self.field, "AXSelectedTextRange")?)
++    }
++    pub fn set_selection(&self, r: Range) -> bool {
++        let Some(v) = range_value(r) else {
++            return false;
++        };
++        (unsafe {
++            AXUIElementSetAttributeValue(
++                self.field.raw(),
++                CFString::new("AXSelectedTextRange").as_concrete_TypeRef(),
++                v.0,
++            )
++        }) == 0
++    }
++    pub fn set_selected_text(&self, text: &str) -> bool {
++        (unsafe {
++            AXUIElementSetAttributeValue(
++                self.field.raw(),
++                CFString::new("AXSelectedText").as_concrete_TypeRef(),
++                CFString::new(text).as_CFTypeRef(),
++            )
++        }) == 0
++    }
++}
++#[derive(Clone)]
++pub struct Expected {
++    pub focus: Focus,
++    pub fragment_range: Range,
++    pub fragment: String,
++    pub revision: u64,
++}
++impl Expected {
++    pub fn matches(&self, now: &Focus, policy: impl Fn(u64) -> bool) -> bool {
++        policy(self.revision)
++            && now.same_field(&self.focus)
++            && now.selection() == self.focus.selection()
++            && policy(self.revision)
++            && now.fragment(self.fragment_range).as_deref() == Some(self.fragment.as_str())
++    }
++}
++struct WatchState {
++    generation: Arc<AtomicU64>,
++    invalidated: Arc<AtomicBool>,
++    expected: Arc<Mutex<Vec<Expected>>>,
++    policy: Arc<dyn Fn(u64) -> bool + Send + Sync>,
++}
++unsafe extern "C" fn notify(
++    _observer: CFTypeRef,
++    _element: CFTypeRef,
++    name: CFStringRef,
++    refcon: *mut c_void,
++) {
++    if refcon.is_null() {
++        return;
++    }
++    let state = unsafe { &*(refcon as *const WatchState) };
++    // A notification is only an invalidation hint; payload text is never read.
++    let focus_change =
++        if name.is_null() || unsafe { CFGetTypeID(name as CFTypeRef) != CFStringGetTypeID() } {
++            true
++        } else {
++            unsafe { CFString::wrap_under_get_rule(name) }
++                .to_string()
++                .contains("Focused")
++        };
++    let matches = !focus_change
++        && Focus::capture().is_some_and(|now| {
++            state.expected.lock().ok().is_some_and(|xs| {
++                xs.iter()
++                    .any(|x| x.matches(&now, |revision| (state.policy)(revision)))
++            })
++        });
++    if !matches {
++        state.generation.fetch_add(1, Ordering::SeqCst);
++        state.invalidated.store(true, Ordering::SeqCst);
++    }
++}
++#[derive(Clone)]
++pub struct Watch {
++    tx: mpsc::Sender<Focus>,
++    ready: Arc<Mutex<Option<Focus>>>,
++    expected: Arc<Mutex<Vec<Expected>>>,
++    pub invalidated: Arc<AtomicBool>,
++}
++impl Watch {
++    pub fn start(
++        generation: Arc<AtomicU64>,
++        policy: Arc<dyn Fn(u64) -> bool + Send + Sync>,
++    ) -> Result<Self, std::io::Error> {
++        let (tx, rx) = mpsc::channel::<Focus>();
++        let ready = Arc::new(Mutex::new(None));
++        let expected = Arc::new(Mutex::new(Vec::new()));
++        let invalidated = Arc::new(AtomicBool::new(false));
++        let r = ready.clone();
++        let xs = expected.clone();
++        let invalid = invalidated.clone();
++        std::thread::Builder::new()
++            .name("rekey-ax-observer".into())
++            .spawn(move || {
++                let state = Box::new(WatchState {
++                    generation: generation.clone(),
++                    invalidated: invalid,
++                    expected: xs,
++                    policy,
++                });
++                let refcon = (&*state as *const WatchState) as *mut c_void;
++                let runloop = CFRunLoop::get_current();
++                let mut observer: Option<Owned> = None;
++                let mut installed: Option<Focus> = None;
++                loop {
++                    match rx.recv_timeout(Duration::from_millis(10)) {
++                        Ok(focus) => {
++                            if installed.as_ref().is_some_and(|x| x.same_field(&focus)) {
++                                continue;
++                            }
++                            if let Some(old) = observer.take() {
++                                unsafe {
++                                    CFRunLoopRemoveSource(
++                                        runloop.as_concrete_TypeRef(),
++                                        AXObserverGetRunLoopSource(old.0),
++                                        kCFRunLoopDefaultMode,
++                                    );
++                                }
++                                drop(old);
++                            }
++                            installed = None;
++                            if let Ok(mut slot) = r.lock() {
++                                *slot = None;
++                            }
++                            let mut raw = std::ptr::null();
++                            if unsafe { AXObserverCreate(focus.pid, notify, &mut raw) } != 0
++                                || raw.is_null()
++                            {
++                                continue;
++                            }
++                            let own = Owned(raw);
++                            let Some(app) = AXElement::from_owned(Owned(unsafe {
++                                AXUIElementCreateApplication(focus.pid)
++                            })) else {
++                                continue;
++                            };
++                            let mut ok = true;
++                            for (element, name) in [
++                                (&app, "AXFocusedUIElementChanged"),
++                                (&app, "AXFocusedWindowChanged"),
++                                (&*focus.field, "AXSelectedTextChanged"),
++                                (&*focus.field, "AXValueChanged"),
++                            ] {
++                                if unsafe {
++                                    AXObserverAddNotification(
++                                        own.0,
++                                        element.raw(),
++                                        CFString::new(name).as_concrete_TypeRef(),
++                                        refcon,
++                                    )
++                                } != 0
++                                {
++                                    ok = false;
++                                    break;
++                                }
++                            }
++                            if !ok {
++                                continue;
++                            }
++                            unsafe {
++                                CFRunLoopAddSource(
++                                    runloop.as_concrete_TypeRef(),
++                                    AXObserverGetRunLoopSource(own.0),
++                                    kCFRunLoopDefaultMode,
++                                );
++                            }
++                            installed = Some(focus.clone());
++                            observer = Some(own);
++                            if let Ok(mut slot) = r.lock() {
++                                *slot = Some(focus);
++                            }
++                        }
++                        Err(mpsc::RecvTimeoutError::Disconnected) => {
++                            generation.fetch_add(1, Ordering::SeqCst);
++                            if let Some(old) = observer.take() {
++                                unsafe {
++                                    CFRunLoopRemoveSource(
++                                        runloop.as_concrete_TypeRef(),
++                                        AXObserverGetRunLoopSource(old.0),
++                                        kCFRunLoopDefaultMode,
++                                    );
++                                }
++                            }
++                            break;
++                        }
++                        Err(mpsc::RecvTimeoutError::Timeout) => {}
++                    }
++                    if observer.is_some() {
++                        CFRunLoop::run_in_mode(
++                            unsafe { kCFRunLoopDefaultMode },
++                            Duration::from_millis(10),
++                            false,
++                        );
++                    }
++                }
++            })?;
++        Ok(Self {
++            tx,
++            ready,
++            expected,
++            invalidated,
++        })
++    }
++    pub fn ensure(&self, focus: &Focus) -> bool {
++        if self
++            .ready
++            .lock()
++            .ok()
++            .is_some_and(|x| x.as_ref().is_some_and(|f| f.same_field(focus)))
++        {
++            true
++        } else {
++            let _ = self.tx.send(focus.clone());
++            false
++        }
++    }
++    pub fn expect(&self, xs: Vec<Expected>) {
++        if let Ok(mut x) = self.expected.lock() {
++            *x = xs;
++        }
++    }
++    pub fn clear(&self) {
++        self.expect(Vec::new());
++    }
++}

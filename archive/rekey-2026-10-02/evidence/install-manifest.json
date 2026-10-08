@@ -1,0 +1,22 @@
+{
+  "source": "https://github.com/rstqDev/rekey",
+  "base_commit": "b4928649e07a1fea7e91c8f469a97215eb54b712",
+  "safety_patch": "local-safety-v3.patch",
+  "patch_sha256": "3183c2417d9b21befde7f5827066541bf29b4190b3ecb66151c18b56a7d0a5db",
+  "architecture": "aarch64-apple-darwin",
+  "installed_app": "$USER_HOME/Applications/Rekey.app",
+  "binary_sha256": "91aa58a1736c90247ffd05f0eb593c78673af72f2d0251d74a26aabd6cadfe8c",
+  "signature": "ad-hoc, strictdeepverifyPASS",
+  "unit_integration_tests": 126,
+  "native_rustsec_known_vulnerabilities": 0,
+  "warnings": {
+    "unmaintained": 6,
+    "unsound": 1
+  },
+  "accessibility_ui": "ON observed",
+  "master_correction": "OFF after runtimeblocked",
+  "ai": "OFF",
+  "autostart": "OFF, LaunchAgent absent",
+  "launched": true,
+  "real_autocorrection_gate": "NOT PASS; UIabortedbyuser/globalfocustestingblocked"
+}

@@ -1,0 +1,4 @@
+[1790852844 INFO rekey::service] AX correction applied (7 chars); compatible observed fields only
+[1790852850 INFO rekey::service] AX correction applied (7 chars); compatible observed fields only
+[1790852854 INFO rekey::service] AX correction applied (3 chars); compatible observed fields only
+[1790852882 WARN rekey::service] AX correction cancelled; selection restoration was unsafe and skipped

@@ -225,6 +225,25 @@ pub fn frontmost_app() -> Option<String> {
 }
 
 /// True when a password field has taken over keyboard input.
+/// Names and bundle identifiers of running apps for the exclusion picker.
+/// Main-thread metadata only; no window titles or document contents.
+pub fn running_applications() -> Vec<(String, String)> {
+    let workspace = objc2_app_kit::NSWorkspace::sharedWorkspace();
+    let mut out = Vec::new();
+    for app in workspace.runningApplications().iter() {
+        if let Some(id) = app.bundleIdentifier() {
+            let id = id.to_string();
+            let name = app
+                .localizedName()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| id.clone());
+            out.push((name, id));
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
 pub fn secure_input_active() -> bool {
     unsafe { IsSecureEventInputEnabled() }
 }
@@ -241,6 +260,20 @@ pub fn current_context() -> Context {
         layout: current_layout(),
         secure_input: secure_input_active(),
     }
+}
+
+/// Read bundle id and pid from the same frontmost application object.
+/// Must be called on the main thread, like current_context.
+pub fn current_context_with_pid() -> Option<(Context, i32)> {
+    let app = objc2_app_kit::NSWorkspace::sharedWorkspace().frontmostApplication()?;
+    Some((
+        Context {
+            app: app.bundleIdentifier().map(|id| id.to_string()),
+            layout: current_layout(),
+            secure_input: secure_input_active(),
+        },
+        app.processIdentifier(),
+    ))
 }
 
 // -- injection --------------------------------------------------------------
@@ -493,7 +526,15 @@ where
         CGEventTapPlacement::HeadInsertEventTap,
         // Listen-only: the user's keystroke is never delayed or swallowed.
         CGEventTapOptions::ListenOnly,
-        vec![CGEventType::KeyDown, CGEventType::FlagsChanged],
+        vec![
+            CGEventType::KeyDown,
+            CGEventType::FlagsChanged,
+            CGEventType::LeftMouseDown,
+            CGEventType::RightMouseDown,
+            CGEventType::OtherMouseDown,
+            CGEventType::LeftMouseDragged,
+            CGEventType::ScrollWheel,
+        ],
         move |_proxy, event_type, event| {
             // macOS switches a tap off if its callback is ever too slow, or if
             // the user's own input trips the watchdog, and it stays off until
@@ -506,6 +547,15 @@ where
             ) {
                 let port = callback_port.load(Ordering::Relaxed);
                 if port != 0 {
+                    // A lost tap invalidates every buffered/queued correction before rearm.
+                    if let Ok(mut handler) = on_key.lock() {
+                        handler(KeyEvent {
+                            character: None,
+                            key: Key::Navigation,
+                            modifiers: Modifiers::default(),
+                            synthetic: false,
+                        });
+                    }
                     log::warn!("keyboard tap was disabled by the system; re-arming");
                     unsafe { CGEventTapEnable(port as *mut c_void, true) };
                 }
@@ -533,6 +583,16 @@ where
                 CGEventType::FlagsChanged => Some(KeyEvent {
                     character: None,
                     key: Key::ModifiersChanged,
+                    modifiers: modifiers_of(event),
+                    synthetic,
+                }),
+                CGEventType::LeftMouseDown
+                | CGEventType::RightMouseDown
+                | CGEventType::OtherMouseDown
+                | CGEventType::LeftMouseDragged
+                | CGEventType::ScrollWheel => Some(KeyEvent {
+                    character: None,
+                    key: Key::Navigation,
                     modifiers: modifiers_of(event),
                     synthetic,
                 }),
