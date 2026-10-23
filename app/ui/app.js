@@ -21,7 +21,7 @@ const PAGE_TITLES = {
 
 /** The modifiers on offer, right-hand keys first: they are rarely in chords. */
 const KEYS = [
-  { id: "right_command", symbol: "⌘", label: "Правый Command", tag: "лучший выбор", short: "правый ⌘" },
+  { id: "right_command", symbol: "⌘", label: "Правый Command", short: "правый ⌘" },
   { id: "right_option", symbol: "⌥", label: "Правый Option", short: "правый ⌥" },
   { id: "right_shift", symbol: "⇧", label: "Правый Shift", short: "правый ⇧" },
   { id: "right_control", symbol: "⌃", label: "Правый Control", short: "правый ⌃" },
@@ -146,9 +146,20 @@ async function pollLiveFields() {
   renderStats();
 }
 
+/** Words that differ between the Mac and Windows. */
+function renderPlatformText() {
+  const windows = state.platform === "windows";
+  $("open-log").textContent = windows ? "Показать в Проводнике" : "Показать в Finder";
+  $("copy-chord").textContent = windows ? "Ctrl+C" : "⌘C";
+  $("apps-tray-hint").textContent = windows
+    ? "значка MarKey в области уведомлений"
+    : "меню MarKey в строке меню";
+}
+
 function render() {
   const root = document.documentElement;
   root.dataset.platform = state.platform;
+  renderPlatformText();
   root.dataset.vibrancy = state.vibrancy ? "on" : "off";
   $("version").textContent = `MarKey ${state.version}`;
   $("no-models").hidden = state.models_loaded.length > 0;
@@ -213,10 +224,13 @@ function renderShortcut() {
     label.className = "keycap-label";
     label.textContent = names.label;
     button.append(symbol, label);
-    if (key.tag) {
+    // Right Command on a Mac; right Ctrl on Windows, where a tap of the
+    // Windows key belongs to the Start menu.
+    const best = state.platform === "windows" ? "right_control" : "right_command";
+    if (key.id === best) {
       const tag = document.createElement("span");
       tag.className = "keycap-tag";
-      tag.textContent = key.tag;
+      tag.textContent = "лучший выбор";
       button.append(tag);
     }
     button.addEventListener("click", () => {
@@ -565,6 +579,7 @@ function renderAdvanced() {
   $("switch-layout").checked = c.switch_layout;
   $("skip-caps").checked = c.skip_all_caps;
   $("sound").checked = c.sound;
+  $("fix-case").checked = c.fix_case;
   $("launch").checked = state.launch_at_login;
   $("ai").checked = c.ai_assist;
   $("ai-key-row").hidden = !c.ai_assist;
@@ -592,6 +607,7 @@ $("sensitivity").addEventListener("click", (e) => {
 $("switch-layout").addEventListener("change", (e) => save({ switch_layout: e.target.checked }));
 $("skip-caps").addEventListener("change", (e) => save({ skip_all_caps: e.target.checked }));
 $("sound").addEventListener("change", (e) => save({ sound: e.target.checked }));
+$("fix-case").addEventListener("change", (e) => save({ fix_case: e.target.checked }));
 $("ai").addEventListener("change", (e) => save({ ai_assist: e.target.checked }));
 $("launch").addEventListener("change", (e) => save({}, { launchAtLogin: e.target.checked }));
 $("api-key").addEventListener("change", (e) => {

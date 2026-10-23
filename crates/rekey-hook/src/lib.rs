@@ -35,6 +35,11 @@ pub enum Disposition {
     /// Swallow it. Only possible when the hook was able to install itself as
     /// an active filter; see [`Capabilities::can_hold`].
     Drop,
+    /// The release of a modifier that was just used as MarKey's shortcut:
+    /// let it through, but so that the system does not act on the tap itself.
+    /// On Windows a lone tap of Alt focuses the menu bar and a tap of the
+    /// Windows key opens Start.
+    Mask,
 }
 
 /// A keystroke as the OS described it, kept so it can be sent again later.

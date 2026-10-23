@@ -121,6 +121,16 @@ impl Modifier {
             || family(m.meta, m.right_meta, cmd.is_some(), cmd.unwrap_or(false))
     }
 
+    /// The shortcut key a new installation starts with: right Command on a
+    /// Mac, right Ctrl on Windows — where a tap of the Windows key opens Start.
+    pub fn platform_default() -> Modifier {
+        if cfg!(windows) {
+            Modifier::RightControl
+        } else {
+            Modifier::RightCommand
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Modifier::Option => "Option",
@@ -198,6 +208,9 @@ pub struct Config {
     pub convert_word_before_caret: bool,
     /// Play a quiet sound when a word is corrected automatically.
     pub sound: bool,
+    /// Fix `пРИВЕТ` (Caps Lock left on, which is then switched off) and
+    /// `ПРивет` (Shift held a letter too long).
+    pub fix_case: bool,
 }
 
 impl Default for Config {
@@ -213,12 +226,13 @@ impl Default for Config {
             skip_all_caps: true,
             ai_assist: false,
             shortcut: Shortcut::Tap {
-                modifier: Modifier::RightCommand,
+                modifier: Modifier::platform_default(),
             },
             switch_layout: true,
             convert_selection: true,
             convert_word_before_caret: true,
             sound: false,
+            fix_case: true,
         }
     }
 }
@@ -239,7 +253,14 @@ fn default_excluded_apps() -> Vec<String> {
         "io.alacritty",
         "1Password.exe",
         "KeePass.exe",
+        "KeePassXC.exe",
         "Bitwarden.exe",
+        "WindowsTerminal.exe",
+        "cmd.exe",
+        "powershell.exe",
+        "pwsh.exe",
+        "conhost.exe",
+        "putty.exe",
     ]
     .iter()
     .map(|s| s.to_string())

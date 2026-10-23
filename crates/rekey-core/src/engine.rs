@@ -122,6 +122,9 @@ const LOOKBACK_MAX_LETTERS: usize = 4;
 /// fixed along with the word after it.
 const LOOKBACK_ADVANTAGE: f32 = 0.5;
 
+/// How common a word must be for its capitals to be fixed.
+const CASE_FIX_FLOOR: f32 = -6.0;
+
 /// How many words the shortcut converts at most in one go.
 const PHRASE_LIMIT: usize = 16;
 
@@ -195,6 +198,10 @@ pub struct Engine {
     /// An optional second opinion for words the local models cannot settle.
     assist: Option<Arc<dyn Assist>>,
     stats: Stats,
+    /// The last modifier release completed a tap of the shortcut key.
+    tapped: bool,
+    /// A correction just showed Caps Lock left on.
+    caps_lock_on: bool,
 }
 
 impl Engine {
@@ -215,6 +222,8 @@ impl Engine {
             config_dirty: false,
             assist: None,
             stats: Stats::default(),
+            tapped: false,
+            caps_lock_on: false,
         }
     }
 
@@ -233,6 +242,13 @@ impl Engine {
     /// [`Action::Replace::then`]).
     pub fn set_hold_boundaries(&mut self, hold: bool) {
         self.hold_boundaries = hold;
+    }
+
+    /// True once after a tap of the shortcut modifier — fired or, for a
+    /// double tap, armed. The platform hides such taps from the system, which
+    /// would otherwise open Start or the menu bar for a lone Alt or Win.
+    pub fn take_tap(&mut self) -> bool {
+        std::mem::take(&mut self.tapped)
     }
 
     pub fn stats(&self) -> Stats {
@@ -540,29 +556,53 @@ impl Engine {
             }
         );
 
-        let candidate = match verdict {
-            Verdict::Switch(candidate) => candidate,
+        let converted = match verdict {
+            Verdict::Switch(candidate) => Some(candidate),
             Verdict::Ambiguous(candidate) => match self.resolve_ambiguous(text, &candidate, active)
             {
-                Some(true) => candidate,
-                _ => {
-                    self.remember(text, terminator, active, None);
-                    return Action::None;
-                }
+                Some(true) => Some(candidate),
+                _ => None,
             },
-            Verdict::Keep(_) => {
-                self.remember(text, terminator, active, None);
-                return Action::None;
+            Verdict::Keep(_) => None,
+        };
+        // The layout was right but Caps Lock was not, or Shift was held a
+        // letter too long: `пРИВЕТ`, `ПРивет`.
+        let (shown, target, caps_lock) = match converted {
+            Some(c) => {
+                let to = layout::layout(c.to_layout)
+                    .map(|l| l.def.lang)
+                    .unwrap_or("");
+                match self.case_fix(&c.converted, to) {
+                    Some((fixed, caps)) => (fixed, c.to_layout, caps),
+                    None => (c.converted.clone(), c.to_layout, false),
+                }
+            }
+            None => {
+                let lang = layout::layout(active).map(|l| l.def.lang).unwrap_or("");
+                let target = layout::layout(active).map(|l| l.def.id);
+                match (self.case_fix(text, lang), target) {
+                    (Some((fixed, caps)), Some(target))
+                        if !self.detector.config.is_exception(text) =>
+                    {
+                        (fixed, target, caps)
+                    }
+                    _ => {
+                        self.remember(text, terminator, active, None);
+                        return Action::None;
+                    }
+                }
             }
         };
+        if caps_lock {
+            self.caps_lock_on = true;
+        }
 
-        let target = candidate.to_layout;
         let target_lang = layout::layout(target).map(|l| l.def.lang);
         self.remember(text, terminator, active, None);
         let last = self.history.len() - 1;
         {
             let entry = &mut self.history[last];
-            entry.shown = candidate.converted.clone();
+            entry.shown = shown;
             entry.shown_layout = target.to_string();
             entry.auto = true;
             entry.lang = target_lang;
@@ -571,7 +611,7 @@ impl Engine {
         // Short words just before this one, typed on the same wrong keyboard,
         // were too little to go on by themselves. Now there is context.
         let mut words = 1;
-        while words <= LOOKBACK && words < self.history.len() {
+        while target != active && words <= LOOKBACK && words < self.history.len() {
             let i = self.history.len() - 1 - words;
             let e = &self.history[i];
             let letters = e.typed.chars().filter(|c| c.is_alphabetic()).count();
@@ -613,6 +653,69 @@ impl Engine {
         let action = self.write(&change, 0, change.index, held);
         self.last_change = Some(change);
         action
+    }
+
+    /// The word with its capitals fixed, if it shows one of two everyday
+    /// slips — and whether the slip was Caps Lock left on.
+    ///
+    /// * `пРИВЕТ`: Caps Lock was on and Shift was used for the capital, so the
+    ///   case is exactly inverted.
+    /// * `ПРивет`: Shift was released one letter late.
+    ///
+    /// Only real dictionary words are touched, so `iPhone`, `GHz` and `McDonald`
+    /// stay as they are.
+    fn case_fix(&self, token: &str, lang: &str) -> Option<(String, bool)> {
+        if !self.detector.config.fix_case {
+            return None;
+        }
+        let model = self.detector.models.get(lang)?;
+        let letters: Vec<char> = token.chars().filter(|c| c.is_alphabetic()).collect();
+        let n = letters.len();
+        if n < 3
+            || token
+                .chars()
+                .any(|c| c.is_alphabetic() && !c.is_lowercase() && !c.is_uppercase())
+        {
+            return None;
+        }
+        let inverted = letters[0].is_lowercase() && letters[1..].iter().all(|c| c.is_uppercase());
+        let late_shift = n >= 4
+            && letters[0].is_uppercase()
+            && letters[1].is_uppercase()
+            && letters[2..].iter().all(|c| c.is_lowercase());
+        if !inverted && !late_shift {
+            return None;
+        }
+        let lower: String = letters.iter().flat_map(|c| c.to_lowercase()).collect();
+        let common = model
+            .word_logp(&crate::model::normalize(&lower))
+            .is_some_and(|lp| lp >= CASE_FIX_FLOOR);
+        if !common {
+            return None;
+        }
+        let mut first = true;
+        let fixed = token
+            .chars()
+            .map(|c| {
+                if !c.is_alphabetic() {
+                    return c.to_string();
+                }
+                let out: String = if first {
+                    c.to_uppercase().collect()
+                } else {
+                    c.to_lowercase().collect()
+                };
+                first = false;
+                out
+            })
+            .collect();
+        Some((fixed, inverted))
+    }
+
+    /// True once after a correction showed that Caps Lock was left on; the
+    /// platform switches it off.
+    pub fn take_caps_lock(&mut self) -> bool {
+        std::mem::take(&mut self.caps_lock_on)
     }
 
     /// Describe the last `words` history entries as a [`Change`] whose current
@@ -740,7 +843,10 @@ impl Engine {
                 Action::None
             }
             (true, false) => match self.modifier_down_at.take() {
-                Some(at) if at.elapsed() <= MODIFIER_TAP_WINDOW => self.on_tap(shortcut, ctx),
+                Some(at) if at.elapsed() <= MODIFIER_TAP_WINDOW => {
+                    self.tapped = true;
+                    self.on_tap(shortcut, ctx)
+                }
                 _ => Action::None,
             },
             _ => Action::None,
@@ -1716,5 +1822,47 @@ mod tests {
         // sentence it stays English.
         let mut e = engine();
         assert_eq!(type_str(&mut e, "cats vs ", "us"), Action::None);
+    }
+
+    #[test]
+    fn caps_lock_left_on_is_fixed_and_reported() {
+        let mut s = Screen::new(false);
+        let mut e = engine();
+        s.type_str(&mut e, "пРИВЕТ ", "ru");
+        assert_eq!(s.text, "Привет ");
+        assert!(
+            e.take_caps_lock(),
+            "the platform should be told to switch Caps Lock off"
+        );
+        // Wrong layout and Caps Lock together.
+        let mut s = Screen::new(false);
+        let mut e = engine();
+        s.type_str(&mut e, "gHBDTN ", "us");
+        assert_eq!(s.text, "Привет ");
+    }
+
+    #[test]
+    fn a_late_shift_is_fixed_but_names_and_units_are_not() {
+        let mut s = Screen::new(false);
+        let mut e = engine();
+        s.type_str(&mut e, "ПРивет ", "ru");
+        assert_eq!(s.text, "ПРивет ".replace("ПРивет", "Привет"));
+        assert!(!e.take_caps_lock());
+        for word in ["iPhone ", "GHz ", "McDonald ", "NASA "] {
+            let mut s = Screen::new(false);
+            let mut e = engine();
+            s.type_str(&mut e, word, "us");
+            assert_eq!(s.text, word);
+        }
+    }
+
+    #[test]
+    fn a_shortcut_tap_is_reported_for_masking() {
+        let mut e = engine();
+        type_str(&mut e, "hello ", "us");
+        assert!(!e.take_tap());
+        tap_shortcut(&mut e, "us");
+        assert!(e.take_tap());
+        assert!(!e.take_tap(), "reported once");
     }
 }

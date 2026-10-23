@@ -25,6 +25,9 @@ rekey-ai = { workspace = true }
 tauri = { version = "=2.11.6", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
+# A second copy would install a second keyboard hook and correct every word
+# twice; launching again just opens the settings of the one already running.
+tauri-plugin-single-instance = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }

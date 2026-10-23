@@ -13,9 +13,7 @@
     <aside class="sidebar" data-tauri-drag-region>
       <div class="sidebar-top" data-tauri-drag-region></div>
       <div class="brand" data-tauri-drag-region>
-        <div class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="8"/><text x="16" y="21.5" text-anchor="middle">Ж</text></svg>
-        </div>
+        <img class="brand-mark" src="logo.png" alt="" width="34" height="34" />
         <div class="brand-text">
           <span class="brand-name">MarKey</span>
           <span class="brand-status" id="brand-status"><i></i><span>…</span></span>
@@ -143,7 +141,7 @@
 
         <!-- Shortcut -->
         <section class="page" data-page="shortcut" hidden>
-          <p class="page-intro">Одна клавиша на всё: отменить исправление, перевести то, что не исправилось само, или перевести выделенный текст. Модификаторы сами ничего не печатают, поэтому одиночное нажатие безопасно — сочетания вроде ⌘C его не вызывают.</p>
+          <p class="page-intro">Одна клавиша на всё: отменить исправление, перевести то, что не исправилось само, или перевести выделенный текст. Модификаторы сами ничего не печатают, поэтому одиночное нажатие безопасно — сочетания вроде <span id="copy-chord">⌘C</span> его не вызывают.</p>
 
           <h2 class="group-header">Клавиша</h2>
           <section class="group">
@@ -197,7 +195,7 @@
 
         <!-- Apps -->
         <section class="page" data-page="apps" hidden>
-          <p class="page-intro">В этих приложениях MarKey ничего не исправляет и не реагирует на клавишу. Поля паролей защищены всегда, независимо от списка. Добавить приложение можно и из меню MarKey в строке меню — пункт «Не исправлять в …».</p>
+          <p class="page-intro">В этих приложениях MarKey ничего не исправляет и не реагирует на клавишу. Поля паролей защищены всегда, независимо от списка. Добавить приложение можно и из <span id="apps-tray-hint">меню MarKey в строке меню</span> — пункт «Не исправлять в …».</p>
           <section class="group app-list-group">
             <ul id="excluded-apps" class="app-list"></ul>
             <div class="list-toolbar">
@@ -263,6 +261,13 @@
                 <span class="row-detail">Аббревиатуры вроде HTTP и SQL. Длинные слова с Caps Lock всё равно исправятся.</span>
               </div>
               <label class="switch"><input type="checkbox" id="skip-caps" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Исправлять регистр</span>
+                <span class="row-detail">пРИВЕТ → Привет (и выключать забытый Caps Lock), ПРивет → Привет. Только для настоящих слов — iPhone и GHz не трогаются.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="fix-case" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
             </div>
             <div class="row">
               <div class="row-text">

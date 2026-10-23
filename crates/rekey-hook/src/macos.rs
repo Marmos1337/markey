@@ -529,6 +529,54 @@ pub fn play_sound() {
     }
 }
 
+// -- caps lock --------------------------------------------------------------
+
+#[link(name = "IOKit", kind = "framework")]
+unsafe extern "C" {
+    fn IOServiceMatching(name: *const std::ffi::c_char) -> *mut c_void;
+    fn IOServiceGetMatchingService(main_port: u32, matching: *mut c_void) -> u32;
+    fn IOServiceOpen(service: u32, owning_task: u32, kind: u32, connect: *mut u32) -> i32;
+    fn IOServiceClose(connect: u32) -> i32;
+    fn IOObjectRelease(object: u32) -> i32;
+    fn IOHIDSetModifierLockState(handle: u32, selector: i32, state: bool) -> i32;
+}
+
+unsafe extern "C" {
+    static mach_task_self_: u32;
+}
+
+/// Switch Caps Lock off, after a word showed it was left on by mistake.
+pub fn caps_lock_off() {
+    const IO_HID_PARAM_CONNECT_TYPE: u32 = 1;
+    const IO_HID_CAPS_LOCK_STATE: i32 = 1;
+    unsafe {
+        let matching = IOServiceMatching(c"IOHIDSystem".as_ptr());
+        if matching.is_null() {
+            return;
+        }
+        // The matching dictionary is consumed by the call.
+        let service = IOServiceGetMatchingService(0, matching);
+        if service == 0 {
+            return;
+        }
+        let mut connect: u32 = 0;
+        if IOServiceOpen(
+            service,
+            mach_task_self_,
+            IO_HID_PARAM_CONNECT_TYPE,
+            &mut connect,
+        ) == 0
+        {
+            let status = IOHIDSetModifierLockState(connect, IO_HID_CAPS_LOCK_STATE, false);
+            if status != 0 {
+                log::debug!("could not switch Caps Lock off ({status})");
+            }
+            IOServiceClose(connect);
+        }
+        IOObjectRelease(service);
+    }
+}
+
 // -- accessibility ----------------------------------------------------------
 
 /// Length of the selection in the focused text field, when the application

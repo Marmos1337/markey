@@ -71,6 +71,7 @@ if (!window.__TAURI__ && isLocalDevServer()) {
       convert_selection: true,
       convert_word_before_caret: true,
       sound: false,
+      fix_case: true,
     },
     status: "ready",
     has_api_key: false,
@@ -90,7 +91,7 @@ if (!window.__TAURI__ && isLocalDevServer()) {
     models_loaded: ["ar", "de", "el", "en", "es", "fr", "he", "ru", "tr", "uk"],
     version: "0.2.0",
     // Follow the host so the dev server previews the right skin.
-    platform: globalThis.navigator?.userAgent?.includes("Windows")
+    platform: globalThis.location?.search?.includes("windows") || globalThis.navigator?.userAgent?.includes("Windows")
       ? "windows"
       : "macos",
   };

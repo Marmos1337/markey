@@ -23,6 +23,17 @@ pub struct Settings {
     pub launch_at_login: bool,
     /// Which build last wrote these settings; see [`SETTINGS_VERSION`].
     pub version: u32,
+    /// Running totals across launches, for the settings window.
+    pub totals: Totals,
+}
+
+/// How much MarKey has done, ever.
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct Totals {
+    pub corrections: u64,
+    pub undos: u64,
+    pub manual: u64,
 }
 
 /// `~/Library/Application Support/com.marmos.markey` (macOS) or
@@ -73,7 +84,7 @@ impl Settings {
                 })
             {
                 self.config.shortcut = Shortcut::Tap {
-                    modifier: Modifier::RightCommand,
+                    modifier: Modifier::platform_default(),
                 };
             }
             for id in Config::default().excluded_apps {
@@ -85,6 +96,19 @@ impl Settings {
         if self.version < 3 && self.config.min_word_len == 2 {
             // One-letter words (я, а, и, в) are corrected since 0.2.
             self.config.min_word_len = 1;
+        }
+        if self.version < 3
+            && cfg!(windows)
+            && self.config.shortcut
+                == (Shortcut::Tap {
+                    modifier: Modifier::RightCommand,
+                })
+        {
+            // 0.1 offered right Command on Windows too, where it is the Windows
+            // key and its tap opens Start.
+            self.config.shortcut = Shortcut::Tap {
+                modifier: Modifier::platform_default(),
+            };
         }
         self.version = SETTINGS_VERSION;
     }
@@ -211,7 +235,7 @@ mod migration_tests {
         assert_eq!(
             s.config.shortcut,
             Shortcut::Tap {
-                modifier: Modifier::RightCommand
+                modifier: Modifier::platform_default()
             }
         );
         assert_eq!(s.version, SETTINGS_VERSION);

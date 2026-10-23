@@ -76,6 +76,9 @@ pub struct Runtime {
     pub can_hold: AtomicBool,
     /// Corrections actually typed.
     pub applied: AtomicU64,
+    /// The last application the user worked in, other than MarKey and the
+    /// system shell — what "this app" means in the tray menu.
+    pub last_app: Arc<Mutex<Option<String>>>,
     queue: SharedQueue,
 }
 
@@ -88,7 +91,7 @@ impl Runtime {
         }
         let (lock, wake) = &*self.queue;
         if let Ok(mut q) = lock.lock() {
-            q.jobs.push_back(Job::Act(action));
+            q.jobs.push_back(Job::Act(action, None));
             if !q.writing {
                 q.writing = true;
                 q.since = Some(Instant::now());
@@ -99,9 +102,12 @@ impl Runtime {
 }
 
 enum Job {
-    Act(Action),
+    /// An action, and the key it held back to send afterwards.
+    Act(Action, Option<RawKey>),
     /// A key the user pressed while a correction was being typed.
     Replay(RawKey),
+    /// Caps Lock was left on; switch it off.
+    CapsLockOff,
 }
 
 #[derive(Default)]
@@ -126,7 +132,7 @@ pub fn spawn(
 ) -> Result<Arc<Runtime>, rekey_hook::HookError> {
     let runtime = Arc::new(Runtime::default());
     let context: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context::default()));
-    spawn_context_sampler(app, context.clone());
+    spawn_context_sampler(app, context.clone(), runtime.last_app.clone());
     refresh_system_layouts(app);
 
     let queue: SharedQueue = runtime.queue.clone();
@@ -174,6 +180,10 @@ pub fn spawn(
                         Ok(current) => current.clone(),
                         Err(poisoned) => poisoned.into_inner().clone(),
                     };
+                    // MarKey's own windows are never corrected.
+                    if ctx.app.as_deref().is_some_and(is_own_app) {
+                        return Disposition::Pass;
+                    }
                     let hold = can_hold.load(Ordering::Relaxed);
                     let (lock, wake) = &*queue;
                     let mut q = match lock.lock() {
@@ -186,29 +196,46 @@ pub fn spawn(
                         && q.since.is_some_and(|t| t.elapsed() < MAX_HOLD)
                         && raw.is_some();
 
-                    let action = match engine.lock() {
-                        Ok(mut engine) => engine.on_key(&event, &ctx),
-                        Err(poisoned) => {
-                            // A panic in the engine must not silently stop
-                            // corrections for the rest of the session.
-                            log::error!("engine mutex was poisoned; recovering");
-                            poisoned.into_inner().on_key(&event, &ctx)
-                        }
+                    let (action, tapped, caps_lock) = {
+                        let mut engine = match engine.lock() {
+                            Ok(engine) => engine,
+                            Err(poisoned) => {
+                                // A panic in the engine must not silently stop
+                                // corrections for the rest of the session.
+                                log::error!("engine mutex was poisoned; recovering");
+                                poisoned.into_inner()
+                            }
+                        };
+                        let action = engine.on_key(&event, &ctx);
+                        let caps = engine.take_caps_lock();
+                        (action, engine.take_tap(), caps)
                     };
 
                     let swallow = hold && action.swallows_key();
-                    let mut disposition = Disposition::Pass;
+                    let mut disposition = if tapped {
+                        Disposition::Mask
+                    } else {
+                        Disposition::Pass
+                    };
                     if busy && !swallow {
-                        if let Some(raw) = raw {
+                        if let Some(raw) = raw.clone() {
                             q.jobs.push_back(Job::Replay(raw));
                             disposition = Disposition::Drop;
                         }
                     }
                     if !matches!(action, Action::None) {
-                        if swallow {
+                        // A held key goes back exactly as it was pressed —
+                        // Option+Space, Shift+Return and all.
+                        let held = if swallow {
                             disposition = Disposition::Drop;
-                        }
-                        q.jobs.push_back(Job::Act(action));
+                            raw
+                        } else {
+                            None
+                        };
+                        q.jobs.push_back(Job::Act(action, held));
+                    }
+                    if caps_lock {
+                        q.jobs.push_back(Job::CapsLockOff);
                     }
                     if !q.jobs.is_empty() && !q.writing {
                         q.writing = true;
@@ -236,14 +263,26 @@ pub fn spawn(
 /// The hook thread must never sample this itself. macOS Text Input Services
 /// and AppKit are main-thread-only: calling `TISGetInputSourceProperty` from
 /// the event tap thread kills the process with SIGILL on the first keystroke.
-fn spawn_context_sampler(app: &AppHandle, context: Arc<Mutex<Context>>) {
+fn spawn_context_sampler(
+    app: &AppHandle,
+    context: Arc<Mutex<Context>>,
+    last_app: Arc<Mutex<Option<String>>>,
+) {
     let handle = app.clone();
     std::thread::Builder::new()
         .name("markey-context".into())
         .spawn(move || loop {
             let slot = context.clone();
+            let last = last_app.clone();
             let posted = handle.run_on_main_thread(move || {
                 let sampled = platform::current_context();
+                if let Some(app) = sampled.app.as_deref().filter(|a| !is_shell(a)) {
+                    if let Ok(mut last) = last.lock() {
+                        if last.as_deref() != Some(app) {
+                            *last = Some(app.to_string());
+                        }
+                    }
+                }
                 if let Ok(mut current) = slot.lock() {
                     *current = sampled;
                 }
@@ -259,18 +298,32 @@ fn spawn_context_sampler(app: &AppHandle, context: Arc<Mutex<Context>>) {
 /// Read the user's installed keyboard layouts from the system, so conversion
 /// follows the exact variant they use.
 pub fn refresh_system_layouts(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        let _ = app.run_on_main_thread(|| {
-            for (id, lower, upper) in platform::system_layouts() {
-                if rekey_core::layout::override_keys(&id, &lower, &upper) {
-                    log::info!("using the installed key table for layout {id}");
-                }
+    let _ = app.run_on_main_thread(|| {
+        for (id, lower, upper) in platform::system_layouts() {
+            if rekey_core::layout::override_keys(&id, &lower, &upper) {
+                log::info!("using the installed key table for layout {id}");
             }
-        });
-    }
-    #[cfg(not(target_os = "macos"))]
-    let _ = app;
+        }
+    });
+}
+
+/// MarKey's own windows: the settings window has a text box of its own.
+fn is_own_app(app: &str) -> bool {
+    app.eq_ignore_ascii_case("com.marmos.markey") || app.eq_ignore_ascii_case("markey.exe")
+}
+
+/// Apps that are never the one the user means by "this app": the shell's
+/// taskbar takes focus when the tray icon is clicked on Windows.
+fn is_shell(app: &str) -> bool {
+    is_own_app(app)
+        || [
+            "explorer.exe",
+            "shellexperiencehost.exe",
+            "searchhost.exe",
+            "startmenuexperiencehost.exe",
+        ]
+        .iter()
+        .any(|s| app.eq_ignore_ascii_case(s))
 }
 
 fn spawn_injector(
@@ -308,21 +361,21 @@ fn spawn_injector(
                 .unwrap_or_default();
             match job {
                 Job::Replay(raw) => replay(&injector, &raw),
-                Job::Act(action @ Action::Replace { .. }) => {
-                    let held = action.swallows_key();
-                    std::thread::sleep(if held {
+                Job::CapsLockOff => platform::caps_lock_off(),
+                Job::Act(action @ Action::Replace { .. }, held) => {
+                    std::thread::sleep(if action.swallows_key() {
                         HELD_REPLACE_DELAY
                     } else {
                         LATE_REPLACE_DELAY
                     });
-                    apply(&handle, &injector, &action, &config);
+                    apply(&handle, &injector, &action, held.as_ref(), &config);
                     runtime.applied.fetch_add(1, Ordering::Relaxed);
                 }
-                Job::Act(Action::ConvertSelection { select_word }) => {
+                Job::Act(Action::ConvertSelection { select_word }, _) => {
                     let active = context.lock().ok().and_then(|c| c.layout.clone());
                     convert_selection(&handle, &injector, &engine, active, select_word, &config);
                 }
-                Job::Act(Action::None) => {}
+                Job::Act(Action::None, _) => {}
             }
             // An undo may have taught the engine a new exception; keep it.
             let changed = engine
@@ -344,7 +397,13 @@ fn spawn_injector(
 /// only means the right character once the matching layout is active. It also
 /// leaves the user on the right layout for the next word, which is the point
 /// of switching at all — unless they asked for the keyboard to stay put.
-fn apply(handle: &AppHandle, injector: &Injector, action: &Action, config: &Config) {
+fn apply(
+    handle: &AppHandle,
+    injector: &Injector,
+    action: &Action,
+    held: Option<&RawKey>,
+    config: &Config,
+) {
     let Action::Replace {
         delete,
         text,
@@ -386,8 +445,13 @@ fn apply(handle: &AppHandle, injector: &Injector, action: &Action, config: &Conf
     if !replayed && !text.is_empty() {
         injector.type_text(text);
     }
-    if let Some(boundary) = then {
-        injector.boundary(boundary.key, boundary.shift);
+    // The key that ended the word, held back until now.
+    match (held, then) {
+        (Some(raw), _) => injector.replay(raw),
+        (None, Some(boundary)) => {
+            injector.boundary(boundary.key, boundary.shift);
+        }
+        (None, None) => {}
     }
 
     if let Some(original) = original {
@@ -398,26 +462,17 @@ fn apply(handle: &AppHandle, injector: &Injector, action: &Action, config: &Conf
     }
 }
 
-#[cfg(target_os = "macos")]
 fn play_sound() {
     platform::play_sound();
 }
 
-#[cfg(not(target_os = "macos"))]
-fn play_sound() {}
-
-#[cfg(target_os = "macos")]
 fn replay(injector: &Injector, raw: &RawKey) {
     injector.replay(raw);
 }
 
-#[cfg(not(target_os = "macos"))]
-fn replay(_injector: &Injector, _raw: &RawKey) {}
-
 /// Convert the selected text, or the word before the caret, through the
 /// clipboard — which is the one way to read and replace a selection that every
 /// application supports. The user's clipboard is put back afterwards.
-#[cfg(target_os = "macos")]
 fn convert_selection(
     handle: &AppHandle,
     injector: &Injector,
@@ -446,12 +501,17 @@ fn convert_selection(
         .then(platform::pasteboard_string)
         .flatten()
         .filter(|t| !t.trim().is_empty() && t.chars().count() <= MAX_SELECTION);
+    let changed = platform::pasteboard_change_count() != before;
     let abort = |why: &str| {
         log::info!("shortcut: selection not converted ({why})");
         if select_word {
             injector.collapse_right();
         }
-        platform::pasteboard_restore(&snapshot);
+        // Put the clipboard back only if the copy touched it: rewriting it
+        // for nothing would show up as a duplicate in clipboard managers.
+        if changed {
+            platform::pasteboard_restore(&snapshot);
+        }
     };
     let Some(text) = copied else {
         abort("nothing was copied");
@@ -476,18 +536,6 @@ fn convert_selection(
         "shortcut: converted a selection of {} chars",
         converted.chars().count()
     );
-}
-
-#[cfg(not(target_os = "macos"))]
-fn convert_selection(
-    _handle: &AppHandle,
-    _injector: &Injector,
-    _engine: &SharedEngine,
-    _active: Option<String>,
-    _select_word: bool,
-    _config: &Config,
-) {
-    log::info!("converting a selection is only supported on macOS");
 }
 
 /// Select `layout` on the main thread and confirm it took effect.

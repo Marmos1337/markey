@@ -78,3 +78,46 @@ where
         "keyboard hooks are available on macOS and Windows",
     ))
 }
+
+impl RecordingInjector {
+    pub fn copy(&self) {}
+    pub fn paste(&self) {}
+    pub fn select_word_left(&self) {}
+    pub fn collapse_right(&self) {}
+    pub fn replay(&self, raw: &crate::RawKey) {
+        self.type_text(&raw.text);
+    }
+}
+
+/// A layout id with what each of its keys types, unshifted and shifted.
+pub type KeyTable = (String, Vec<Option<String>>, Vec<Option<String>>);
+
+pub fn system_layouts() -> Vec<KeyTable> {
+    Vec::new()
+}
+
+pub fn focused_selection_length() -> Option<usize> {
+    None
+}
+
+pub fn play_sound() {}
+
+pub struct PasteboardSnapshot;
+
+pub fn pasteboard_change_count() -> isize {
+    0
+}
+
+pub fn pasteboard_snapshot() -> PasteboardSnapshot {
+    PasteboardSnapshot
+}
+
+pub fn pasteboard_restore(_snapshot: &PasteboardSnapshot) {}
+
+pub fn pasteboard_string() -> Option<String> {
+    None
+}
+
+pub fn pasteboard_set_string(_text: &str) {}
+
+pub fn caps_lock_off() {}

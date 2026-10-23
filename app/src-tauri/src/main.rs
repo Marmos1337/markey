@@ -30,6 +30,33 @@ struct AppState {
     vibrancy: Mutex<bool>,
     /// Application icons already rendered, by bundle path.
     icons: Mutex<HashMap<String, Option<String>>>,
+    /// The session counts already added to the saved totals.
+    flushed: Mutex<rekey_core::engine::Stats>,
+}
+
+/// Add this session's new corrections to the totals kept across launches.
+fn flush_stats(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let Ok(stats) = state.engine.lock().map(|e| e.stats()) else {
+        return;
+    };
+    let Ok(mut flushed) = state.flushed.lock() else {
+        return;
+    };
+    if stats == *flushed {
+        return;
+    }
+    if let Ok(mut settings) = state.settings.lock() {
+        settings.totals.corrections += stats.corrections - flushed.corrections;
+        settings.totals.undos += stats.undos - flushed.undos;
+        settings.totals.manual += stats.manual - flushed.manual;
+        if let Err(e) = settings.save() {
+            log::warn!("cannot save settings: {e}");
+        }
+    }
+    *flushed = stats;
 }
 
 /// A snapshot for the settings window.
@@ -103,6 +130,7 @@ fn get_state(state: State<'_, AppState>) -> UiState {
             langs,
         )
     };
+    let flushed = *state.flushed.lock().expect("stats lock");
     let settings = state.settings.lock().expect("settings lock");
     let permission = rekey_hook::platform::has_permission();
     let running = state.runtime.running.load(Ordering::Relaxed);
@@ -124,9 +152,9 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         assist_active,
         assist_learned,
         vibrancy: *state.vibrancy.lock().expect("vibrancy lock"),
-        corrections: stats.corrections,
-        undos: stats.undos,
-        manual: stats.manual,
+        corrections: settings.totals.corrections + stats.corrections - flushed.corrections,
+        undos: settings.totals.undos + stats.undos - flushed.undos,
+        manual: settings.totals.manual + stats.manual - flushed.manual,
         has_permission: permission,
         hook_running: running,
         can_hold: state.runtime.can_hold.load(Ordering::Relaxed),
@@ -179,7 +207,21 @@ fn list_apps() -> Vec<AppChoice> {
         out.sort_by_key(|a| a.name.to_lowercase());
         out
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // Windows identifies apps by executable; the picker offers whatever
+        // has a window open right now.
+        rekey_hook::platform::running_applications()
+            .into_iter()
+            .map(|(name, exe)| AppChoice {
+                name,
+                bundle_id: exe,
+                path: String::new(),
+                running: true,
+            })
+            .collect()
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Vec::new()
     }
@@ -231,6 +273,7 @@ fn app_icon(state: State<'_, AppState>, path: String) -> Option<String> {
 }
 
 /// Standard base64, for embedding icons. Small enough not to need a crate.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
@@ -470,7 +513,7 @@ fn refresh_tray(app: &AppHandle) {
         Err(_) => return,
     };
     let _ = items.toggle.set_checked(config.enabled);
-    let label = match frontmost_app_name() {
+    let label = match frontmost_app_name(app) {
         Some((name, id)) if config.is_excluded_app(&id) => format!("Включить в «{name}»"),
         Some((name, _)) => format!("Не исправлять в «{name}»"),
         None => "Не исправлять в текущем приложении".to_string(),
@@ -480,27 +523,31 @@ fn refresh_tray(app: &AppHandle) {
 
 /// The app the user was working in. MarKey never becomes frontmost itself —
 /// it is a menu bar app — so this is the app behind the menu.
-fn frontmost_app_name() -> Option<(String, String)> {
+fn frontmost_app_name(app: &AppHandle) -> Option<(String, String)> {
+    // The app the user was last working in: on Windows, clicking the tray
+    // icon itself hands focus to the taskbar.
+    let id = app
+        .try_state::<AppState>()
+        .and_then(|s| s.runtime.last_app.lock().ok().and_then(|l| l.clone()))
+        .or_else(rekey_hook::platform::frontmost_app)?;
+    if id.eq_ignore_ascii_case("com.marmos.markey") || id.eq_ignore_ascii_case("markey.exe") {
+        return None;
+    }
     #[cfg(target_os = "macos")]
-    {
-        let id = rekey_hook::platform::frontmost_app()?;
-        if id.eq_ignore_ascii_case("com.marmos.markey") {
-            return None;
-        }
-        let name = rekey_hook::platform::application_path(&id)
-            .and_then(|p| {
-                std::path::Path::new(&p)
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-            })
-            .unwrap_or_else(|| id.clone());
-        Some((name, id))
-    }
+    let name = rekey_hook::platform::application_path(&id)
+        .and_then(|p| {
+            std::path::Path::new(&p)
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| id.clone());
     #[cfg(not(target_os = "macos"))]
-    {
-        let id = rekey_hook::platform::frontmost_app()?;
-        Some((id.clone(), id))
-    }
+    let name = id
+        .strip_suffix(".exe")
+        .or_else(|| id.strip_suffix(".EXE"))
+        .unwrap_or(&id)
+        .to_string();
+    Some((name, id))
 }
 
 fn update_config(app: &AppHandle, change: impl FnOnce(&mut Config)) {
@@ -565,19 +612,22 @@ fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
         exclude: exclude.clone(),
     });
 
+    // macOS tints a template icon to match the menu bar. Windows draws icons
+    // as they are, and a black template would vanish on a dark taskbar.
+    #[cfg(target_os = "macos")]
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/trayTemplate@2x.png"))?;
+    #[cfg(not(target_os = "macos"))]
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
     TrayIconBuilder::with_id("markey")
-        .icon(tauri::image::Image::from_bytes(include_bytes!(
-            "../icons/trayTemplate@2x.png"
-        ))?)
-        // A template icon is tinted by macOS to match the menu bar.
-        .icon_as_template(true)
+        .icon(icon)
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("MarKey")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "toggle" => update_config(app, |c| c.enabled = !c.enabled),
             "exclude" => {
-                if let Some((name, id)) = frontmost_app_name() {
+                if let Some((name, id)) = frontmost_app_name(app) {
                     log::info!("tray: toggling the exclusion of the frontmost app");
                     update_config(app, |c| {
                         if c.is_excluded_app(&id) {
@@ -669,6 +719,10 @@ fn main() {
     init_logging();
 
     tauri::Builder::default()
+        // Registered first, so a second launch exits before doing anything.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_settings(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -694,7 +748,13 @@ fn main() {
 
             let handle = app.handle().clone();
             let first_run = !settings::config_path().exists();
-            let settings = Settings::load();
+            let mut settings = Settings::load();
+            // A layout switcher is only useful if it is always there, so a new
+            // installation starts at login; the setting turns it off.
+            if first_run && !settings.launch_at_login {
+                settings.launch_at_login = true;
+                apply_launch_at_login(&handle, true);
+            }
             if let Err(e) = settings.save() {
                 log::warn!("cannot save settings: {e}");
             }
@@ -743,8 +803,19 @@ fn main() {
                 runtime,
                 vibrancy: Mutex::new(vibrancy),
                 icons: Mutex::new(HashMap::new()),
+                flushed: Mutex::new(Default::default()),
             });
             refresh_tray(&handle);
+
+            // Keep the totals current without writing on every keystroke.
+            let saver = handle.clone();
+            std::thread::Builder::new()
+                .name("markey-stats".into())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_secs(60));
+                    flush_stats(&saver);
+                })
+                .ok();
 
             // First run, or permission still missing: show the window so the
             // user is not left with a silent menu bar icon.
@@ -762,13 +833,13 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("cannot start MarKey")
-        .run(|_app, event| {
+        .run(|app, event| match event {
             // This is a menu bar app that happens to have a settings window.
-            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
-                if code.is_none() {
-                    api.prevent_exit();
-                }
+            tauri::RunEvent::ExitRequested { api, code, .. } if code.is_none() => {
+                api.prevent_exit();
             }
+            tauri::RunEvent::Exit => flush_stats(app),
+            _ => {}
         });
 }
 
