@@ -259,7 +259,7 @@ pub fn select_layout(layout_id: &str) -> bool {
     selected
 }
 
-/// macOS virtual key codes for each of the 47 printable keys, in the same
+/// macOS virtual key codes for each of the 48 printable keys, in the same
 /// physical order `rekey_core::layout` uses.
 ///
 /// These are positions, not characters: key code 0 is the key labelled `a` on
@@ -273,7 +273,11 @@ const KEYCODES: [u16; rekey_core::layout::KEY_COUNT] = [
     // a s d f g h j k l ; '
     0, 1, 2, 3, 5, 4, 38, 40, 37, 41, 39, //
     // z x c v b n m , . /
-    6, 7, 8, 9, 11, 45, 46, 43, 47, 44,
+    6, 7, 8, 9, 11, 45, 46, 43, 47, 44, //
+    // The ISO key (kVK_ISO_Section). On a Russian Mac keyboard this is where
+    // some layouts put ё; without it, ё typed on the wrong layout broke the
+    // word in two.
+    10,
 ];
 
 /// What one key produces on a keyboard layout, or `None` for a dead key or a
@@ -308,12 +312,12 @@ unsafe fn translate(
     printable.then_some(text)
 }
 
-/// A layout id with what each of its 47 keys types, unshifted and shifted.
+/// A layout id with what each of its 48 keys types, unshifted and shifted.
 pub type KeyTable = (String, Vec<Option<String>>, Vec<Option<String>>);
 
 /// The key tables of the user's own installed layouts, read from the system.
 ///
-/// Returns `(layout id, lower, upper)` with 47 space-separated tokens each, in
+/// Returns `(layout id, lower, upper)` with 48 space-separated tokens each, in
 /// the same physical order as [`rekey_core::layout`]; keys the system reports
 /// nothing for are `None` and keep the built-in table's value. Feeding these
 /// to [`rekey_core::layout::override_keys`] makes conversion follow the

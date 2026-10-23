@@ -1,6 +1,6 @@
 //! Physical-key layout tables and cross-layout transliteration.
 //!
-//! Every layout is described as 47 space-separated tokens, one per printable
+//! Every layout is described as 48 space-separated tokens, one per printable
 //! key of a US ANSI keyboard, always in the same physical order:
 //!
 //! ```text
@@ -8,6 +8,9 @@
 //!   row 2 (13):  q w e r t y u i o p [ ] \
 //!   row 3 (11):  a s d f g h j k l ; '
 //!   row 4 (10):  z x c v b n m , . /
+//!   extra (1):   the ISO key — left of `1` on a Mac ISO keyboard, beside the
+//!                left Shift on a PC one. Built-in tables leave it empty; the
+//!                installed layouts fill it in at runtime.
 //! ```
 //!
 //! Because the index *is* the physical key, converting a string between two
@@ -21,7 +24,7 @@ use std::sync::OnceLock;
 use unicode_normalization::UnicodeNormalization;
 
 /// Number of printable keys we model.
-pub const KEY_COUNT: usize = 47;
+pub const KEY_COUNT: usize = 48;
 
 /// Sentinel token for "this key produces nothing on this layout".
 const NONE: &str = "~NONE~";
@@ -70,8 +73,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "en",
         script: Script::Latin,
         latin_overlap: true,
-        lower: "` 1 2 3 4 5 6 7 8 9 0 - = q w e r t y u i o p [ ] \\ a s d f g h j k l ; ' z x c v b n m , . /",
-        upper: "~ ! @ # $ % ^ & * ( ) _ + Q W E R T Y U I O P { } | A S D F G H J K L : \" Z X C V B N M < > ?",
+        lower: "` 1 2 3 4 5 6 7 8 9 0 - = q w e r t y u i o p [ ] \\ a s d f g h j k l ; ' z x c v b n m , . / ~NONE~",
+        upper: "~ ! @ # $ % ^ & * ( ) _ + Q W E R T Y U I O P { } | A S D F G H J K L : \" Z X C V B N M < > ? ~NONE~",
         dead: &[],
     },
     LayoutDef {
@@ -80,8 +83,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "ru",
         script: Script::Cyrillic,
         latin_overlap: false,
-        lower: "ё 1 2 3 4 5 6 7 8 9 0 - = й ц у к е н г ш щ з х ъ \\ ф ы в а п р о л д ж э я ч с м и т ь б ю .",
-        upper: "Ё ! \" № ; % : ? * ( ) _ + Й Ц У К Е Н Г Ш Щ З Х Ъ / Ф Ы В А П Р О Л Д Ж Э Я Ч С М И Т Ь Б Ю ,",
+        lower: "ё 1 2 3 4 5 6 7 8 9 0 - = й ц у к е н г ш щ з х ъ \\ ф ы в а п р о л д ж э я ч с м и т ь б ю . ~NONE~",
+        upper: "Ё ! \" № ; % : ? * ( ) _ + Й Ц У К Е Н Г Ш Щ З Х Ъ / Ф Ы В А П Р О Л Д Ж Э Я Ч С М И Т Ь Б Ю , ~NONE~",
            dead: &[],
     },
     LayoutDef {
@@ -90,8 +93,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "uk",
         script: Script::Cyrillic,
         latin_overlap: false,
-        lower: "' 1 2 3 4 5 6 7 8 9 0 - = й ц у к е н г ш щ з х ї ґ ф і в а п р о л д ж є я ч с м и т ь б ю .",
-        upper: "₴ ! \" № ; % : ? * ( ) _ + Й Ц У К Е Н Г Ш Щ З Х Ї Ґ Ф І В А П Р О Л Д Ж Є Я Ч С М И Т Ь Б Ю ,",
+        lower: "' 1 2 3 4 5 6 7 8 9 0 - = й ц у к е н г ш щ з х ї ґ ф і в а п р о л д ж є я ч с м и т ь б ю . ~NONE~",
+        upper: "₴ ! \" № ; % : ? * ( ) _ + Й Ц У К Е Н Г Ш Щ З Х Ї Ґ Ф І В А П Р О Л Д Ж Є Я Ч С М И Т Ь Б Ю , ~NONE~",
            dead: &[],
     },
     LayoutDef {
@@ -100,8 +103,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "he",
         script: Script::Hebrew,
         latin_overlap: false,
-        lower: "; 1 2 3 4 5 6 7 8 9 0 - = / ' ק ר א ט ו ן ם פ ] [ \\ ש ד ג כ ע י ח ל ך ף , ז ס ב ה נ מ צ ת ץ .",
-        upper: "~ ! @ # $ % ^ & * ( ) _ + Q W ק ר א ט ו ן ם פ } { | ש ד ג כ ע י ח ל ך ף \" ז ס ב ה נ מ צ ת ץ ?",
+        lower: "; 1 2 3 4 5 6 7 8 9 0 - = / ' ק ר א ט ו ן ם פ ] [ \\ ש ד ג כ ע י ח ל ך ף , ז ס ב ה נ מ צ ת ץ . ~NONE~",
+        upper: "~ ! @ # $ % ^ & * ( ) _ + Q W ק ר א ט ו ן ם פ } { | ש ד ג כ ע י ח ל ך ף \" ז ס ב ה נ מ צ ת ץ ? ~NONE~",
            dead: &[],
     },
     LayoutDef {
@@ -110,8 +113,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "ar",
         script: Script::Arabic,
         latin_overlap: false,
-        lower: "ذ 1 2 3 4 5 6 7 8 9 0 - = ض ص ث ق ف غ ع ه خ ح ج د \\ ش س ي ب ل ا ت ن م ك ط ئ ء ؤ ر لا ى ة و ز ظ",
-        upper: "ّ ! @ # $ % ^ & * ( ) _ + َ ً ُ ٌ لإ إ ‘ ÷ × ؛ < > | ِ ٍ ] [ لأ أ ـ ، / : \" ~ ْ } { لآ آ ’ , . ؟",
+        lower: "ذ 1 2 3 4 5 6 7 8 9 0 - = ض ص ث ق ف غ ع ه خ ح ج د \\ ش س ي ب ل ا ت ن م ك ط ئ ء ؤ ر لا ى ة و ز ظ ~NONE~",
+        upper: "ّ ! @ # $ % ^ & * ( ) _ + َ ً ُ ٌ لإ إ ‘ ÷ × ؛ < > | ِ ٍ ] [ لأ أ ـ ، / : \" ~ ْ } { لآ آ ’ , . ؟ ~NONE~",
            dead: &[],
     },
     LayoutDef {
@@ -120,8 +123,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "el",
         script: Script::Greek,
         latin_overlap: false,
-        lower: "` 1 2 3 4 5 6 7 8 9 0 - = ; ς ε ρ τ υ θ ι ο π [ ] \\ α σ δ φ γ η ξ κ λ ΄ ' ζ χ ψ ω β ν μ , . /",
-        upper: "~ ! @ # $ % ^ & * ( ) _ + : Σ Ε Ρ Τ Υ Θ Ι Ο Π { } | Α Σ Δ Φ Γ Η Ξ Κ Λ ¨ \" Ζ Χ Ψ Ω Β Ν Μ < > ?",
+        lower: "` 1 2 3 4 5 6 7 8 9 0 - = ; ς ε ρ τ υ θ ι ο π [ ] \\ α σ δ φ γ η ξ κ λ ΄ ' ζ χ ψ ω β ν μ , . / ~NONE~",
+        upper: "~ ! @ # $ % ^ & * ( ) _ + : Σ Ε Ρ Τ Υ Θ Ι Ο Π { } | Α Σ Δ Φ Γ Η Ξ Κ Λ ¨ \" Ζ Χ Ψ Ω Β Ν Μ < > ? ~NONE~",
            dead: &[('\u{301}', '\u{384}'), ('\u{308}', '\u{a8}')],
     },
     LayoutDef {
@@ -130,8 +133,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "de",
         script: Script::Latin,
         latin_overlap: true,
-        lower: "^ 1 2 3 4 5 6 7 8 9 0 ß ´ q w e r t z u i o p ü + # a s d f g h j k l ö ä y x c v b n m , . -",
-        upper: "° ! \" § $ % & / ( ) = ? ` Q W E R T Z U I O P Ü * ' A S D F G H J K L Ö Ä Y X C V B N M ; : _",
+        lower: "^ 1 2 3 4 5 6 7 8 9 0 ß ´ q w e r t z u i o p ü + # a s d f g h j k l ö ä y x c v b n m , . - ~NONE~",
+        upper: "° ! \" § $ % & / ( ) = ? ` Q W E R T Z U I O P Ü * ' A S D F G H J K L Ö Ä Y X C V B N M ; : _ ~NONE~",
            dead: &[('\u{301}', '\u{b4}'), ('\u{300}', '\u{60}'), ('\u{302}', '\u{5e}')],
     },
     LayoutDef {
@@ -140,8 +143,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "fr",
         script: Script::Latin,
         latin_overlap: true,
-        lower: "² & é \" ' ( - è _ ç à ) = a z e r t y u i o p ^ $ * q s d f g h j k l m ù w x c v b n , ; : !",
-        upper: "~NONE~ 1 2 3 4 5 6 7 8 9 0 ° + A Z E R T Y U I O P ¨ £ µ Q S D F G H J K L M % W X C V B N ? . / §",
+        lower: "² & é \" ' ( - è _ ç à ) = a z e r t y u i o p ^ $ * q s d f g h j k l m ù w x c v b n , ; : ! ~NONE~",
+        upper: "~NONE~ 1 2 3 4 5 6 7 8 9 0 ° + A Z E R T Y U I O P ¨ £ µ Q S D F G H J K L M % W X C V B N ? . / § ~NONE~",
            dead: &[('\u{302}', '\u{5e}'), ('\u{308}', '\u{a8}')],
     },
     LayoutDef {
@@ -150,8 +153,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "es",
         script: Script::Latin,
         latin_overlap: true,
-        lower: "º 1 2 3 4 5 6 7 8 9 0 ' ¡ q w e r t y u i o p ` + ç a s d f g h j k l ñ ´ z x c v b n m , . -",
-        upper: "ª ! \" · $ % & / ( ) = ? ¿ Q W E R T Y U I O P ^ * Ç A S D F G H J K L Ñ ¨ Z X C V B N M ; : _",
+        lower: "º 1 2 3 4 5 6 7 8 9 0 ' ¡ q w e r t y u i o p ` + ç a s d f g h j k l ñ ´ z x c v b n m , . - ~NONE~",
+        upper: "ª ! \" · $ % & / ( ) = ? ¿ Q W E R T Y U I O P ^ * Ç A S D F G H J K L Ñ ¨ Z X C V B N M ; : _ ~NONE~",
            dead: &[('\u{301}', '\u{b4}'), ('\u{308}', '\u{a8}'), ('\u{300}', '\u{60}'), ('\u{302}', '\u{5e}')],
     },
     LayoutDef {
@@ -160,8 +163,8 @@ pub static LAYOUTS: &[LayoutDef] = &[
         lang: "tr",
         script: Script::Latin,
         latin_overlap: true,
-        lower: "\" 1 2 3 4 5 6 7 8 9 0 * - q w e r t y u ı o p ğ ü , a s d f g h j k l ş i z x c v b n m ö ç .",
-        upper: "é ! ' ^ + % & / ( ) = ? _ Q W E R T Y U I O P Ğ Ü ; A S D F G H J K L Ş İ Z X C V B N M Ö Ç :",
+        lower: "\" 1 2 3 4 5 6 7 8 9 0 * - q w e r t y u ı o p ğ ü , a s d f g h j k l ş i z x c v b n m ö ç . ~NONE~",
+        upper: "é ! ' ^ + % & / ( ) = ? _ Q W E R T Y U I O P Ğ Ü ; A S D F G H J K L Ş İ Z X C V B N M Ö Ç : ~NONE~",
            dead: &[],
     },
 ];
@@ -597,7 +600,7 @@ pub fn convert(text: &str, from: &Layout, to: &Layout) -> String {
 
 /// One physical key press.
 ///
-/// Whitespace has its own variants because the layout tables describe the 47
+/// Whitespace has its own variants because the layout tables describe the 48
 /// printable keys only — space is not one of them, and a replacement almost
 /// always ends in the space that finished the word.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -660,7 +663,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_layouts_have_47_keys() {
+    fn all_layouts_have_48_keys() {
         // Building the registry asserts the token counts.
         assert_eq!(registry().read().unwrap().len(), LAYOUTS.len());
     }

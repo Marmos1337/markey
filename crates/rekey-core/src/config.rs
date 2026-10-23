@@ -206,7 +206,7 @@ impl Default for Config {
             enabled: true,
             layouts: vec!["us".into(), "ru".into()],
             sensitivity: Sensitivity::Balanced,
-            min_word_len: 2,
+            min_word_len: 1,
             require_dict_below_len: 4,
             exceptions: Vec::new(),
             excluded_apps: default_excluded_apps(),
@@ -257,8 +257,11 @@ impl Config {
     }
 
     pub fn is_exception(&self, word: &str) -> bool {
-        let w = word.to_lowercase();
-        self.exceptions.iter().any(|e| e.to_lowercase() == w)
+        // ё and е are one letter as far as anyone typing is concerned.
+        let w = crate::model::normalize(word);
+        self.exceptions
+            .iter()
+            .any(|e| crate::model::normalize(e) == w)
     }
 
     /// Remember that the user prefers this word exactly as they typed it.

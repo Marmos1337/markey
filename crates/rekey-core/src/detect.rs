@@ -113,7 +113,18 @@ const MIN_COVERAGE: f32 = 0.99;
 ///
 /// Below this almost everything is one edit from something, so a match stops
 /// being evidence of anything.
-const MIN_TYPO_LEN: usize = 4;
+const MIN_TYPO_LEN: usize = 3;
+
+/// Below this log10 frequency a corpus "word" is treated as a possible typo
+/// of a commoner word, and both readings are considered.
+const RARE_FORM: f32 = -5.5;
+
+/// How much commoner the word behind a converted slip must be than the word
+/// behind the typed one.
+const SLIP_TIE: f32 = 0.5;
+
+/// How common the word behind a three-letter slip must be.
+const SHORT_TYPO_FLOOR: f32 = -3.3;
 
 /// A typo match only counts when the word it corrects to is genuinely common.
 /// The corpus tail is easy to land beside by accident.
@@ -199,6 +210,14 @@ const LETTER_LOSS_PENALTY: f32 = 1.0;
 /// so most of the vocabulary beyond the commonest few thousand words was
 /// never corrected. Being in the dictionary is itself the evidence.
 const KNOWN_WORD_FLOOR: f32 = -6.0;
+
+/// One-letter words, by language. A lone letter outside this list is not a
+/// word, and if the other keyboard turns it into one, it was mistyped.
+const ONE_LETTER_WORDS: &[(&str, &[&str])] = &[
+    ("en", &["a", "i"]),
+    ("ru", &["а", "б", "в", "ж", "и", "к", "о", "с", "у", "я"]),
+    ("uk", &["а", "в", "є", "з", "й", "і", "о", "у", "я"]),
+];
 
 /// English contractions: `don't` is `don` + `'t`. The word lists split them, so
 /// a contraction is scored as its stem.
@@ -300,8 +319,27 @@ impl Detector {
         } else {
             lead_trimmed
         };
-        let typed_letters = typed_core.chars().filter(|c| c.is_alphabetic()).count();
+        // Keys that are letters on another layout count as letters: `nt,,z`
+        // is five keystrokes of `теббя`, not three letters and some commas.
+        let typed_letters = typed_core
+            .chars()
+            .filter(|c| {
+                c.is_alphabetic() || self.is_letter_capable(*c, from, &alternatives_for_trim)
+            })
+            .count();
+        // Typed text gets the same benefit of the doubt as its conversion: a
+        // Russian word with a slip in it is still Russian, not English.
         let mut typed = self.read(src_model, typed_core, None);
+        // What the typed text would be a slip of, if it is not a word itself.
+        // Used only to settle slip-against-slip below, never to score.
+        let typed_slip_of = if typed.known.is_none_or(|lp| lp < RARE_FORM)
+            && typed_core.chars().count() >= MIN_TYPO_LEN
+            && typed_core.chars().all(char::is_alphabetic)
+        {
+            src_model.best_within_one_edit(&crate::model::normalize(typed_core), &from.alphabet())
+        } else {
+            None
+        };
         // A lone letter is not much of a word to protect: `j,` is `об`.
         if typed_core.chars().count() == 1 {
             typed.known = None;
@@ -351,6 +389,11 @@ impl Detector {
         let Some(best) = best else {
             return Verdict::Keep(Skip::NotConfident);
         };
+        // A single letter is decided by a rule of its own: letter statistics
+        // say nothing about one character, but whether it is a word does.
+        if token.chars().filter(|c| c.is_alphabetic()).count() == 1 && typed_letters <= 1 {
+            return self.one_letter(token, from, Box::new(best), hint);
+        }
         let to = layout::layout(best.to_layout).expect("candidate layout exists");
         let target_known = self.models.get(to.def.lang).and_then(|m| {
             split_word(&best.converted).and_then(|(_, w, _)| self.read(m, w, Some(to)).known)
@@ -420,6 +463,16 @@ impl Detector {
             }
         }
 
+        // Both readings are a real word with a slip in it: `дле` (for `для`)
+        // is `lkt` (for `let`) on the other keyboard. Then the commoner
+        // word decides, and a tie goes to what was typed.
+        if let (Some(typed_base), Some(target_base)) = (typed_slip_of, best.target_typo_of) {
+            let target_is_slip = target_known.is_none_or(|lp| lp < RARE_FORM);
+            if target_is_slip && typed_base + SLIP_TIE >= target_base {
+                return Verdict::Keep(Skip::NotConfident);
+            }
+        }
+
         // Shouting is usually an acronym. Convert it only when the other
         // reading is a real word and the typed one is not anything at all.
         let len = typed_letters.max(1);
@@ -432,7 +485,10 @@ impl Detector {
 
         // Short words carry little evidence: insist on a real, reasonably
         // common dictionary word. The corpus tail is full of two-letter noise.
-        if short && !target_known.is_some_and(|lp| lp >= SHORT_WORD_FLOOR) {
+        if short
+            && !target_known.is_some_and(|lp| lp >= SHORT_WORD_FLOOR)
+            && best.target_typo_of.is_none()
+        {
             return Verdict::Keep(Skip::TooShort);
         }
 
@@ -443,6 +499,64 @@ impl Detector {
         } else {
             Verdict::Keep(Skip::NotConfident)
         }
+    }
+
+    /// Decide about a one-letter word.
+    ///
+    /// `z` is `я` typed on the wrong keyboard, and nobody writes a lone `z` in
+    /// English — so it is converted. `a` and `I` are English words, `в`, `с`
+    /// and `к` Russian ones, and those are left alone. A capital letter is
+    /// usually a label or an initial (`B`, `C`, `R`), so it is converted only
+    /// when the sentence around it is already in the other language — except
+    /// `Z`, which is almost always `Я` starting a sentence.
+    fn one_letter(
+        &self,
+        token: &str,
+        from: &Layout,
+        mut best: Box<Candidate>,
+        hint: Hint<'_>,
+    ) -> Verdict {
+        let Some(typed) = token.chars().find(|c| c.is_alphabetic()) else {
+            return Verdict::Keep(Skip::TooShort);
+        };
+        let Some(to) = layout::layout(best.to_layout) else {
+            return Verdict::Keep(Skip::TooShort);
+        };
+        let Some((lead, word, trail)) = split_word(&best.converted)
+            .map(|(l, w, t)| (l.to_string(), w.to_string(), t.to_string()))
+        else {
+            return Verdict::Keep(Skip::TooShort);
+        };
+        let Some(converted) = word.chars().next().filter(|_| word.chars().count() == 1) else {
+            return Verdict::Keep(Skip::TooShort);
+        };
+        let is_word = |lang: &str, c: char| {
+            let lower: String = c.to_lowercase().collect();
+            ONE_LETTER_WORDS
+                .iter()
+                .any(|(l, words)| *l == lang && words.contains(&lower.as_str()))
+        };
+        if is_word(from.def.lang, typed) || !is_word(to.def.lang, converted) {
+            return Verdict::Keep(Skip::TooShort);
+        }
+        if hint.previous_lang == Some(from.def.lang) {
+            return Verdict::Keep(Skip::NotConfident);
+        }
+        let context_agrees = hint.previous_lang == Some(to.def.lang);
+        if typed.is_uppercase() && !context_agrees && converted != 'Я' {
+            return Verdict::Keep(Skip::AllCaps);
+        }
+        if self.config.is_exception(&typed.to_string()) {
+            return Verdict::Keep(Skip::UserException);
+        }
+        // The English pronoun is always a capital.
+        let shown = if to.def.lang == "en" && converted == 'i' {
+            'I'
+        } else {
+            converted
+        };
+        best.converted = format!("{lead}{shown}{trail}");
+        Verdict::Switch(best)
     }
 
     /// Every way `token` might read on `to`, as `(replacement, reading,
@@ -557,15 +671,29 @@ impl Detector {
         let mut score = model.score(word);
         // Not a word — but perhaps a real word with one letter wrong, which is
         // what an ordinary typing slip looks like.
-        let typo_of = match (known, layout) {
-            (None, Some(layout)) if normalized.chars().count() >= MIN_TYPO_LEN => model
-                .best_within_one_edit(&normalized, &layout.alphabet())
-                .filter(|logp| *logp >= TYPO_COMMON_FLOOR),
+        let len = normalized.chars().count();
+        // A "word" this rare in the corpus is usually somebody's typo —
+        // `когд`, `тперь` — so look for the real word next to it as well.
+        let rare = known.is_none_or(|lp| lp < RARE_FORM);
+        let typo_of = match (rare, layout) {
+            (true, Some(layout)) if len >= MIN_TYPO_LEN => {
+                // Three letters are one edit from a great many words, so only
+                // the very commonest count: `vyz` is `мня`, a slip of `меня`.
+                let floor = if len < 4 {
+                    SHORT_TYPO_FLOOR
+                } else {
+                    TYPO_COMMON_FLOOR
+                };
+                model
+                    .best_within_one_edit(&normalized, &layout.alphabet())
+                    .filter(|logp| *logp >= floor)
+            }
             _ => None,
         };
         // Score it as the word it is a slip of, discounted. Left as the
         // letter-shape estimate it would otherwise get, a mistyped real word
         // looks exactly like gibberish.
+        let typo_of = typo_of.filter(|t| known.is_none_or(|k| t + TYPO_SCORE_PENALTY > k));
         if let Some(logp) = typo_of {
             score = score.max(logp + TYPO_SCORE_PENALTY);
         }

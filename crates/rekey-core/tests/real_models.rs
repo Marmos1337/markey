@@ -325,3 +325,103 @@ fn sensitivity_changes_how_eager_it_is() {
         "eager ({eager_switches}) should switch at least as often as cautious ({cautious_switches})"
     );
 }
+
+// -- one-letter words, slips, ё, chat words ----------------------------------
+
+#[test]
+fn one_letter_words_are_converted_when_the_typed_letter_is_not_a_word() {
+    let d = detector(&["us", "ru"]);
+    for (typed, want) in [
+        ("z", "я"),
+        ("f", "а"),
+        ("b", "и"),
+        ("d", "в"),
+        ("c", "с"),
+        ("j", "о"),
+        ("r", "к"),
+        ("e", "у"),
+        ("Z", "Я"),
+    ] {
+        match d.evaluate(typed, "us") {
+            Verdict::Switch(c) => assert_eq!(c.converted, want, "{typed}"),
+            other => panic!("{typed:?} should become {want:?}, got {other:?}"),
+        }
+    }
+    // Real one-letter words stay, and so do capitals used as labels.
+    for typed in ["a", "I", "B", "C", "x", "u"] {
+        assert_keeps(&d, typed, "us");
+    }
+    for typed in ["я", "в", "с", "и", "к"] {
+        assert_keeps(&d, typed, "ru");
+    }
+    // The English pronoun comes out as a capital.
+    match d.evaluate("ш", "ru") {
+        Verdict::Switch(c) => assert_eq!(c.converted, "I"),
+        other => panic!("ш should become I, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_capital_letter_follows_the_sentence_it_is_in() {
+    let d = detector(&["us", "ru"]);
+    let russian = rekey_core::detect::Hint {
+        previous_lang: Some("ru"),
+    };
+    match d.evaluate_with("C", "us", russian) {
+        Verdict::Switch(c) => assert_eq!(c.converted, "С"),
+        other => panic!("C after Russian should become С, got {other:?}"),
+    }
+}
+
+#[test]
+fn words_with_a_slip_are_still_converted() {
+    let d = detector(&["us", "ru"]);
+    for w in [
+        "првет",
+        "пиривет",
+        "спсибо",
+        "когд",
+        "тперь",
+        "знашеь",
+        "мня",
+        "теббя",
+    ] {
+        assert_recovers(&d, w, "ru", "us");
+    }
+    for w in ["helo", "thsi", "becuase", "wiht"] {
+        assert_recovers(&d, w, "us", "ru");
+    }
+}
+
+#[test]
+fn yo_and_ye_are_the_same_letter() {
+    let d = detector(&["us", "ru"]);
+    for w in [
+        "ещё",
+        "еще",
+        "всё",
+        "её",
+        "пришёл",
+        "пришел",
+        "ёлка",
+        "елка",
+        "чёрный",
+        "черный",
+    ] {
+        assert_recovers(&d, w, "ru", "us");
+    }
+    for w in ["ещё", "еще", "всё", "все", "пришёл"] {
+        assert_keeps(&d, w, "ru");
+    }
+}
+
+#[test]
+fn everyday_chat_words_are_known() {
+    let d = detector(&["us", "ru"]);
+    for w in ["спс", "ок", "норм", "щас", "кринж", "кст"] {
+        assert_recovers(&d, w, "ru", "us");
+    }
+    for w in ["idk", "btw", "lol", "thx"] {
+        assert_recovers(&d, w, "us", "ru");
+    }
+}

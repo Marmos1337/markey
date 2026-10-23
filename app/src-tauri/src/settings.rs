@@ -4,7 +4,7 @@ use rekey_core::config::{Config, Modifier, Shortcut};
 use std::path::PathBuf;
 
 /// Bumped whenever loading needs to adjust settings written by an older build.
-const SETTINGS_VERSION: u32 = 2;
+const SETTINGS_VERSION: u32 = 3;
 
 /// The bundle identifier, which names the settings folder.
 const APP_ID: &str = "com.marmos.markey";
@@ -81,6 +81,10 @@ impl Settings {
                     self.config.excluded_apps.push(id);
                 }
             }
+        }
+        if self.version < 3 && self.config.min_word_len == 2 {
+            // One-letter words (я, а, и, в) are corrected since 0.2.
+            self.config.min_word_len = 1;
         }
         self.version = SETTINGS_VERSION;
     }

@@ -142,6 +142,31 @@ fn build(path: &Path, lang: &str) -> std::io::Result<Model> {
         }
     }
 
+    // Words of everyday chat that subtitles under-represent: `спс`, `ок`,
+    // `кринж`, `btw`. A word already more common in the corpus keeps its count.
+    let supplement = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../supplement")
+        .join(format!("{lang}.txt"));
+    if let Ok(extra) = std::fs::read_to_string(&supplement) {
+        let mut added = 0;
+        for line in extra.lines().filter(|l| !l.starts_with('#')) {
+            let mut parts = line.split_whitespace();
+            let (Some(word), Some(count)) = (parts.next(), parts.next()) else {
+                continue;
+            };
+            let Ok(count) = count.parse::<u64>() else {
+                continue;
+            };
+            let w = rekey_core::model::normalize(word);
+            let slot = counts.entry(w).or_insert(0);
+            if *slot < count {
+                *slot = count;
+                added += 1;
+            }
+        }
+        println!("{lang}: {added} words raised from the supplement");
+    }
+
     if counts.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,

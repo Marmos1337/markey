@@ -149,6 +149,16 @@ fn main() -> ExitCode {
                     pct(fp)
                 );
             }
+            let typo_recall = typo_recall(
+                &det,
+                &top_words(&corpus, lang, sample, 4),
+                lang_layout,
+                other,
+            );
+            println!(
+                "{other}->{lang_layout}  words with a typo   recall {:>5.1}%",
+                pct(typo_recall)
+            );
             let typos =
                 typo_false_positives(&det, &top_words(&corpus, lang, sample, 4), lang_layout);
             println!(
@@ -240,6 +250,89 @@ fn false_positives(det: &Detector, words: &[String], layout: &str) -> (usize, us
         .filter(|w| det.evaluate(w, layout).is_switch())
         .count();
     (bad, words.len())
+}
+
+/// Ordinary typing slips of `word` on `layout`: a letter dropped, doubled,
+/// swapped with the next one, or replaced by its neighbour on the keyboard.
+fn slips(word: &str, layout: &str, seed: usize) -> Vec<String> {
+    let chars: Vec<char> = word.chars().collect();
+    let n = chars.len();
+    if n < 3 {
+        return Vec::new();
+    }
+    // Never the first letter: people rarely fumble those.
+    let k = 1 + seed % (n - 1);
+    let mut out: Vec<String> = Vec::new();
+    out.push(
+        chars
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| *j != k)
+            .map(|(_, c)| c)
+            .collect(),
+    );
+    out.push(
+        chars
+            .iter()
+            .enumerate()
+            .flat_map(|(j, c)| if j == k { vec![*c, *c] } else { vec![*c] })
+            .collect(),
+    );
+    let mut swapped = chars.clone();
+    let a = k.min(n - 2);
+    swapped.swap(a, a + 1);
+    out.push(swapped.into_iter().collect());
+    if let Some(l) = rekey_core::layout(layout) {
+        if let Some((idx, shift)) = l.key_for(chars[k]) {
+            // Row starts in the physical key order of the layout tables.
+            let rows = [(0usize, 13usize), (13, 13), (26, 11), (37, 10)];
+            if let Some(&(start, len)) = rows.iter().find(|(s, len)| idx >= *s && idx < s + len) {
+                let neighbour = if idx + 1 < start + len {
+                    idx + 1
+                } else {
+                    idx - 1
+                };
+                let tok = l.token_at(neighbour, shift);
+                if let Some(c) = tok.chars().next().filter(|c| c.is_alphabetic()) {
+                    let mut sub = chars.clone();
+                    sub[k] = c;
+                    out.push(sub.into_iter().collect());
+                }
+            }
+        }
+    }
+    out.retain(|v| v != word);
+    out
+}
+
+/// Words of `target_layout` with a typing slip, typed on `typed_on`: is the
+/// layout still fixed? The slip itself is left for the spell checker.
+fn typo_recall(
+    det: &Detector,
+    words: &[String],
+    target_layout: &str,
+    typed_on: &str,
+) -> (usize, usize) {
+    let mut fixed = 0;
+    let mut total = 0;
+    let mut misses = Vec::new();
+    for (i, w) in words.iter().enumerate() {
+        for v in slips(w, target_layout, i) {
+            let Some(mistyped) = rekey_core::convert_by_id(&v, target_layout, typed_on) else {
+                continue;
+            };
+            total += 1;
+            if fixes(det, &mistyped, typed_on, &v) {
+                fixed += 1;
+            } else if misses.len() < 20 {
+                misses.push(v);
+            }
+        }
+    }
+    if std::env::var_os("EVAL_VERBOSE").is_some() {
+        println!("    typo misses: {}", misses.join(" "));
+    }
+    (fixed, total)
 }
 
 /// Correct-layout words with an ordinary typing slip — a letter dropped,
