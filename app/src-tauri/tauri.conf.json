@@ -55,7 +55,8 @@
     "shortDescription": "Fixes text typed on the wrong keyboard layout.",
     "longDescription": "MarKey watches for words typed with the wrong keyboard layout — ghbdtn instead of привет — and rewrites them as you type. It runs entirely on your Mac.",
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
     },
     "windows": {
       "nsis": {
