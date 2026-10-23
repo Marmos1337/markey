@@ -604,9 +604,8 @@ pub fn pasteboard_string() -> Option<String> {
     let _open = OpenedClipboard::open()?;
     let handle = unsafe { GetClipboardData(CF_UNICODETEXT) }.ok()?;
     let bytes = global_bytes(handle)?;
-    let units: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+    let units: Vec<u16> = (0..bytes.len() / 2)
+        .map(|i| u16::from_le_bytes([bytes[2 * i], bytes[2 * i + 1]]))
         .take_while(|u| *u != 0)
         .collect();
     Some(String::from_utf16_lossy(&units))
