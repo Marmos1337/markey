@@ -147,9 +147,15 @@ async function pollLiveFields() {
   renderStats();
 }
 
+/** Where the API key is kept, in words. */
+function keyStore() {
+  return state?.platform === "windows" ? "в Диспетчере учётных данных" : "в Связке ключей";
+}
+
 /** Words that differ between the Mac and Windows. */
 function renderPlatformText() {
   const windows = state.platform === "windows";
+  for (const el of document.querySelectorAll(".key-store")) el.textContent = keyStore();
   $("open-log").textContent = windows ? "Показать в Проводнике" : "Показать в Finder";
   $("copy-chord").textContent = windows ? "Ctrl+C" : "⌘C";
   $("apps-tray-hint").textContent = windows
@@ -586,7 +592,7 @@ function renderAdvanced() {
   $("ai").checked = c.ai_assist;
   $("ai-key-row").hidden = !c.ai_assist;
   // Never echo a stored key back into the DOM; show that one exists instead.
-  $("api-key").placeholder = state.has_api_key ? "ключ сохранён — введите, чтобы заменить" : "sk-ant-…";
+  $("api-key").placeholder = state.has_api_key ? `ключ сохранён ${keyStore()} — введите новый, чтобы заменить` : "sk-ant-…";
   $("ai-status").textContent = !c.ai_assist
     ? ""
     : !state.assist_active
@@ -610,7 +616,24 @@ $("switch-layout").addEventListener("change", (e) => save({ switch_layout: e.tar
 $("skip-caps").addEventListener("change", (e) => save({ skip_all_caps: e.target.checked }));
 $("sound").addEventListener("change", (e) => save({ sound: e.target.checked }));
 $("fix-case").addEventListener("change", (e) => save({ fix_case: e.target.checked }));
-$("ai").addEventListener("change", (e) => save({ ai_assist: e.target.checked }));
+// Switching the assist on sends words to a third party, so it is asked
+// about every time, in plain words; switching it off is immediate.
+$("ai").addEventListener("change", (e) => {
+  if (!e.target.checked) {
+    save({ ai_assist: false });
+    return;
+  }
+  e.target.checked = false;
+  const dialog = $("ai-consent");
+  dialog.returnValue = "";
+  dialog.showModal();
+});
+$("ai-consent").addEventListener("close", () => {
+  if ($("ai-consent").returnValue === "ok") {
+    $("ai").checked = true;
+    save({ ai_assist: true });
+  }
+});
 $("launch").addEventListener("change", (e) => save({}, { launchAtLogin: e.target.checked }));
 $("api-key").addEventListener("change", (e) => {
   const key = e.target.value.trim();

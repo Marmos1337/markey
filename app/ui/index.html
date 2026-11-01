@@ -287,7 +287,7 @@
             <div class="row">
               <div class="row-text">
                 <span class="row-title">Спрашивать Claude о спорных словах</span>
-                <span class="row-detail">Отправляет только отдельные спорные слова — никогда не фразы и ничего из исключённых приложений — и запоминает ответ локально. Нужен свой API-ключ Anthropic.</span>
+                <span class="row-detail">Отправляет в Anthropic только отдельные спорные слова: без цифр и символов, никогда не фразы, ничего из исключённых приложений и полей пароля. Ответ запоминается на Mac. Нужен свой API-ключ.</span>
                 <span class="row-detail" id="ai-status"></span>
               </div>
               <label class="switch"><input type="checkbox" id="ai" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
@@ -335,6 +335,23 @@
       </details>
       <div class="sheet-actions">
         <button class="btn btn-primary" value="close">Готово</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="ai-consent" class="sheet" aria-labelledby="ai-consent-title">
+    <form method="dialog" class="sheet-inner">
+      <h2 id="ai-consent-title">Отправлять слова в Anthropic?</h2>
+      <p class="sheet-text">Когда локальная модель не уверена, MarKey отправит это слово на серверы Anthropic (api.anthropic.com) и спросит Claude, как его исправить. Ответ сохраняется на этом Mac, и то же слово больше не отправляется.</p>
+      <ul class="sheet-list">
+        <li>Уходит только одно спорное слово и его вариант в другой раскладке, без соседних слов.</li>
+        <li>Слова с цифрами и символами не отправляются никогда: так пароли и коды не уходят.</li>
+        <li>Ничего не отправляется из полей пароля и из приложений в «Исключениях».</li>
+        <li>Запросы идут с вашим API-ключом; ключ хранится <span class="key-store">в Связке ключей</span>.</li>
+      </ul>
+      <div class="sheet-actions">
+        <button class="btn" value="cancel">Не включать</button>
+        <button class="btn btn-primary" value="ok">Включить</button>
       </div>
     </form>
   </dialog>

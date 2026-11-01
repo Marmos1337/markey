@@ -801,6 +801,11 @@ impl Engine {
             return None;
         }
         let assist = self.assist.as_ref()?;
+        // Never send what might be a password, a code or a handle: anything
+        // with a digit, or whose other reading is not a plain word.
+        if !sendable_to_assist(core, &candidate.converted) {
+            return None;
+        }
         if let Some(verdict) = assist.cached(core, &candidate.converted) {
             log::debug!("assist had a verdict for an ambiguous word: convert={verdict}");
             return Some(verdict);
@@ -1082,6 +1087,21 @@ impl Engine {
 }
 
 /// Words and their terminators as they appear on screen.
+/// Whether a word may be asked about at all: no digits in either reading,
+/// and the reading it would become is letters only (a hyphen or apostrophe
+/// inside a word is fine). Punctuation in what was *typed* is allowed, because
+/// on the other layout it is a letter: `ds,` reads `выб`.
+pub fn sendable_to_assist(typed: &str, alternative: &str) -> bool {
+    let no_digits = |s: &str| !s.chars().any(|c| c.is_numeric());
+    let word = |s: &str| {
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_alphabetic() || c == '-' || c == '\'' || c == '’')
+            && s.chars().next().is_some_and(char::is_alphabetic)
+    };
+    no_digits(typed) && no_digits(alternative) && word(alternative)
+}
+
 /// Convert selected `text` with a detector, typically a
 /// [`Engine::detector_snapshot`] taken so the engine stays free meanwhile.
 /// Returns the converted text and the layout it is now in.
@@ -1818,6 +1838,51 @@ mod tests {
             action != Action::None,
             "a learned 'convert' verdict should be acted on for {word:?}"
         );
+    }
+
+    #[test]
+    fn words_with_digits_or_symbols_are_never_sent_to_the_assist() {
+        assert!(sendable_to_assist("ntcn", "тест"));
+        assert!(sendable_to_assist("ds,", "выб"));
+        assert!(!sendable_to_assist("ntcn1", "тест1"));
+        assert!(!sendable_to_assist("gfhjkm2024", "пароль2024"));
+        assert!(!sendable_to_assist("q@w", "й\"ц"));
+        assert!(!sendable_to_assist("", ""));
+        assert!(sendable_to_assist("lfq-rf", "дай-ка"));
+    }
+
+    #[test]
+    fn nothing_from_password_fields_or_excluded_apps_reaches_the_assist() {
+        use crate::assist::test_support::FakeAssist;
+        let mut e = engine();
+        let mut cfg = e.config().clone();
+        cfg.ai_assist = true;
+        cfg.excluded_apps = vec!["com.example.secret".into()];
+        e.set_config(cfg);
+        let assist = std::sync::Arc::new(FakeAssist::default());
+        e.set_assist(Some(assist.clone()));
+        let words = ["ntcn", "vjq", "hfp", "ldf", "ytn", "rjn", "ne", "herb"];
+        let secure = Context {
+            secure_input: true,
+            ..ctx("us")
+        };
+        let excluded = Context {
+            app: Some("com.example.secret".into()),
+            ..ctx("us")
+        };
+        for c in [&secure, &excluded] {
+            for word in words {
+                for ch in format!("{word} ").chars() {
+                    let ev = if ch == ' ' {
+                        special(Key::Space)
+                    } else {
+                        key(ch)
+                    };
+                    assert_eq!(e.on_key(&ev, c), Action::None);
+                }
+            }
+        }
+        assert!(assist.asked.lock().unwrap().is_empty());
     }
 
     #[test]
