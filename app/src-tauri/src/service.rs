@@ -508,9 +508,20 @@ fn spawn_injector(
                     apply(&handle, &injector, &action, held.as_ref(), &config);
                     runtime.applied.fetch_add(1, Ordering::Relaxed);
                 }
-                Job::Act(Action::ConvertSelection { select_word }, _) => {
+                Job::Act(Action::ConvertSelection { select_word, to }, _) => {
                     let active = context.lock().ok().and_then(|c| c.layout.clone());
-                    convert_selection(&handle, &injector, &engine, active, select_word, &config);
+                    convert_selection(
+                        &handle,
+                        &injector,
+                        &engine,
+                        active,
+                        select_word,
+                        to.as_deref(),
+                        &config,
+                    );
+                }
+                Job::Act(Action::SwitchLayout { to }, _) => {
+                    select_layout_and_wait(&handle, &to);
                 }
                 Job::Act(Action::None, _) => {}
             }
@@ -616,6 +627,7 @@ fn convert_selection(
     engine: &SharedEngine,
     active: Option<String>,
     select_word: bool,
+    to: Option<&str>,
     config: &Config,
 ) {
     // When the app can say, trust it: nothing selected means nothing to do.
@@ -663,7 +675,7 @@ fn convert_selection(
     // Converted on a copy of the detector: the keyboard hook needs the engine
     // on every keystroke, and a long selection takes a while to score.
     let detector = engine.lock().ok().map(|e| e.detector_snapshot());
-    let converted = detector.and_then(|d| convert_with(&d, &text, active.as_deref()));
+    let converted = detector.and_then(|d| convert_with(&d, &text, active.as_deref(), to));
     let Some((converted, target)) = converted else {
         abort("no other reading");
         return;
@@ -671,7 +683,8 @@ fn convert_selection(
     if let Ok(mut e) = engine.lock() {
         e.note_converted(&target);
     }
-    if config.switch_layout {
+    // The force-layout hotkeys always leave the keyboard on their layout.
+    if config.switch_layout || to.is_some() {
         select_layout_and_wait(handle, &target);
     }
     platform::pasteboard_set_string(&converted);

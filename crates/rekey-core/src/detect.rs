@@ -977,6 +977,22 @@ impl Detector {
     /// Works out which layout typed it from the characters, so it does the
     /// right thing whichever way round the mistake was. Returns the converted
     /// text and the layout it is now in.
+    /// Convert `text` into the layout `to`, whatever it reads best as.
+    pub fn convert_text_to(
+        &self,
+        text: &str,
+        active: &str,
+        to: &str,
+    ) -> Option<(String, &'static str)> {
+        let from = self.text_layout(text, active)?;
+        let target = layout::layout(to)?.def.id;
+        if from.def.id == target {
+            return None;
+        }
+        let converted = layout::convert_by_id(text, from.def.id, target)?;
+        (converted != text).then_some((converted, target))
+    }
+
     pub fn convert_text(&self, text: &str, active: &str) -> Option<(String, &'static str)> {
         let from = self.text_layout(text, active)?;
         let target = self.best_target(text, from.def.id)?;

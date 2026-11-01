@@ -310,6 +310,7 @@ fn set_config(
     launch_at_login: Option<bool>,
 ) -> Result<(), String> {
     config.excluded_apps = settings::normalize_exclusions(config.excluded_apps)?;
+    config.validate()?;
     if config.layouts.is_empty() {
         return Err("Choose at least one layout".into());
     }

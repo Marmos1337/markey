@@ -17,7 +17,7 @@
 
 use crate::assist::{Assist, Question};
 use crate::buffer::{Buffer, Input};
-use crate::config::{Config, Shortcut};
+use crate::config::{Config, Hotkey};
 use crate::detect::{Candidate, Detector, Hint, Skip, Verdict};
 use crate::input::{Context, Key, KeyEvent, Modifiers, TextWriter};
 use crate::layout;
@@ -62,7 +62,13 @@ pub enum Action {
     ConvertSelection {
         /// Nothing is selected: select the word before the caret first.
         select_word: bool,
+        /// Convert into this layout rather than the likeliest one
+        /// («Всегда раскладка 1 / 2»).
+        to: Option<String>,
     },
+    /// Only switch the system keyboard: a force-layout hotkey with nothing
+    /// typed to convert.
+    SwitchLayout { to: String },
 }
 
 impl Action {
@@ -151,6 +157,27 @@ struct Entry {
     lang: Option<&'static str>,
 }
 
+/// Where one hotkey's tap stands.
+#[derive(Debug, Default, Clone, Copy)]
+struct TapState {
+    /// The modifier was down at the last flags change.
+    was_down: bool,
+    /// When it went down, while that can still become a tap.
+    down_at: Option<Instant>,
+    /// The first tap of a double tap.
+    last_tap_at: Option<Instant>,
+}
+
+/// The tap slot a hotkey uses.
+fn slot(hotkey: Hotkey) -> usize {
+    match hotkey {
+        Hotkey::Main => 0,
+        Hotkey::ForceLayout(0) => 1,
+        Hotkey::ForceLayout(_) => 2,
+        Hotkey::AddException => 3,
+    }
+}
+
 /// The stretch of text the last replacement wrote, in every reading.
 ///
 /// This is what makes the shortcut feel right. Rekey's guess is only a guess,
@@ -183,10 +210,8 @@ pub struct Engine {
     selection: bool,
     last_context: Option<(Option<String>, Option<String>)>,
     /// When the shortcut modifier went down with nothing else pressed since.
-    modifier_down_at: Option<Instant>,
-    modifier_was_down: bool,
-    /// When the last completed tap happened, for double-tap shortcuts.
-    last_tap_at: Option<Instant>,
+    /// Tap detection, one slot per hotkey (see [`slot`]).
+    taps: [TapState; 4],
     /// The layout Rekey has just asked the system to switch to, so that its
     /// own switch is not mistaken for the user changing context.
     expected_layout: Option<String>,
@@ -214,9 +239,7 @@ impl Engine {
             last_change: None,
             selection: false,
             last_context: None,
-            modifier_down_at: None,
-            modifier_was_down: false,
-            last_tap_at: None,
+            taps: Default::default(),
             expected_layout: None,
             hold_boundaries: false,
             config_dirty: false,
@@ -266,7 +289,7 @@ impl Engine {
         self.forget();
         self.selection = false;
         self.expected_layout = None;
-        self.modifier_down_at = None;
+        self.reset_taps();
     }
 
     fn forget(&mut self) {
@@ -343,7 +366,7 @@ impl Engine {
         }
 
         // Anything else while the modifier is down makes it a chord.
-        self.modifier_down_at = None;
+        self.reset_taps();
 
         match event.key {
             Key::Click => {
@@ -442,7 +465,8 @@ impl Engine {
         // was typed is gone from under the caret once the key lands. Correct
         // only while the key can be held back, and remember nothing after it.
         let final_key = event.key != Key::Space;
-        let can_correct = !final_key || self.hold_boundaries;
+        let can_correct =
+            !final_key || (self.hold_boundaries && self.detector.config.correct_on_enter_tab);
         self.last_change = None;
 
         // The word before the caret was converted by the shortcut mid-word;
@@ -528,6 +552,10 @@ impl Engine {
 
     /// Evaluate one finished word and produce the corresponding action.
     fn consider(&mut self, text: &str, terminator: char, active: &str, event: &KeyEvent) -> Action {
+        // A short form the user defined wins over everything else.
+        if let Some(full) = self.expansion(text, active) {
+            return self.show_instead(text, terminator, active, event, full);
+        }
         let hint = Hint {
             previous_lang: self.history.last().and_then(|e| e.lang),
         };
@@ -580,12 +608,13 @@ impl Engine {
             None => {
                 let lang = layout::layout(active).map(|l| l.def.lang).unwrap_or("");
                 let target = layout::layout(active).map(|l| l.def.id);
-                match (self.case_fix(text, lang), target) {
-                    (Some((fixed, caps)), Some(target))
-                        if !self.detector.config.is_exception(text) =>
-                    {
-                        (fixed, target, caps)
-                    }
+                let exception = self.detector.config.is_exception(text);
+                let fix = self
+                    .case_fix(text, lang)
+                    .filter(|_| !exception)
+                    .or_else(|| self.typo_fix(text, active).map(|f| (f, false)));
+                match (fix, target) {
+                    (Some((fixed, caps)), Some(target)) => (fixed, target, caps),
                     _ => {
                         self.remember(text, terminator, active, None);
                         return Action::None;
@@ -655,6 +684,96 @@ impl Engine {
         action
     }
 
+    /// The full text for `text` when it is one of the user's short forms —
+    /// as typed, or typed on the wrong layout (`cgc` for `спс`).
+    fn expansion(&self, text: &str, active: &str) -> Option<String> {
+        let config = &self.detector.config;
+        if !config.expand_abbreviations || config.abbreviations.is_empty() {
+            return None;
+        }
+        let (pre, core, suf) = self.detector.trim_affixes(text, active);
+        if core.is_empty() {
+            return None;
+        }
+        let full = config.abbreviation(core).or_else(|| {
+            config.alternatives(active).into_iter().find_map(|alt| {
+                layout::convert_by_id(core, active, alt).and_then(|c| config.abbreviation(&c))
+            })
+        })?;
+        Some(format!("{pre}{full}{suf}"))
+    }
+
+    /// The word with an obvious slip fixed: two neighbouring letters swapped
+    /// or one letter doubled, when that gives one clearly common word and
+    /// what was typed is no word at all. Off unless switched on.
+    fn typo_fix(&self, text: &str, active: &str) -> Option<String> {
+        let config = &self.detector.config;
+        if !config.fix_typos || config.is_exception(text) {
+            return None;
+        }
+        let (pre, core, suf) = self.detector.trim_affixes(text, active);
+        if !core.chars().all(char::is_alphabetic) {
+            return None;
+        }
+        // An acronym or a name in capitals is not a slip.
+        let letters: Vec<char> = core.chars().collect();
+        if letters.len() > 1 && letters[1..].iter().any(|c| c.is_uppercase()) {
+            return None;
+        }
+        let lang = layout::layout(active)?.def.lang;
+        let model = self.detector.models.get(lang)?;
+        let fixed = model.obvious_typo(&crate::model::normalize(core))?;
+        let fixed: String = if letters[0].is_uppercase() {
+            let mut chars = fixed.chars();
+            chars
+                .next()
+                .map(|f| f.to_uppercase().chain(chars).collect())
+                .unwrap_or_default()
+        } else {
+            fixed
+        };
+        Some(format!("{pre}{fixed}{suf}"))
+    }
+
+    /// Show `shown` in place of the word just typed, on the same layout —
+    /// an abbreviation. The shortcut puts the typed text back.
+    fn show_instead(
+        &mut self,
+        text: &str,
+        terminator: char,
+        active: &str,
+        event: &KeyEvent,
+        shown: String,
+    ) -> Action {
+        self.remember(text, terminator, active, None);
+        if let Some(entry) = self.history.last_mut() {
+            entry.shown = shown.clone();
+            entry.auto = true;
+            entry.lang = None;
+        }
+        self.stats.corrections += 1;
+        self.expected_layout = Some(active.to_string());
+        let held = self.hold_boundaries.then_some(Boundary {
+            key: event.key,
+            shift: event.modifiers.shift,
+        });
+        // Only two readings: what was typed and what replaced it, so one
+        // press of the shortcut is an undo.
+        let change = Change {
+            words: 1,
+            variants: vec![
+                join([(text, terminator)].into_iter()),
+                join([(shown.as_str(), terminator)].into_iter()),
+            ],
+            layouts: vec![active.to_string(), active.to_string()],
+            index: 1,
+            auto: true,
+        };
+        let action = self.write(&change, 0, 1, held);
+        self.last_change = Some(change);
+        action
+    }
+
     /// The word with its capitals fixed, if it shows one of two everyday
     /// slips — and whether the slip was Caps Lock left on.
     ///
@@ -665,7 +784,8 @@ impl Engine {
     /// Only real dictionary words are touched, so `iPhone`, `GHz` and `McDonald`
     /// stay as they are.
     fn case_fix(&self, token: &str, lang: &str) -> Option<(String, bool)> {
-        if !self.detector.config.fix_case {
+        let config = &self.detector.config;
+        if !config.fix_case && !config.fix_two_caps {
             return None;
         }
         let model = self.detector.models.get(lang)?;
@@ -678,8 +798,11 @@ impl Engine {
         {
             return None;
         }
-        let inverted = letters[0].is_lowercase() && letters[1..].iter().all(|c| c.is_uppercase());
-        let late_shift = n >= 4
+        let inverted = config.fix_case
+            && letters[0].is_lowercase()
+            && letters[1..].iter().all(|c| c.is_uppercase());
+        let late_shift = config.fix_two_caps
+            && n >= 4
             && letters[0].is_uppercase()
             && letters[1].is_uppercase()
             && letters[2..].iter().all(|c| c.is_lowercase());
@@ -827,52 +950,157 @@ impl Engine {
     /// — it is someone reaching for a shortcut in the app they are using, and
     /// firing on that would make Rekey rewrite text at random moments.
     fn on_modifier_change(&mut self, modifiers: Modifiers, ctx: &Context) -> Action {
-        let shortcut = self.detector.config.shortcut;
-        let Some(target) = shortcut.modifier() else {
-            return Action::None;
-        };
-
-        let down = target.is_held(modifiers);
-        let others_held = target.others_held(modifiers);
-        let was_down = std::mem::replace(&mut self.modifier_was_down, down);
-
-        if others_held {
-            // Another modifier joined in; this is a chord, not a tap.
-            self.modifier_down_at = None;
-            return Action::None;
-        }
-
-        match (was_down, down) {
-            (false, true) => {
-                self.modifier_down_at = Some(Instant::now());
-                Action::None
+        let mut fired = None;
+        for (hotkey, shortcut) in self.detector.config.hotkeys() {
+            let Some(target) = shortcut.modifier() else {
+                continue;
+            };
+            let state = &mut self.taps[slot(hotkey)];
+            let down = target.is_held(modifiers);
+            let was_down = std::mem::replace(&mut state.was_down, down);
+            if target.others_held(modifiers) {
+                // Another modifier joined in; this is a chord, not a tap.
+                state.down_at = None;
+                continue;
             }
-            (true, false) => match self.modifier_down_at.take() {
-                Some(at) if at.elapsed() <= MODIFIER_TAP_WINDOW => {
+            match (was_down, down) {
+                (false, true) => state.down_at = Some(Instant::now()),
+                (true, false) => {
+                    let Some(at) = state.down_at.take() else {
+                        continue;
+                    };
+                    if at.elapsed() > MODIFIER_TAP_WINDOW {
+                        continue;
+                    }
                     self.tapped = true;
-                    self.on_tap(shortcut, ctx)
+                    if !shortcut.needs_two_taps() {
+                        fired = Some(hotkey);
+                        continue;
+                    }
+                    // A double tap: the first arms, the second fires. Anything
+                    // slower than the window starts over, so a stray tap cannot
+                    // linger and combine with an unrelated one later.
+                    match state.last_tap_at.take() {
+                        Some(previous) if previous.elapsed() <= DOUBLE_TAP_WINDOW => {
+                            fired = Some(hotkey)
+                        }
+                        _ => state.last_tap_at = Some(Instant::now()),
+                    }
                 }
-                _ => Action::None,
-            },
-            _ => Action::None,
+                _ => {}
+            }
+        }
+        match fired {
+            Some(Hotkey::Main) => self.manual(ctx),
+            Some(Hotkey::ForceLayout(n)) => self.force_layout(n, ctx),
+            Some(Hotkey::AddException) => self.add_word_exception(ctx),
+            None => Action::None,
         }
     }
 
-    /// A completed tap of the shortcut modifier.
-    fn on_tap(&mut self, shortcut: Shortcut, ctx: &Context) -> Action {
-        if !shortcut.needs_two_taps() {
-            return self.manual(ctx);
+    /// Any key other than a lone modifier: no tap is in progress any more.
+    fn reset_taps(&mut self) {
+        for state in &mut self.taps {
+            state.down_at = None;
         }
-        // A double tap: the first arms, the second fires. Anything slower than
-        // the window starts over, so a stray tap cannot linger and combine
-        // with an unrelated one later.
-        match self.last_tap_at.take() {
-            Some(previous) if previous.elapsed() <= DOUBLE_TAP_WINDOW => self.manual(ctx),
-            _ => {
-                self.last_tap_at = Some(Instant::now());
-                Action::None
+    }
+
+    /// «Всегда раскладка N»: put what was just typed — or the selection, or
+    /// the last correction — into the N-th chosen layout, and switch the
+    /// keyboard to it. With nothing to convert, only the keyboard switches.
+    pub fn force_layout(&mut self, n: usize, ctx: &Context) -> Action {
+        let Some(target) = self.detector.config.layouts.get(n).cloned() else {
+            return Action::None;
+        };
+        if self.selection {
+            self.selection = false;
+            log::info!("hotkey: converting the selection into layout {}", n + 1);
+            return Action::ConvertSelection {
+                select_word: false,
+                to: Some(target),
+            };
+        }
+        if let Some(mut change) = self.last_change.take() {
+            let from = change.index;
+            if let Some(to) = change.layouts.iter().position(|l| *l == target) {
+                if to != from {
+                    change.index = to;
+                    change.auto = false;
+                    let action = self.write(&change, from, to, None);
+                    self.apply_variant(&change);
+                    self.expected_layout = Some(target);
+                    self.last_change = Some(change);
+                    return action;
+                }
+            }
+            self.last_change = Some(change);
+        } else if let Some(change) = self.phrase(ctx, Some(&target)) {
+            log::info!(
+                "hotkey: {} typed word(s) into layout {}",
+                change.words,
+                n + 1
+            );
+            self.stats.manual += 1;
+            let action = self.write(&change, 0, change.index, None);
+            self.apply_variant(&change);
+            self.expected_layout = Some(target);
+            self.last_change = Some(change);
+            return action;
+        }
+        self.expected_layout = Some(target.clone());
+        Action::SwitchLayout { to: target }
+    }
+
+    /// Add the word at the caret to the exceptions. Right after MarKey
+    /// corrected it, the correction is undone too, exactly as the main
+    /// shortcut's undo would.
+    pub fn add_word_exception(&mut self, ctx: &Context) -> Action {
+        if self
+            .last_change
+            .as_ref()
+            .is_some_and(|c| c.auto && c.index != 0)
+        {
+            let Some(mut change) = self.last_change.take() else {
+                return Action::None;
+            };
+            // Step to the typed reading; `cycle` would pass through others.
+            let from = change.index;
+            change.index = 0;
+            self.stats.undos += 1;
+            let start = self.history.len().saturating_sub(change.words);
+            let learned: Vec<String> = self.history[start..]
+                .iter()
+                .filter(|e| e.auto)
+                .map(|e| e.typed.clone())
+                .collect();
+            for word in learned {
+                if self.detector.config.add_exception(&word) {
+                    self.config_dirty = true;
+                }
+            }
+            change.auto = false;
+            let action = self.write(&change, from, 0, None);
+            self.apply_variant(&change);
+            self.expected_layout = change.layouts.first().cloned();
+            self.last_change = Some(change);
+            return action;
+        }
+        let word = if self.buffer.is_empty() {
+            self.history.last().map(|e| e.shown.clone())
+        } else {
+            Some(self.buffer.current().to_string())
+        };
+        let _ = ctx;
+        if let Some(word) = word {
+            if self.detector.config.add_exception(&word) {
+                log::info!(
+                    "hotkey: added a word of {} chars to the exceptions",
+                    word.chars().count()
+                );
+                self.config_dirty = true;
             }
         }
+        Action::None
     }
 
     /// The manual shortcut.
@@ -889,14 +1117,17 @@ impl Engine {
             self.selection = false;
             if self.detector.config.convert_selection {
                 log::info!("shortcut: converting the selection");
-                return Action::ConvertSelection { select_word: false };
+                return Action::ConvertSelection {
+                    select_word: false,
+                    to: None,
+                };
             }
             return Action::None;
         }
         if self.last_change.is_some() {
             return self.cycle();
         }
-        if let Some(change) = self.phrase(ctx) {
+        if let Some(change) = self.phrase(ctx, None) {
             log::info!("shortcut: converting {} typed word(s)", change.words);
             self.stats.manual += 1;
             let action = self.write(&change, 0, change.index, None);
@@ -907,7 +1138,10 @@ impl Engine {
         }
         if self.detector.config.convert_word_before_caret && self.buffer.is_empty() {
             log::info!("shortcut: nothing tracked; converting the word before the caret");
-            return Action::ConvertSelection { select_word: true };
+            return Action::ConvertSelection {
+                select_word: true,
+                to: None,
+            };
         }
         Action::None
     }
@@ -966,7 +1200,9 @@ impl Engine {
     /// The run of words the shortcut should convert when Rekey has not just
     /// changed anything: the word at the caret, plus every word before it that
     /// also reads better on another layout.
-    fn phrase(&mut self, ctx: &Context) -> Option<Change> {
+    ///
+    /// `forced` names the layout to convert into instead of the likeliest.
+    fn phrase(&mut self, ctx: &Context, forced: Option<&str>) -> Option<Change> {
         // A word still being typed is finished here, as if a space had ended
         // it — minus the space, which is not on screen.
         let partial = (!self.buffer.is_empty())
@@ -1006,11 +1242,18 @@ impl Engine {
         }
         let entries = &self.history[self.history.len() - words..];
         let typed = join(entries.iter().map(|e| (e.typed.as_str(), e.terminator)));
-        let target = self
-            .detector
-            .best_target(typed.trim_end_matches(OPEN), &anchor.typed_layout)?;
+        let target = match forced {
+            Some(layout) if layout == anchor.typed_layout => return None,
+            Some(layout) => layout,
+            None => self
+                .detector
+                .best_target(typed.trim_end_matches(OPEN), &anchor.typed_layout)?,
+        };
         let mut change = self.change_for(words, false);
-        let index = change.layouts.iter().position(|l| l == target).unwrap_or(1);
+        let index = match forced {
+            Some(_) => change.layouts.iter().position(|l| l == target)?,
+            None => change.layouts.iter().position(|l| l == target).unwrap_or(1),
+        };
         if index >= change.variants.len() {
             return None;
         }
@@ -1032,7 +1275,7 @@ impl Engine {
     /// Convert a stretch of text the platform read from the selection.
     /// Returns the converted text and the layout it is now in.
     pub fn convert_text(&mut self, text: &str, active: Option<&str>) -> Option<(String, String)> {
-        let result = convert_with(&self.detector, text, active)?;
+        let result = convert_with(&self.detector, text, active, None)?;
         self.note_converted(&result.1);
         Some(result)
     }
@@ -1105,15 +1348,20 @@ pub fn sendable_to_assist(typed: &str, alternative: &str) -> bool {
 /// Convert selected `text` with a detector, typically a
 /// [`Engine::detector_snapshot`] taken so the engine stays free meanwhile.
 /// Returns the converted text and the layout it is now in.
+/// With `to`, into that layout rather than the likeliest one.
 pub fn convert_with(
     detector: &Detector,
     text: &str,
     active: Option<&str>,
+    to: Option<&str>,
 ) -> Option<(String, String)> {
     let active = active
         .map(str::to_string)
         .or_else(|| detector.config.layouts.first().cloned())?;
-    let (converted, target) = detector.convert_text(text, &active)?;
+    let (converted, target) = match to {
+        Some(to) => detector.convert_text_to(text, &active, to)?,
+        None => detector.convert_text(text, &active)?,
+    };
     Some((converted, target.to_string()))
 }
 
@@ -1343,16 +1591,27 @@ mod tests {
 
     #[test]
     fn return_is_corrected_only_when_it_can_be_held() {
-        // Without holding, Return would already have sent the chat message.
+        let on = |mut e: Engine| {
+            let mut c = e.config().clone();
+            c.correct_on_enter_tab = true;
+            e.set_config(c);
+            e
+        };
+        // Off by default: Return and Tab end a word untouched.
         let mut e = engine();
+        e.set_hold_boundaries(true);
         assert_eq!(type_str(&mut e, "ghbdtn\n", "us"), Action::None);
-        let mut e = engine();
+        assert_eq!(type_str(&mut e, "ghbdtn\t", "us"), Action::None);
+        // Without holding, Return would already have sent the chat message.
+        let mut e = on(engine());
+        assert_eq!(type_str(&mut e, "ghbdtn\n", "us"), Action::None);
+        let mut e = on(engine());
         e.set_hold_boundaries(true);
         let action = type_str(&mut e, "ghbdtn\n", "us");
         assert!(action.swallows_key());
         // And nothing before the Return can be rewritten afterwards.
         let mut s = Screen::new(true);
-        let mut e = engine();
+        let mut e = on(engine());
         e.set_hold_boundaries(true);
         s.type_str(&mut e, "ghbdtn\n", "us");
         assert_eq!(s.text, "привет\n");
@@ -1625,7 +1884,10 @@ mod tests {
         e.on_key(&special(Key::Selection), &ctx("us"));
         assert_eq!(
             tap_shortcut(&mut e, "us"),
-            Action::ConvertSelection { select_word: false }
+            Action::ConvertSelection {
+                select_word: false,
+                to: None
+            }
         );
         // Shift+arrow selects too.
         let mut e = engine();
@@ -1634,7 +1896,10 @@ mod tests {
         e.on_key(&ev, &ctx("us"));
         assert_eq!(
             tap_shortcut(&mut e, "us"),
-            Action::ConvertSelection { select_word: false }
+            Action::ConvertSelection {
+                select_word: false,
+                to: None
+            }
         );
     }
 
@@ -1647,7 +1912,10 @@ mod tests {
         e.on_key(&copy, &ctx("us"));
         assert_eq!(
             tap_shortcut(&mut e, "us"),
-            Action::ConvertSelection { select_word: false }
+            Action::ConvertSelection {
+                select_word: false,
+                to: None
+            }
         );
     }
 
@@ -1672,7 +1940,10 @@ mod tests {
         e.on_key(&special(Key::Click), &ctx("us"));
         assert_eq!(
             tap_shortcut(&mut e, "us"),
-            Action::ConvertSelection { select_word: true }
+            Action::ConvertSelection {
+                select_word: true,
+                to: None
+            }
         );
     }
 
@@ -1933,14 +2204,27 @@ mod tests {
 
     #[test]
     fn a_late_shift_is_fixed_but_names_and_units_are_not() {
+        // Off by default.
         let mut s = Screen::new(false);
         let mut e = engine();
+        s.type_str(&mut e, "ПРивет ", "ru");
+        assert_eq!(s.text, "ПРивет ");
+        let mut s = Screen::new(false);
+        let mut e = engine_with(Config {
+            layouts: vec!["us".into(), "ru".into()],
+            fix_two_caps: true,
+            ..Config::default()
+        });
         s.type_str(&mut e, "ПРивет ", "ru");
         assert_eq!(s.text, "ПРивет ".replace("ПРивет", "Привет"));
         assert!(!e.take_caps_lock());
         for word in ["iPhone ", "GHz ", "McDonald ", "NASA "] {
             let mut s = Screen::new(false);
-            let mut e = engine();
+            let mut e = engine_with(Config {
+                layouts: vec!["us".into(), "ru".into()],
+                fix_two_caps: true,
+                ..Config::default()
+            });
             s.type_str(&mut e, word, "us");
             assert_eq!(s.text, word);
         }
@@ -2105,5 +2389,186 @@ mod tests {
             }
         }
         assert!(wrong.is_empty(), "{wrong:?}");
+    }
+
+    fn engine_with_options(change: impl FnOnce(&mut Config)) -> Engine {
+        let mut config = Config {
+            layouts: vec!["us".into(), "ru".into()],
+            ..Config::default()
+        };
+        change(&mut config);
+        engine_with(config)
+    }
+
+    fn right_opt(down: bool) -> Modifiers {
+        Modifiers {
+            alt: down,
+            right_alt: down,
+            ..Default::default()
+        }
+    }
+
+    fn fn_key(down: bool) -> Modifiers {
+        Modifiers {
+            function: down,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn force_layout_puts_the_word_into_the_chosen_layout() {
+        use crate::config::{Modifier, Shortcut};
+        let mut e = engine_with_options(|c| {
+            c.force_layout_1 = Shortcut::Tap {
+                modifier: Modifier::RightOption,
+            };
+            c.force_layout_2 = Shortcut::Tap {
+                modifier: Modifier::Fn,
+            };
+        });
+        // Typed on English, wanted Russian: layout 2 is ru.
+        let mut s = Screen::new(true);
+        s.type_str(&mut e, "ghbdtn", "us");
+        let action = tap(&mut e, "us", fn_key(true));
+        s.apply(&action);
+        assert_eq!(s.text, "привет");
+        assert_eq!(action.layout_switch(), Some("ru"));
+        // Layout 1 takes it back to English.
+        let action = tap(&mut e, "ru", right_opt(true));
+        s.apply(&action);
+        assert_eq!(s.text, "ghbdtn");
+        // A word that is already in that layout stays; only the keyboard moves.
+        let mut e2 = engine_with_options(|c| {
+            c.force_layout_2 = Shortcut::Tap {
+                modifier: Modifier::Fn,
+            };
+        });
+        type_str(&mut e2, "привет", "ru");
+        assert_eq!(
+            tap(&mut e2, "ru", fn_key(true)),
+            Action::SwitchLayout { to: "ru".into() }
+        );
+    }
+
+    #[test]
+    fn force_layout_converts_a_selection_into_that_layout() {
+        use crate::config::{Modifier, Shortcut};
+        let mut e = engine_with_options(|c| {
+            c.force_layout_1 = Shortcut::Tap {
+                modifier: Modifier::RightOption,
+            };
+        });
+        e.on_key(&special(Key::Selection), &ctx("ru"));
+        assert_eq!(
+            tap(&mut e, "ru", right_opt(true)),
+            Action::ConvertSelection {
+                select_word: false,
+                to: Some("us".into())
+            }
+        );
+    }
+
+    #[test]
+    fn the_exception_hotkey_undoes_and_remembers_the_word() {
+        use crate::config::{Modifier, Shortcut};
+        let mut e = engine_with_options(|c| {
+            c.add_exception_key = Shortcut::Tap {
+                modifier: Modifier::RightOption,
+            };
+        });
+        let mut s = Screen::new(true);
+        s.type_str(&mut e, "ghbdtn ", "us");
+        assert_eq!(s.text, "привет ");
+        let action = tap(&mut e, "ru", right_opt(true));
+        s.apply(&action);
+        assert_eq!(s.text, "ghbdtn ");
+        assert!(e.config().is_exception("ghbdtn"));
+        assert!(e.take_config_dirty());
+        // A word MarKey did not touch is simply added.
+        let mut e = engine_with_options(|c| {
+            c.add_exception_key = Shortcut::Tap {
+                modifier: Modifier::RightOption,
+            };
+        });
+        type_str(&mut e, "vkontakte", "us");
+        assert_eq!(tap(&mut e, "us", right_opt(true)), Action::None);
+        assert!(e.config().is_exception("vkontakte"));
+    }
+
+    #[test]
+    fn the_fn_key_can_be_the_main_shortcut() {
+        use crate::config::{Modifier, Shortcut};
+        let mut e = engine_with_options(|c| {
+            c.shortcut = Shortcut::Tap {
+                modifier: Modifier::Fn,
+            };
+        });
+        let mut s = Screen::new(true);
+        s.type_str(&mut e, "ghbdtn", "us");
+        let action = tap(&mut e, "us", fn_key(true));
+        s.apply(&action);
+        assert_eq!(s.text, "привет");
+        // Fn held with an arrow (as Mac keyboards report it) is not a tap.
+        let mut e = engine_with_options(|c| {
+            c.shortcut = Shortcut::Tap {
+                modifier: Modifier::Fn,
+            };
+        });
+        type_str(&mut e, "ghbdtn", "us");
+        let c = ctx("us");
+        e.on_key(&modifier_event(fn_key(true)), &c);
+        e.on_key(&special(Key::Navigation), &c);
+        assert_eq!(e.on_key(&modifier_event(fn_key(false)), &c), Action::None);
+    }
+
+    #[test]
+    fn abbreviations_expand_and_the_shortcut_undoes_them() {
+        use crate::config::Abbreviation;
+        let list = vec![Abbreviation {
+            short: "спс".into(),
+            full: "спасибо".into(),
+        }];
+        // Off by default, even with a list.
+        let mut e = engine_with_options(|c| c.abbreviations = list.clone());
+        assert_eq!(screen_with(&mut e, "спс ", "ru"), "спс ");
+        let mut e = engine_with_options(|c| {
+            c.expand_abbreviations = true;
+            c.abbreviations = list.clone();
+        });
+        let mut s = Screen::new(true);
+        s.type_str(&mut e, "спс, ", "ru");
+        assert_eq!(s.text, "спасибо, ");
+        s.tap(&mut e, "ru");
+        assert_eq!(s.text, "спс, ", "one press of the shortcut is an undo");
+        // Typed on the wrong layout too.
+        let mut e = engine_with_options(|c| {
+            c.expand_abbreviations = true;
+            c.abbreviations = list.clone();
+        });
+        assert_eq!(screen_with(&mut e, "cgc ", "us"), "спасибо ");
+    }
+
+    #[test]
+    fn obvious_typos_are_fixed_only_when_asked() {
+        let mut e = engine();
+        assert_eq!(screen_with(&mut e, "пирвет ", "ru"), "пирвет ");
+        for (typed, layout, shown) in [
+            ("пирвет ", "ru", "привет "),
+            ("Пирвет, ", "ru", "Привет, "),
+            ("приввет ", "ru", "привет "),
+            ("hlelo ", "us", "hello "),
+            ("hello ", "us", "hello "),
+            // Capitals inside: an acronym or a name, not a slip.
+            ("HLELO ", "us", "HLELO "),
+        ] {
+            let mut e = engine_with_options(|c| c.fix_typos = true);
+            assert_eq!(screen_with(&mut e, typed, layout), shown, "typed {typed:?}");
+        }
+    }
+
+    fn screen_with(e: &mut Engine, typed: &str, layout: &str) -> String {
+        let mut s = Screen::new(true);
+        s.type_str(e, typed, layout);
+        s.text
     }
 }

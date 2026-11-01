@@ -75,6 +75,9 @@ pub enum Modifier {
     RightShift,
     RightControl,
     RightCommand,
+    /// The Fn / 🌐 key of Mac keyboards. Windows never sees it: the key is
+    /// handled inside the keyboard itself there.
+    Fn,
 }
 
 impl Modifier {
@@ -89,11 +92,18 @@ impl Modifier {
             Modifier::RightShift => m.shift && m.right_shift,
             Modifier::RightControl => m.control && m.right_control,
             Modifier::RightCommand => m.meta && m.right_meta,
+            Modifier::Fn => m.function,
         }
     }
 
     /// Is any modifier *other* than this one held?
     pub fn others_held(self, m: crate::input::Modifiers) -> bool {
+        if self == Modifier::Fn {
+            return m.shift || m.control || m.alt || m.meta;
+        }
+        if m.function {
+            return true;
+        }
         // For a right-hand key, the same modifier held on the left is "another"
         // key; the flags cannot tell both-held apart from right-only, which is
         // the harmless direction to be wrong in.
@@ -109,6 +119,7 @@ impl Modifier {
             Modifier::RightControl => (None, None, Some(true), None),
             Modifier::Command => (None, None, None, Some(false)),
             Modifier::RightCommand => (None, None, None, Some(true)),
+            Modifier::Fn => unreachable!("handled above"),
         };
         family(m.alt, m.right_alt, opt.is_some(), opt.unwrap_or(false))
             || family(m.shift, m.right_shift, sh.is_some(), sh.unwrap_or(false))
@@ -141,6 +152,7 @@ impl Modifier {
             Modifier::RightShift => "Right Shift",
             Modifier::RightControl => "Right Control",
             Modifier::RightCommand => "Right Command",
+            Modifier::Fn => "Fn",
         }
     }
 }
@@ -172,6 +184,58 @@ impl Shortcut {
     pub fn needs_two_taps(self) -> bool {
         matches!(self, Shortcut::DoubleTap { .. })
     }
+
+    /// Two hotkeys on the same key cannot be told apart reliably — a single
+    /// tap would also arm a double tap — so one key serves one hotkey.
+    pub fn collides_with(self, other: Shortcut) -> bool {
+        matches!((self.modifier(), other.modifier()), (Some(a), Some(b)) if a == b)
+    }
+}
+
+/// What a hotkey does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hotkey {
+    /// The main shortcut: undo, convert what was typed, or the selection.
+    Main,
+    /// Put what was just typed (or the selection) into the n-th layout of
+    /// [`Config::layouts`] and switch the keyboard to it, whatever the
+    /// detector thinks. «Всегда раскладка 1 / 2».
+    ForceLayout(usize),
+    /// Add the word at the caret to the exceptions.
+    AddException,
+}
+
+/// A short form the user types and the text it stands for: `спс` → `спасибо`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Abbreviation {
+    pub short: String,
+    pub full: String,
+}
+
+/// Limits on the abbreviation list, checked when settings are saved.
+pub const MAX_ABBREVIATIONS: usize = 300;
+pub const MAX_ABBREVIATION_SHORT: usize = 32;
+pub const MAX_ABBREVIATION_FULL: usize = 500;
+
+/// What the menu bar icon shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum MenuBarIcon {
+    /// The MarKey keycap.
+    #[default]
+    Logo,
+    /// The current layout, as a badge with its code, centred.
+    Layout,
+}
+
+/// How big the layout badge in the menu bar is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum MenuBarSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,9 +272,27 @@ pub struct Config {
     pub convert_word_before_caret: bool,
     /// Play a quiet sound when a word is corrected automatically.
     pub sound: bool,
-    /// Fix `пРИВЕТ` (Caps Lock left on, which is then switched off) and
-    /// `ПРивет` (Shift held a letter too long).
+    /// Fix `пРИВЕТ` (Caps Lock left on, which is then switched off).
     pub fix_case: bool,
+    /// Fix `ПРивет` (Shift held a letter too long). Was part of `fix_case`
+    /// until 0.3; settings from before keep what they had.
+    pub fix_two_caps: bool,
+    /// Also correct a word ended by Return or Tab (only where the key can be
+    /// held back until the word is fixed).
+    pub correct_on_enter_tab: bool,
+    /// Fix obvious typos in real words: two letters swapped, one doubled.
+    pub fix_typos: bool,
+    /// Replace short forms with their full text.
+    pub expand_abbreviations: bool,
+    pub abbreviations: Vec<Abbreviation>,
+    /// Use the extended dictionary (slang, names, brands) when it is present.
+    pub extended_dictionary: bool,
+    /// Hotkeys besides [`Config::shortcut`]. Off unless chosen.
+    pub force_layout_1: Shortcut,
+    pub force_layout_2: Shortcut,
+    pub add_exception_key: Shortcut,
+    pub menu_bar_icon: MenuBarIcon,
+    pub menu_bar_size: MenuBarSize,
 }
 
 impl Default for Config {
@@ -233,6 +315,17 @@ impl Default for Config {
             convert_word_before_caret: true,
             sound: false,
             fix_case: true,
+            fix_two_caps: false,
+            correct_on_enter_tab: false,
+            fix_typos: false,
+            expand_abbreviations: false,
+            abbreviations: Vec::new(),
+            extended_dictionary: false,
+            force_layout_1: Shortcut::Off,
+            force_layout_2: Shortcut::Off,
+            add_exception_key: Shortcut::Off,
+            menu_bar_icon: MenuBarIcon::Logo,
+            menu_bar_size: MenuBarSize::Medium,
         }
     }
 }
@@ -298,6 +391,66 @@ impl Config {
         true
     }
 
+    /// Every hotkey that is switched on, with what it does.
+    pub fn hotkeys(&self) -> Vec<(Hotkey, Shortcut)> {
+        [
+            (Hotkey::Main, self.shortcut),
+            (Hotkey::ForceLayout(0), self.force_layout_1),
+            (Hotkey::ForceLayout(1), self.force_layout_2),
+            (Hotkey::AddException, self.add_exception_key),
+        ]
+        .into_iter()
+        .filter(|(_, s)| *s != Shortcut::Off)
+        .collect()
+    }
+
+    /// Check what the settings window sent: hotkeys that collide, and the
+    /// abbreviation list's size and contents. Trims abbreviations in place.
+    pub fn validate(&mut self) -> Result<(), String> {
+        let keys = self.hotkeys();
+        for (i, (_, a)) in keys.iter().enumerate() {
+            if keys[i + 1..].iter().any(|(_, b)| a.collides_with(*b)) {
+                return Err("Две горячие клавиши совпадают".into());
+            }
+        }
+        if self.abbreviations.len() > MAX_ABBREVIATIONS {
+            return Err(format!("Не больше {MAX_ABBREVIATIONS} сокращений"));
+        }
+        let mut seen: Vec<String> = Vec::new();
+        for a in &mut self.abbreviations {
+            a.short = a.short.trim().to_string();
+            a.full = a.full.trim().to_string();
+            let short_len = a.short.chars().count();
+            if short_len == 0
+                || short_len > MAX_ABBREVIATION_SHORT
+                || a.short.chars().any(char::is_whitespace)
+            {
+                return Err("Сокращение — одно слово без пробелов, до 32 символов".into());
+            }
+            if a.full.is_empty()
+                || a.full.chars().count() > MAX_ABBREVIATION_FULL
+                || a.full.chars().any(|c| c.is_control() && c != '\n')
+            {
+                return Err("Полный текст — до 500 символов".into());
+            }
+            let key = a.short.to_lowercase();
+            if seen.contains(&key) {
+                return Err(format!("Сокращение «{}» уже есть", a.short));
+            }
+            seen.push(key);
+        }
+        Ok(())
+    }
+
+    /// The full text for a typed short form, ignoring case.
+    pub fn abbreviation(&self, short: &str) -> Option<&str> {
+        let key = short.to_lowercase();
+        self.abbreviations
+            .iter()
+            .find(|a| a.short.to_lowercase() == key)
+            .map(|a| a.full.as_str())
+    }
+
     pub fn is_excluded_app(&self, app: &str) -> bool {
         self.excluded_apps
             .iter()
@@ -332,6 +485,82 @@ mod tests {
             ..right
         };
         assert!(Modifier::RightCommand.others_held(with_shift));
+    }
+
+    #[test]
+    fn fn_is_its_own_modifier() {
+        let fn_only = Modifiers {
+            function: true,
+            ..Default::default()
+        };
+        assert!(Modifier::Fn.is_held(fn_only));
+        assert!(!Modifier::Fn.others_held(fn_only));
+        let with_cmd = Modifiers {
+            meta: true,
+            ..fn_only
+        };
+        assert!(Modifier::Fn.others_held(with_cmd));
+        // Fn held while waiting for a right Command tap makes it a chord.
+        let right_cmd = Modifiers {
+            meta: true,
+            right_meta: true,
+            function: true,
+            ..Default::default()
+        };
+        assert!(Modifier::RightCommand.others_held(right_cmd));
+        let json = serde_json::to_string(&Shortcut::Tap {
+            modifier: Modifier::Fn,
+        })
+        .unwrap();
+        assert_eq!(json, r#"{"kind":"tap","modifier":"fn"}"#);
+    }
+
+    #[test]
+    fn colliding_hotkeys_and_bad_abbreviations_are_refused() {
+        let mut c = Config {
+            force_layout_1: Shortcut::Tap {
+                modifier: Modifier::platform_default(),
+            },
+            ..Config::default()
+        };
+        assert!(c.validate().is_err(), "same key as the main shortcut");
+        c.force_layout_1 = Shortcut::DoubleTap {
+            modifier: Modifier::platform_default(),
+        };
+        assert!(c.validate().is_err(), "one key, one hotkey");
+        c.force_layout_1 = Shortcut::Tap {
+            modifier: Modifier::RightOption,
+        };
+        assert!(c.validate().is_ok());
+        c.abbreviations = vec![Abbreviation {
+            short: " спс ".into(),
+            full: " спасибо ".into(),
+        }];
+        assert!(c.validate().is_ok());
+        assert_eq!(c.abbreviations[0].short, "спс");
+        assert_eq!(c.abbreviation("СПС"), Some("спасибо"));
+        c.abbreviations.push(Abbreviation {
+            short: "Спс".into(),
+            full: "x".into(),
+        });
+        assert!(c.validate().is_err(), "duplicate short form");
+        c.abbreviations.pop();
+        c.abbreviations.push(Abbreviation {
+            short: "two words".into(),
+            full: "x".into(),
+        });
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn new_behaviours_are_off_by_default() {
+        let c = Config::default();
+        assert!(!c.fix_two_caps && !c.correct_on_enter_tab && !c.fix_typos);
+        assert!(!c.expand_abbreviations && !c.extended_dictionary);
+        assert_eq!(c.force_layout_1, Shortcut::Off);
+        assert_eq!(c.force_layout_2, Shortcut::Off);
+        assert_eq!(c.add_exception_key, Shortcut::Off);
+        assert_eq!(c.menu_bar_icon, MenuBarIcon::Logo);
     }
 
     #[test]

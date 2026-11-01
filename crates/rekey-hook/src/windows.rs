@@ -89,6 +89,8 @@ impl ModState {
             right_control: self.rctrl,
             right_alt: self.ralt,
             right_meta: self.rwin,
+            // Fn is handled inside the keyboard; Windows never sees it.
+            function: false,
         }
     }
 

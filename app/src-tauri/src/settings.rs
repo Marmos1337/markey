@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Bumped whenever loading needs to adjust settings written by an older build.
-const SETTINGS_VERSION: u32 = 3;
+const SETTINGS_VERSION: u32 = 4;
 
 /// The bundle identifier, which names the settings folder.
 const APP_ID: &str = "com.marmos.markey";
@@ -180,6 +180,13 @@ impl Settings {
             self.config.shortcut = Shortcut::Tap {
                 modifier: Modifier::platform_default(),
             };
+        }
+        if self.version < 4 {
+            // 0.3 made two behaviours settings of their own, off for new
+            // installations. Whoever had them keeps them: Return and Tab
+            // corrected words, and fix_case also fixed ПРивет.
+            self.config.correct_on_enter_tab = true;
+            self.config.fix_two_caps = self.config.fix_case;
         }
         self.version = SETTINGS_VERSION;
     }
@@ -490,6 +497,20 @@ mod migration_tests {
                 modifier: Modifier::Shift
             }
         );
+        // 0.2 behaviour is kept for 0.2 users.
+        let mut s: Settings =
+            serde_json::from_str(r#"{"version":3,"config":{"fix_case":true}}"#).unwrap();
+        s.migrate();
+        assert!(s.config.correct_on_enter_tab && s.config.fix_two_caps);
+        let mut s: Settings =
+            serde_json::from_str(r#"{"version":3,"config":{"fix_case":false}}"#).unwrap();
+        s.migrate();
+        assert!(!s.config.fix_two_caps);
+        // A new installation starts with them off.
+        let fresh = Settings::read(std::path::Path::new("/nonexistent/markey/settings.json"));
+        let mut fresh = fresh;
+        fresh.migrate();
+        assert!(!fresh.config.correct_on_enter_tab && !fresh.config.fix_two_caps);
         // And current settings are left alone.
         let mut s: Settings = serde_json::from_str(
             r#"{"version":2,"config":{"shortcut":{"kind":"tap","modifier":"option"}}}"#,

@@ -70,6 +70,9 @@ fn modifiers_of(event: &CGEvent) -> Modifiers {
         right_control: bits & NX_DEVICERCTLKEYMASK != 0,
         right_alt: bits & NX_DEVICERALTKEYMASK != 0,
         right_meta: bits & NX_DEVICERCMDKEYMASK != 0,
+        // The Fn / 🌐 key. Arrow and function keys carry this flag too, but
+        // they arrive as key presses, which end any tap in progress.
+        function: flags.contains(CGEventFlags::CGEventFlagSecondaryFn),
     }
 }
 

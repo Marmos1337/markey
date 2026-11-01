@@ -193,6 +193,45 @@ impl Model {
         sum / tris.len() as f32
     }
 
+    /// The word `word` is an obvious slip of, if there is exactly one clear
+    /// candidate: two neighbouring letters swapped (`пирвет`) or one letter
+    /// typed twice (`приввет`). Only for words of five letters or more that
+    /// are not words themselves, and only towards a common word that beats
+    /// any other candidate by a wide margin. Substitutions and insertions are
+    /// left out on purpose: they have too many plausible readings.
+    pub fn obvious_typo(&self, word: &str) -> Option<String> {
+        const MIN_LEN: usize = 5;
+        const COMMON: f32 = -5.0;
+        const MARGIN: f32 = 1.0;
+        let chars: Vec<char> = word.chars().collect();
+        if chars.len() < MIN_LEN || self.word_logp(word).is_some() {
+            return None;
+        }
+        let mut candidates: Vec<(String, f32)> = Vec::new();
+        let mut consider = |candidate: String| {
+            if let Some(logp) = self.word_logp(&candidate) {
+                if !candidates.iter().any(|(c, _)| *c == candidate) {
+                    candidates.push((candidate, logp));
+                }
+            }
+        };
+        for i in 0..chars.len() - 1 {
+            if chars[i] != chars[i + 1] {
+                let mut swapped = chars.clone();
+                swapped.swap(i, i + 1);
+                consider(swapped.into_iter().collect());
+            } else {
+                let mut single = chars.clone();
+                single.remove(i);
+                consider(single.into_iter().collect());
+            }
+        }
+        candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let (best, logp) = candidates.first()?.clone();
+        let runner_up = candidates.get(1).map(|c| c.1);
+        (logp >= COMMON && runner_up.is_none_or(|r| logp - r >= MARGIN)).then_some(best)
+    }
+
     /// The most likely real word within one edit of `word`.
     ///
     /// Returns that word's log10 probability, so the caller can tell a slip in

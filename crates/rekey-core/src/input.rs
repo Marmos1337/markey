@@ -51,6 +51,8 @@ pub struct Modifiers {
     pub right_control: bool,
     pub right_alt: bool,
     pub right_meta: bool,
+    /// The Fn / 🌐 key (macOS only).
+    pub function: bool,
 }
 
 impl Modifiers {
