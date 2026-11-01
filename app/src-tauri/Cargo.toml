@@ -37,6 +37,14 @@ log = { workspace = true }
 env_filter = "2"
 dirs = "6"
 
+# The API key lives in the Keychain (Security.framework, through Core
+# Foundation types) or the Windows Credential Manager; see src/secrets.rs.
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+
 [features]
 # Tauri's default production behaviour; kept explicit for the release build.
 custom-protocol = ["tauri/custom-protocol"]

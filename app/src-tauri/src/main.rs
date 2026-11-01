@@ -6,6 +6,7 @@
 
 mod assist;
 mod logging;
+mod secrets;
 mod service;
 mod settings;
 
@@ -317,6 +318,14 @@ fn set_config(
         let mut next = settings.clone();
         next.config = config.clone();
         if let Some(key) = api_key {
+            let key = key.trim().to_string();
+            // Into the Keychain / Credential Manager; the settings file never
+            // holds it (see secrets.rs).
+            if key.is_empty() {
+                secrets::system().delete()?;
+            } else {
+                secrets::system().set(&key)?;
+            }
             next.api_key = key;
         }
         if let Some(launch) = launch_at_login {

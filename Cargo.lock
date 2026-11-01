@@ -2959,6 +2959,7 @@ name = "rekey-app"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "core-foundation",
  "dirs 6.0.0",
  "env_filter",
  "log",
@@ -2972,6 +2973,7 @@ dependencies = [
  "tauri-plugin-autostart",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
+ "windows 0.62.2",
 ]
 
 [[package]]
