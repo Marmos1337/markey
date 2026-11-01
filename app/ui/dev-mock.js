@@ -72,6 +72,26 @@ if (!window.__TAURI__ && isLocalDevServer()) {
       convert_word_before_caret: true,
       sound: false,
       fix_case: true,
+      fix_two_caps: false,
+      correct_on_enter_tab: false,
+      fix_typos: false,
+      expand_abbreviations: !globalThis.location?.search?.includes("empty"),
+      abbreviations: globalThis.location?.search?.includes("empty")
+        ? []
+        : [
+            { short: "спс", full: "спасибо" },
+            { short: "пжл", full: "пожалуйста" },
+            { short: "мб", full: "может быть" },
+            { short: "адр", full: "Москва, ул. Тверская, д. 7, кв. 12" },
+          ],
+      extended_dictionary: false,
+      force_layout_1: { kind: "off" },
+      force_layout_2: globalThis.location?.search?.includes("hotkeys")
+        ? { kind: "tap", modifier: "fn" }
+        : { kind: "off" },
+      add_exception_key: { kind: "off" },
+      menu_bar_icon: globalThis.location?.search?.includes("badge") ? "layout" : "logo",
+      menu_bar_size: "medium",
     },
     status: "ready",
     has_api_key: false,
@@ -89,6 +109,9 @@ if (!window.__TAURI__ && isLocalDevServer()) {
       id, name, language, limited,
     })),
     models_loaded: ["ar", "de", "el", "en", "es", "fr", "he", "ru", "tr", "uk"],
+    extended_words: 18068,
+    check_updates: false,
+    update: null,
     version: "0.2.0",
     // Follow the host so the dev server previews the right skin.
     platform: globalThis.location?.search?.includes("windows") || globalThis.navigator?.userAgent?.includes("Windows")
@@ -109,11 +132,39 @@ if (!window.__TAURI__ && isLocalDevServer()) {
     ["Firefox", "org.mozilla.firefox", false],
   ].map(([name, bundle_id, running]) => ({ name, bundle_id, path: "", running }));
 
+  // A release as the GitHub feed would describe it, for the update dialog.
+  const UPDATE = {
+    version: "0.3.0",
+    current: "0.2.0",
+    notes_ru: "- Расширенный словарь: имена, города, бренды и новые слова\n- Горячие клавиши «Всегда раскладка 1 / 2» и «В исключения», клавиша 🌐\n- Сокращения: «спс» → «спасибо»\n- Исправление при Return и Tab, две заглавные, явные опечатки\n- Раскладка в строке меню, три размера\n- Перехват клавиатуры больше не отключается системой при нагрузке",
+    notes_en: "- Extended dictionary: names, places, brands and new words\n- Hotkeys for layout 1 / 2 and for exceptions, the 🌐 key\n- Abbreviations\n- The keyboard tap no longer gets disabled under load",
+    page: "https://github.com/Marmos1337/MarKey/releases/tag/v0.3.0",
+    asset_name: "MarKey_0.3.0_aarch64.dmg",
+    size: 9437184,
+  };
+  if (globalThis.location?.search?.includes("update")) state.update = UPDATE;
+  const later = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
+
   const handlers = {
     get_state: () => structuredClone(state),
     list_apps: () => structuredClone(APPS),
     describe_app: () => null,
     app_icon: () => null,
+    check_update: () => later(700, (state.update = UPDATE)),
+    dismiss_update: () => {
+      state.update = null;
+    },
+    skip_update: () => {
+      state.update = null;
+    },
+    set_update_checks: ({ on }) => {
+      state.check_updates = on;
+    },
+    download_update: () => later(1200, "/Users/you/Downloads/MarKey_0.3.0_aarch64.dmg"),
+    install_update: () =>
+      later(1200).then(() => {
+        throw "В режиме разработки ничего не устанавливается.";
+      }),
     set_config: ({ config, launchAtLogin, apiKey }) => {
       state.config = structuredClone(config);
       state.status = config.enabled ? "ready" : "paused";

@@ -1,0 +1,59 @@
+/* mar-ui 1.0.0 7af02f8 — vendored by mar-ui/tools/vendor.mjs; do not edit here, update the kit and re-vendor. */
+/* mar-ui states: skeleton with a sheen (MarGram primitives/skeleton.css), the
+   error tone of the empty-state anatomy, and the cross-fade frame (states.js). */
+
+/* ---------- Skeleton ---------- */
+.ds-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  min-height: 0.75rem;
+  border-radius: var(--ds-radius-xs);
+  background: var(--ds-skeleton);
+}
+/* A line is one body line tall (it holds the final height); the bar sits in its middle. */
+.ds-skeleton--line {
+  height: calc(var(--ds-text-body) * 1.5);
+  background: linear-gradient(transparent 22%, var(--ds-skeleton) 22% 78%, transparent 78%);
+}
+.ds-skeleton--line::after { inset-block: 22%; }
+.ds-skeleton--line-sm { height: calc(var(--ds-text-label) * 1.5); }
+.ds-skeleton--block { border-radius: var(--ds-radius-md); }
+/* The lead tile of a list row (.ds-row__lead geometry). */
+.ds-skeleton--lead { width: 2.25rem; height: 2.25rem; flex: none; border-radius: var(--ds-radius-md); }
+.ds-skeleton--circle { width: 2.5rem; height: 2.5rem; flex: none; border-radius: var(--ds-radius-full); }
+.ds-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--ds-skeleton-sheen), transparent);
+  transform: translateX(-100%);
+  animation: ds-skeleton-sheen var(--ds-motion-shimmer) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes ds-skeleton-sheen { to { transform: translateX(100%); } }
+.ds-skeleton-group { display: flex; flex-direction: column; gap: var(--ds-space-3); }
+.ds-skeleton-group__lines { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.ds-skeleton-group__row { display: flex; align-items: center; gap: var(--ds-space-3); }
+
+/* ---------- Empty / error anatomy: icon, title, one line, action ---------- */
+.ds-empty { display: flex; flex-direction: column; align-items: center; gap: var(--ds-space-3); padding: var(--ds-space-8) var(--ds-space-4); text-align: center; color: var(--ds-text-muted); }
+.ds-empty__icon { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: var(--ds-radius-xl); background: var(--ds-surface-2); color: var(--ds-text-2); }
+.ds-empty__title { margin: 0; color: var(--ds-text); font-size: var(--ds-text-section); font-weight: var(--ds-weight-semibold); }
+.ds-empty__text { margin: 0; max-width: 22rem; font-size: var(--ds-text-label); }
+.ds-empty__action { display: flex; justify-content: center; margin-top: var(--ds-space-1); }
+.ds-empty--error .ds-empty__icon { background: var(--ds-danger-soft); color: var(--ds-danger-text); }
+.ds-empty--success .ds-empty__icon { background: var(--ds-success-soft); color: var(--ds-success); }
+
+/* ---------- Cross-fade frame ----------
+   Old and new content share one grid cell, so during the fade the frame is as
+   tall as the taller of the two; states.js then keeps it at its largest height. */
+.ds-xfade { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.ds-xfade > .ds-xfade__layer { grid-area: 1 / 1; min-width: 0; }
+.ds-xfade > .ds-xfade__layer.is-leaving { pointer-events: none; }
+
+/* ---------- Reduced motion: the skeleton stays, the sheen stops ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ds-skeleton::after { animation: none; opacity: 0; }
+}
+:root[data-motion="off"] .ds-skeleton::after { animation: none; opacity: 0; }

@@ -85,7 +85,10 @@ jobs:
       # mock ever activated inside the packaged app it would show invented
       # statistics and dead controls while looking entirely normal.
       - name: UI tests
-        run: node --test app/ui/test/
+        run: node --test "app/ui/test/*.test.mjs"
+      - name: The vendored mar-ui kit has not been edited in place
+        run: |
+          node -e "const m=require('./app/ui/vendor/mar-ui/mar-ui.json');const c=require('crypto'),f=require('fs');let bad=0;for(const[n,h]of Object.entries(m.files)){let t=f.readFileSync('app/ui/vendor/mar-ui/'+n,'utf8');if(t.startsWith('/* mar-ui '))t=t.slice(t.indexOf('\\n')+1);if(c.createHash('sha256').update(t).digest('hex')!==h){console.error('edited: '+n);bad=1}}process.exit(bad)"
 
   deny:
     name: Dependencies (licences, advisories, sources)

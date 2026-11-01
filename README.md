@@ -71,7 +71,7 @@ macOS привязывает разрешение Универсального �
 cargo test -p rekey-core -p rekey-hook -p rekey-app   # ядро, хук, приложение (с замером пути хука)
 cargo clippy -p rekey-core -p rekey-hook -p rekey-app --all-targets -- -D warnings
 cargo run --release -p eval -- tools/.cache crates/rekey-core/data/models
-node --test app/ui/test/                              # окно настроек
+node --test "app/ui/test/*.test.mjs"                 # окно настроек
 cargo deny check                                      # лицензии и уязвимости зависимостей
 node ../path/to/mar-ui/tools/vendor.mjs app/ui/vendor/mar-ui --check   # дизайн-кит не разошёлся
 ```

@@ -1,0 +1,56 @@
+/* mar-ui 1.0.0 7af02f8 — vendored by mar-ui/tools/vendor.mjs; do not edit here, update the kit and re-vendor. */
+/* mar-ui for desktop utilities (MarKey, MarOptimize, MarEdit windows, overlays).
+   <link rel="stylesheet" href="vendor/mar-ui/desktop.css">
+   Tokens, glass, states and animated icons with compact density, a focus ring
+   and themed scrollbars. No Telegram code and no mini-app blocks.
+   Incremental: linking this file changes nothing visible on its own (tokens and
+   ds-* classes only). Page-level rules (background, font, focus ring, scrollbars,
+   selection) apply only under <body class="ds-desktop">, and use :where() so the
+   app's own CSS still wins without !important. */
+@import url("./tokens.css");
+@import url("./glass.css");
+@import url("./states.css");
+@import url("./icon-motion.css");
+@import url("./patterns.css");
+
+/* Desktop density is the default here; <html data-shape="soft"> opts out. */
+:root:not([data-shape="soft"]) {
+  --ds-radius-card: var(--ds-radius-md);
+  --ds-radius-control: 0.625rem;
+  --ds-control-h: 2.25rem;
+  --ds-control-h-sm: 1.875rem;
+  --ds-text-body: 0.875rem;
+  --ds-gutter: var(--ds-space-3);
+}
+
+:where(html:has(> body.ds-desktop)) {
+  background: var(--ds-bg);
+  scrollbar-color: var(--ds-border-strong) transparent;
+}
+:where(body.ds-desktop) {
+  margin: 0;
+  background: var(--ds-bg);
+  color: var(--ds-text);
+  font: var(--ds-weight-regular) var(--ds-text-body)/1.5 var(--ds-font);
+  -webkit-font-smoothing: antialiased;
+}
+:where(.ds-desktop) :where(button, input, select, textarea) { font: inherit; color: inherit; }
+
+/* Focus ring: keyboard focus only, same colour as the mini apps' ring. */
+:where(.ds-desktop) :where(:focus-visible) { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
+:where(.ds-desktop) :where(:focus:not(:focus-visible)) { outline: none; }
+
+.ds-desktop ::selection { background: color-mix(in srgb, var(--ds-accent) 32%, transparent); }
+
+/* Scrollbars: thin, token-coloured, no track (Chromium/WebKit; Firefox uses scrollbar-color). */
+.ds-desktop ::-webkit-scrollbar { width: 0.625rem; height: 0.625rem; }
+.ds-desktop ::-webkit-scrollbar-track { background: transparent; }
+.ds-desktop ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: var(--ds-radius-full); background: var(--ds-border-strong) padding-box; }
+.ds-desktop ::-webkit-scrollbar-thumb:hover { background-color: var(--ds-text-disabled); }
+.ds-desktop ::-webkit-scrollbar-corner { background: transparent; }
+
+/* Icons (the mini apps get these from blocks.css). */
+.ds-icon { width: 1.25rem; height: 1.25rem; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ds-icon--sm { width: 1rem; height: 1rem; }
+.ds-icon--lg { width: 1.5rem; height: 1.5rem; }
+.ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

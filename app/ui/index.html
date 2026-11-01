@@ -1,12 +1,15 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-palette="system" data-tone="graphite" data-shape="compact" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MarKey</title>
+  <!-- Sets data-theme before first paint; the kit's tokens read it. -->
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="vendor/mar-ui/desktop.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="ds-desktop">
   <div class="app">
     <!-- The sidebar doubles as the window's drag area: macOS draws the traffic
          lights over its top-left corner. -->
@@ -20,33 +23,40 @@
         </div>
       </div>
       <nav class="nav" aria-label="Разделы">
-        <button class="nav-item" data-page="general" style="--tint:#8e8e93">
-          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M10 6.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Zm7 4.6v-2.4l-2-.4a5 5 0 0 0-.6-1.5l1.2-1.7-1.7-1.7-1.7 1.2a5 5 0 0 0-1.5-.6L10.4 2H8l-.4 2a5 5 0 0 0-1.5.6L4.4 3.4 2.7 5.1l1.2 1.7a5 5 0 0 0-.6 1.5l-2 .4v2.4l2 .4a5 5 0 0 0 .6 1.5l-1.2 1.7 1.7 1.7 1.7-1.2a5 5 0 0 0 1.5.6l.4 2h2.4l.4-2a5 5 0 0 0 1.5-.6l1.7 1.2 1.7-1.7-1.2-1.7a5 5 0 0 0 .6-1.5Z"/></svg></span>
+        <button class="nav-item" data-page="general">
+          <span class="ds-tile" data-tile="gray"><span data-kit-icon="settings"></span></span>
           Основное
         </button>
-        <button class="nav-item" data-page="shortcut" style="--tint:#5e5ce6">
-          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M7 4a3 3 0 1 0-3 3h2v6H4a3 3 0 1 0 3 3v-2h6v2a3 3 0 1 0 3-3h-2V7h2a3 3 0 1 0-3-3v2H7Zm0 3h6v6H7Z" fill-rule="evenodd"/></svg></span>
-          Горячая клавиша
+        <button class="nav-item" data-page="shortcut">
+          <span class="ds-tile" data-tile="indigo">
+            <svg class="ds-icon" data-icon="command" data-icon-motion="pop" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12a3 3 0 1 1-3-3h12a3 3 0 1 1-3 3V6a3 3 0 1 1 3 3H6a3 3 0 1 1 3-3Z" /></svg>
+          </span>
+          Горячие клавиши
         </button>
-        <button class="nav-item" data-page="apps" style="--tint:#ff9f0a">
-          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM12.2 12.2l4.6 4.6M16.8 12.2l-4.6 4.6" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></span>
+        <button class="nav-item" data-page="apps">
+          <span class="ds-tile" data-tile="orange"><span data-kit-icon="shield"></span></span>
           Исключения
         </button>
-        <button class="nav-item" data-page="languages" style="--tint:#0a84ff">
-          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Zm0 0c2 2 3 4.5 3 7.5s-1 5.5-3 7.5m0-15c-2 2-3 4.5-3 7.5s1 5.5 3 7.5M3 10h14" stroke="#fff" stroke-width="1.6" fill="none"/></svg></span>
+        <button class="nav-item" data-page="languages">
+          <span class="ds-tile" data-tile="blue"><span data-kit-icon="globe"></span></span>
           Языки
         </button>
-        <button class="nav-item" data-page="words" style="--tint:#30d158">
-          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M4 5h12M4 10h8M4 15h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <button class="nav-item" data-page="words">
+          <span class="ds-tile" data-tile="green"><span data-kit-icon="book"></span></span>
           Слова
         </button>
-        <button class="nav-item" data-page="advanced" style="--tint:#636366">
-          <span class="nav-icon"><svg viewBox="0 0 20 20"><path d="M4 6h7m4 0h1M4 14h1m4 0h7M11 6a2 2 0 1 0 4 0 2 2 0 0 0-4 0Zm-6 8a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></span>
+        <button class="nav-item" data-page="abbreviations">
+          <span class="ds-tile" data-tile="purple"><span data-kit-icon="edit"></span></span>
+          Сокращения
+        </button>
+        <button class="nav-item" data-page="advanced">
+          <span class="ds-tile" data-tile="gray"><span data-kit-icon="sliders"></span></span>
           Дополнительно
         </button>
       </nav>
       <div class="sidebar-foot">
         <span id="version"></span>
+        <span class="update-dot" id="update-dot" hidden>Есть обновление</span>
       </div>
     </aside>
 
@@ -61,7 +71,7 @@
         <!-- General -->
         <section class="page" data-page="general">
           <div id="permission" class="banner banner-warn" hidden>
-            <div class="banner-icon" aria-hidden="true">!</div>
+            <div class="banner-icon" aria-hidden="true"><span data-kit-icon="warning"></span></div>
             <div class="banner-body">
               <strong>Разрешите MarKey доступ к клавиатуре</strong>
               <p>Системные настройки → Конфиденциальность и безопасность → Универсальный доступ → включите MarKey. Перезапуск не нужен — всё заработает само.</p>
@@ -73,7 +83,7 @@
           </div>
 
           <div id="no-models" class="banner banner-error" hidden>
-            <div class="banner-icon" aria-hidden="true">!</div>
+            <div class="banner-icon" aria-hidden="true"><span data-kit-icon="alert"></span></div>
             <div class="banner-body">
               <strong>Не найдены языковые модели</strong>
               <p>Без них исправление выключено. Переустановите MarKey или соберите модели из репозитория.</p>
@@ -112,14 +122,14 @@
             <div class="row">
               <span class="how-step">2</span>
               <div class="row-text">
-                <span class="row-title">Исправилось зря — нажмите <kbd class="shortcut-name">правый ⌘</kbd></span>
+                <span class="row-title">Исправилось зря — нажмите <kbd class="ds-kbd shortcut-name">правый ⌘</kbd></span>
                 <span class="row-detail">Слово вернётся как было, и MarKey запомнит его.</span>
               </div>
             </div>
             <div class="row">
               <span class="how-step">3</span>
               <div class="row-text">
-                <span class="row-title">Не исправилось — нажмите <kbd class="shortcut-name">правый ⌘</kbd></span>
+                <span class="row-title">Не исправилось — нажмите <kbd class="ds-kbd shortcut-name">правый ⌘</kbd></span>
                 <span class="row-detail">Переведётся последнее слово вместе со всей фразой, набранной не в той раскладке. Выделили текст — переведётся выделение.</span>
               </div>
             </div>
@@ -139,14 +149,14 @@
           <p class="group-footnote">Всё работает только на вашем Mac. Ничего из набранного никуда не отправляется и не записывается.</p>
         </section>
 
-        <!-- Shortcut -->
+        <!-- Hotkeys -->
         <section class="page" data-page="shortcut" hidden>
-          <p class="page-intro">Одна клавиша на всё: отменить исправление, перевести то, что не исправилось само, или перевести выделенный текст. Модификаторы сами ничего не печатают, поэтому одиночное нажатие безопасно — сочетания вроде <span id="copy-chord">⌘C</span> его не вызывают.</p>
+          <p class="page-intro">Главная клавиша делает всё: отменяет исправление, переводит то, что не исправилось само, или выделенный текст. Модификаторы сами ничего не печатают, поэтому одиночное нажатие безопасно — сочетания вроде <span id="copy-chord">⌘C</span> его не вызывают.</p>
 
-          <h2 class="group-header">Клавиша</h2>
+          <h2 class="group-header">Главная клавиша</h2>
           <section class="group">
             <div class="row row-column">
-              <div class="keycaps" id="keycaps" role="radiogroup" aria-label="Клавиша"></div>
+              <div class="keycaps" id="keycaps" role="radiogroup" aria-label="Главная клавиша"></div>
             </div>
             <div class="row">
               <div class="row-text">
@@ -158,9 +168,12 @@
                 <button data-value="doubletap" role="radio">Двойное</button>
               </div>
             </div>
+            <div class="row fn-note" id="fn-note" hidden>
+              <span class="row-detail">Чтобы клавиша 🌐 не открывала эмодзи и не меняла язык сама, в Системных настройках → Клавиатура выберите «Нажатие клавиши 🌐: Ничего не делать».</span>
+            </div>
           </section>
 
-          <h2 class="group-header">Что делает клавиша</h2>
+          <h2 class="group-header">Что делает главная клавиша</h2>
           <section class="group">
             <div class="row">
               <div class="row-text">
@@ -191,6 +204,10 @@
               <label class="switch"><input type="checkbox" id="convert-word" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
             </div>
           </section>
+
+          <h2 class="group-header">Другие клавиши</h2>
+          <section class="group" id="extra-hotkeys"></section>
+          <p class="group-footnote">Одна клавиша — одно действие. Занятые клавиши в списках недоступны.</p>
         </section>
 
         <!-- Apps -->
@@ -199,9 +216,9 @@
           <section class="group app-list-group">
             <ul id="excluded-apps" class="app-list"></ul>
             <div class="list-toolbar">
-              <button class="tool-btn" id="add-app" aria-label="Добавить приложение" title="Добавить приложение">+</button>
+              <button class="tool-btn" id="add-app" aria-label="Добавить приложение" title="Добавить приложение"><span data-kit-icon="plus"></span></button>
               <span class="tool-sep"></span>
-              <button class="tool-btn" id="remove-app" aria-label="Убрать выбранное" title="Убрать выбранное" disabled>−</button>
+              <button class="tool-btn" id="remove-app" aria-label="Убрать выбранное" title="Убрать выбранное" disabled><span data-kit-icon="minus"></span></button>
               <span class="tool-spacer"></span>
               <button class="btn btn-small" id="add-app-text">Добавить приложение…</button>
             </div>
@@ -211,7 +228,7 @@
 
         <!-- Languages -->
         <section class="page" data-page="languages" hidden>
-          <p class="page-intro">Отметьте только те языки, на которых пишете. Чем меньше лишних — тем увереннее MarKey.</p>
+          <p class="page-intro">Отметьте только те языки, на которых пишете. Чем меньше лишних — тем увереннее MarKey. Первые два в списке — «раскладка 1» и «раскладка 2» для горячих клавиш.</p>
           <section class="group">
             <ul id="layouts" class="layouts"></ul>
           </section>
@@ -231,11 +248,53 @@
               <span class="row-detail" id="exceptions-empty">Пока пусто.</span>
             </div>
           </section>
+
+          <h2 class="group-header">Словарь</h2>
+          <section class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Расширенный словарь</span>
+                <span class="row-detail" id="extended-detail">Имена, города, бренды, сервисы и новые слова — сбербанк, гитхаб, openai, вайлдберриз. Словарь уже внутри MarKey и ничего не скачивает.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="extended" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+          </section>
+        </section>
+
+        <!-- Abbreviations -->
+        <section class="page" data-page="abbreviations" hidden>
+          <p class="page-intro">Наберите сокращение и пробел — MarKey заменит его полным текстом. Сработает и в неправильной раскладке: «cgc» станет «спасибо». Отменить замену можно главной клавишей.</p>
+          <section class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Заменять сокращения</span>
+                <span class="row-detail" id="abbr-count">Список пуст.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="abbr-enabled" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+          </section>
+
+          <h2 class="group-header">Сокращения</h2>
+          <section class="group">
+            <form class="row abbr-add" id="abbr-form" autocomplete="off">
+              <input id="abbr-short" class="field abbr-short" placeholder="спс" spellcheck="false" maxlength="32" aria-label="Сокращение" />
+              <span class="abbr-arrow" aria-hidden="true"><span data-kit-icon="arrow"></span></span>
+              <input id="abbr-full" class="field" placeholder="спасибо" spellcheck="false" maxlength="500" aria-label="Полный текст" />
+              <button class="btn" id="abbr-add" type="submit">Добавить</button>
+            </form>
+            <p class="row-error" id="abbr-error" role="alert"></p>
+            <ul class="abbr-list" id="abbr-list"></ul>
+            <div class="empty" id="abbr-empty">
+              <span class="empty-icon" aria-hidden="true"><span data-kit-icon="edit"></span></span>
+              <span class="empty-title">Пока нет сокращений</span>
+              <span class="empty-text">Добавьте первое: например, «спс» → «спасибо» или «адр» → ваш адрес.</span>
+            </div>
+          </section>
         </section>
 
         <!-- Advanced -->
         <section class="page" data-page="advanced" hidden>
-          <h2 class="group-header">Исправление</h2>
+          <h2 class="group-header group-header-first">Исправление</h2>
           <section class="group">
             <div class="row">
               <div class="row-text">
@@ -257,6 +316,13 @@
             </div>
             <div class="row">
               <div class="row-text">
+                <span class="row-title">Исправлять при Return и Tab</span>
+                <span class="row-detail">Слово перед Return или Tab тоже исправится. В Outlook — только по пробелу: там Return может отправить письмо.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="enter-tab" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
                 <span class="row-title">Не трогать слова КАПСОМ</span>
                 <span class="row-detail">Аббревиатуры вроде HTTP и SQL. Длинные слова с Caps Lock всё равно исправятся.</span>
               </div>
@@ -264,10 +330,24 @@
             </div>
             <div class="row">
               <div class="row-text">
-                <span class="row-title">Исправлять регистр</span>
-                <span class="row-detail">пРИВЕТ → Привет (и выключать забытый Caps Lock), ПРивет → Привет. Только для настоящих слов — iPhone и GHz не трогаются.</span>
+                <span class="row-title">Исправлять забытый Caps Lock</span>
+                <span class="row-detail">пРИВЕТ → Привет, и Caps Lock выключится. Только для настоящих слов — iPhone и GHz не трогаются.</span>
               </div>
               <label class="switch"><input type="checkbox" id="fix-case" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Исправлять две заглавные</span>
+                <span class="row-detail">ПРивет → Привет: Shift отпустили на букву позже.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="two-caps" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Исправлять явные опечатки</span>
+                <span class="row-detail">Переставленные или задвоенные буквы: пирвет → привет. Только когда вариант один и это частое слово.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="fix-typos" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
             </div>
             <div class="row">
               <div class="row-text">
@@ -275,6 +355,33 @@
                 <span class="row-detail">Тихий системный щелчок.</span>
               </div>
               <label class="switch"><input type="checkbox" id="sound" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+          </section>
+
+          <h2 class="group-header">Строка меню</h2>
+          <section class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Значок</span>
+                <span class="row-detail">Раскладка — код текущего языка по центру строки меню.</span>
+              </div>
+              <div class="segmented" id="menu-icon" role="radiogroup" aria-label="Значок в строке меню">
+                <button data-value="logo" role="radio">MarKey</button>
+                <button data-value="layout" role="radio">Раскладка</button>
+              </div>
+            </div>
+            <div class="row" id="menu-size-row">
+              <div class="row-text">
+                <span class="row-title">Размер</span>
+                <div class="menubar-preview" aria-hidden="true">
+                  <span class="menubar-strip"><canvas id="menu-preview" width="120" height="44"></canvas></span>
+                </div>
+              </div>
+              <div class="segmented" id="menu-size" role="radiogroup" aria-label="Размер значка">
+                <button data-value="small" role="radio">Мелкий</button>
+                <button data-value="medium" role="radio">Средний</button>
+                <button data-value="large" role="radio">Крупный</button>
+              </div>
             </div>
           </section>
 
@@ -297,6 +404,24 @@
             </div>
           </section>
 
+          <h2 class="group-header">Обновления</h2>
+          <section class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Проверять обновления</span>
+                <span class="row-detail">Раз в день MarKey смотрит, вышла ли новая версия на GitHub. Ничего не ставит без вашего согласия.</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="check-updates" switch /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title" id="update-version">MarKey</span>
+                <span class="row-detail" id="update-status">Установщик проверяется по контрольной сумме из того же релиза.</span>
+              </div>
+              <button class="btn btn-icon" id="check-now"><span data-kit-icon="refresh"></span>Проверить</button>
+            </div>
+          </section>
+
           <h2 class="group-header">Диагностика</h2>
           <section class="group">
             <div class="row">
@@ -312,7 +437,7 @@
                 <span class="row-title">Журнал</span>
                 <span class="row-detail">Только решения и длины слов — сами слова не записываются.</span>
               </div>
-              <button class="btn" id="open-log">Показать в Finder</button>
+              <button class="btn btn-icon" id="open-log"><span data-kit-icon="folder"></span><span id="open-log-label">Показать в Finder</span></button>
             </div>
           </section>
         </section>
@@ -356,9 +481,39 @@
     </form>
   </dialog>
 
+  <dialog id="update-dialog" class="sheet update-sheet" aria-labelledby="update-title">
+    <div class="sheet-inner" tabindex="-1" autofocus>
+      <div class="update-head">
+        <img class="update-logo" src="logo.png" alt="" width="56" height="56" />
+        <div class="update-head-text">
+          <h2 id="update-title">Доступно обновление</h2>
+          <p class="update-sub" id="update-sub"></p>
+        </div>
+      </div>
+      <div class="update-notes-head">
+        <span class="update-notes-title">Что нового</span>
+        <div class="segmented segmented-small" id="update-lang" role="radiogroup" aria-label="Язык описания">
+          <button data-value="ru" role="radio" aria-checked="true">RU</button>
+          <button data-value="en" role="radio" aria-checked="false">EN</button>
+        </div>
+      </div>
+      <div class="update-notes" id="update-notes" tabindex="0"></div>
+      <p class="update-verify"><span data-kit-icon="shield"></span><span>Перед установкой файл проверяется по SHA256SUMS из этого же релиза. Если сумма не совпадёт, MarKey ничего не установит.</span></p>
+      <p class="row-error" id="update-error" role="alert"></p>
+      <div class="update-actions">
+        <button class="btn btn-plain" id="update-skip">Пропустить</button>
+        <span class="tool-spacer"></span>
+        <button class="btn" id="update-later">Позже</button>
+        <button class="btn btn-icon" id="update-download"><span data-kit-icon="download"></span>Скачать</button>
+        <button class="btn btn-primary" id="update-install">Установить и перезапустить</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Inert when running inside Tauri; see dev-mock.js. -->
   <script src="dev-mock.js"></script>
   <script src="save-queue.js"></script>
   <script src="app.js"></script>
+  <script type="module" src="ui.js"></script>
 </body>
 </html>

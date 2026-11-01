@@ -1,0 +1,53 @@
+/* mar-ui 1.0.0 7af02f8 — vendored by mar-ui/tools/vendor.mjs; do not edit here, update the kit and re-vendor. */
+/* mar-ui small patterns shared by mini apps and desktop windows. */
+
+/* Keycap (MarKey): shortcuts and hints. Pressed look comes from the thicker bottom edge. */
+.ds-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 var(--ds-space-2);
+  border: 1px solid var(--ds-border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--ds-radius-xs);
+  background: var(--ds-surface-2);
+  color: var(--ds-text-2);
+  font: var(--ds-weight-semibold) var(--ds-text-meta)/1 var(--ds-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ds-kbd-group { display: inline-flex; align-items: center; gap: var(--ds-space-1); }
+
+/* Coloured icon tiles (MarKey's signature, macOS System Settings sidebar):
+   <span class="ds-tile" data-tile="blue"><svg class="ds-icon ds-icon--sm">…</svg></span>
+   A decorative glyph next to its label; the label carries the meaning. */
+.ds-tile {
+  --tile: var(--ds-accent);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--ds-radius-xs);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 82%, #ffffff), var(--tile));
+  color: #ffffff;
+  box-shadow: inset 0 0 0 0.5px #00000026, 0 1px 1px #0000001f;
+}
+.ds-tile > .ds-icon { width: 0.9375rem; height: 0.9375rem; stroke-width: 2.25; }
+.ds-tile[data-tile="gray"] { --tile: #8e8e93; }
+.ds-tile[data-tile="blue"] { --tile: #007aff; }
+.ds-tile[data-tile="indigo"] { --tile: #5856d6; }
+.ds-tile[data-tile="purple"] { --tile: #af52de; }
+.ds-tile[data-tile="orange"] { --tile: #ff9500; }
+.ds-tile[data-tile="green"] { --tile: #34c759; }
+.ds-tile[data-tile="red"] { --tile: #ff3b30; }
+.ds-tile[data-tile="teal"] { --tile: #30b0c7; }
+:root[data-theme="dark"] .ds-tile[data-tile="blue"] { --tile: #0a84ff; }
+:root[data-theme="dark"] .ds-tile[data-tile="indigo"] { --tile: #5e5ce6; }
+:root[data-theme="dark"] .ds-tile[data-tile="purple"] { --tile: #bf5af2; }
+:root[data-theme="dark"] .ds-tile[data-tile="orange"] { --tile: #ff9f0a; }
+:root[data-theme="dark"] .ds-tile[data-tile="green"] { --tile: #30d158; }
+:root[data-theme="dark"] .ds-tile[data-tile="red"] { --tile: #ff453a; }
+:root[data-theme="dark"] .ds-tile[data-tile="teal"] { --tile: #40c8e0; }

@@ -1,0 +1,88 @@
+/* mar-ui 1.0.0 7af02f8 — vendored by mar-ui/tools/vendor.mjs; do not edit here, update the kit and re-vendor. */
+/* mar-ui animated icons (motions from MarMic packages/ui/src/icons/icons.css).
+   A glyph animates only while icon-motion.js has set [data-icon-play]; at rest
+   there is no animation and no transition on any icon. Transform only, so a
+   playing icon never moves the label or button next to it. */
+
+.ds-icon[data-icon-play] {
+  animation: var(--ds-icon-keyframes, none) var(--ds-motion-icon) var(--ds-ease-out) 1;
+  transform-origin: 50% 50%;
+}
+.ds-icon[data-icon-play="nudge"] { --ds-icon-keyframes: ds-icon-nudge; }
+.ds-icon[data-icon-play="pop"] { --ds-icon-keyframes: ds-icon-pop; }
+.ds-icon[data-icon-play="swing"] { --ds-icon-keyframes: ds-icon-swing; transform-origin: 50% 8%; }
+.ds-icon[data-icon-play="turn"] { --ds-icon-keyframes: ds-icon-turn; }
+.ds-icon[data-icon-play="spin"] { --ds-icon-keyframes: ds-icon-spin; }
+.ds-icon[data-icon-play="drop"] { --ds-icon-keyframes: ds-icon-drop; }
+.ds-icon[data-icon-play="lift"] { --ds-icon-keyframes: ds-icon-lift; }
+.ds-icon[data-icon-play="slide"] { --ds-icon-keyframes: ds-icon-slide; }
+.ds-icon[data-icon-play="shake"] { --ds-icon-keyframes: ds-icon-shake; }
+.ds-icon[data-icon-play="blink"] { --ds-icon-keyframes: ds-icon-blink; }
+/* Backwards-pointing glyphs slide the way they point. */
+.ds-icon:is([data-icon="back"], [data-icon="left"], [data-icon="undo"]) { --ds-icon-dir: -1; }
+
+@keyframes ds-icon-nudge { 40% { transform: scale(1.08) rotate(-4deg); } }
+@keyframes ds-icon-pop { 40% { transform: scale(1.1); } 70% { transform: scale(0.97); } }
+@keyframes ds-icon-swing { 20% { transform: rotate(10deg); } 45% { transform: rotate(-7deg); } 70% { transform: rotate(3deg); } }
+/* Turn: a quarter turn and back, so the glyph rests exactly where it started. */
+@keyframes ds-icon-turn { 50% { transform: rotate(90deg); } 100% { transform: rotate(0deg); } }
+@keyframes ds-icon-spin { from { transform: rotate(0deg); } to { transform: rotate(1turn); } }
+@keyframes ds-icon-drop { 45% { transform: translateY(10%); } }
+@keyframes ds-icon-lift { 45% { transform: translateY(-10%); } }
+@keyframes ds-icon-slide { 45% { transform: translateX(calc(10% * var(--ds-icon-dir, 1))); } }
+@keyframes ds-icon-shake { 20% { transform: rotate(-6deg); } 45% { transform: rotate(5deg); } 70% { transform: rotate(-2deg); } }
+@keyframes ds-icon-blink { 35% { transform: scaleY(0.2); } }
+
+/* ---------- Morph between two states ----------
+   Two glyphs stacked in one fixed slot; data-state="a" | "b" picks the visible
+   one. Transitions run only on a real state change, never on mount or at rest. */
+.ds-morph {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  vertical-align: middle;
+}
+.ds-morph.ds-icon--sm { width: 1rem; height: 1rem; }
+.ds-morph.ds-icon--lg { width: 1.5rem; height: 1.5rem; }
+.ds-morph > .ds-icon {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  transition:
+    opacity var(--ds-motion-morph) var(--ds-ease),
+    transform var(--ds-motion-morph) var(--ds-ease-spring-soft),
+    clip-path var(--ds-motion-morph) var(--ds-ease-out);
+}
+.ds-morph > .ds-morph__b,
+.ds-morph[data-state="b"] > .ds-morph__a { opacity: 0; }
+.ds-morph[data-state="b"] > .ds-morph__b { opacity: 1; }
+
+/* turn: sun turns away, moon turns in (and back). */
+.ds-morph--turn > .ds-morph__b { transform: rotate(-90deg) scale(0.5); }
+.ds-morph--turn[data-state="b"] > .ds-morph__a { transform: rotate(90deg) scale(0.5); }
+.ds-morph--turn[data-state="b"] > .ds-morph__b { transform: none; }
+
+/* scale: play shrinks out, pause grows in. */
+.ds-morph--scale > .ds-morph__b { transform: scale(0.4); }
+.ds-morph--scale[data-state="b"] > .ds-morph__a { transform: scale(0.4); }
+.ds-morph--scale[data-state="b"] > .ds-morph__b { transform: none; }
+
+/* reveal: the done glyph wipes in left to right over the empty circle. */
+.ds-morph--reveal > .ds-morph__b { opacity: 1; clip-path: inset(0 100% 0 0); }
+.ds-morph--reveal[data-state="b"] > .ds-morph__b { clip-path: inset(0 0 0 0); }
+.ds-morph--reveal[data-state="b"] > .ds-morph__a { opacity: 0; transform: scale(0.85); }
+
+/* strike: the struck glyph is uncovered from the top-left corner, the way the
+   strike is drawn; the plain glyph fades under it. */
+.ds-morph--strike > .ds-morph__b { opacity: 1; clip-path: inset(0 100% 100% 0); }
+.ds-morph--strike[data-state="b"] > .ds-morph__b { clip-path: inset(0 0 0 0); }
+
+/* ---------- Reduced motion: no plays, instant swaps ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ds-icon[data-icon-play] { animation: none; }
+  .ds-morph > .ds-icon { transition-duration: 0s; }
+}
+:root[data-motion="off"] .ds-icon[data-icon-play] { animation: none; }
+:root[data-motion="off"] .ds-morph > .ds-icon { transition-duration: 0s; }

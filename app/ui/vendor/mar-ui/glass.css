@@ -1,0 +1,87 @@
+/* mar-ui 1.0.0 7af02f8 — vendored by mar-ui/tools/vendor.mjs; do not edit here, update the kit and re-vendor. */
+/* mar-ui glass, lite profile (from MarGram packages/ui/src/glass/glass.css).
+   Backdrop blur + saturation over live content, a hairline edge light and an
+   inner highlight. No SVG displacement: the Telegram iOS WebView is WebKit and
+   does not run it. Rule: text never sits on the bare tint — put it on
+   .ds-glass-backing (or use a glass surface whose own tint is dense enough,
+   like the tab bar, header and sheet below).
+   Falls back to a solid surface when backdrop-filter is unsupported, when the
+   user asks for less transparency, or when <html data-glass="off">. */
+
+.ds-glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--ds-glass-tint);
+  -webkit-backdrop-filter: blur(var(--ds-glass-blur)) saturate(var(--ds-glass-saturate));
+  backdrop-filter: blur(var(--ds-glass-blur)) saturate(var(--ds-glass-saturate));
+  box-shadow: var(--ds-glass-highlight), var(--ds-glass-shadow);
+  color: var(--ds-text);
+}
+/* Edge light: a one-hairline gradient ring cut out of a full fill. */
+.ds-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--ds-glass-edge);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.ds-glass--bar { border-radius: var(--ds-radius-2xl); }
+.ds-glass--panel { border-radius: var(--ds-radius-card); }
+.ds-glass--pill { border-radius: var(--ds-radius-full); }
+.ds-glass--sheet { border-radius: var(--ds-radius-2xl) var(--ds-radius-2xl) 0 0; }
+.ds-glass--edge { border-radius: 0; }
+
+/* Text backing: the density that keeps body text readable over any content. */
+.ds-glass-backing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-1) var(--ds-space-3);
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-glass-backing);
+  color: var(--ds-text);
+}
+.ds-glass-backing--block { display: flex; padding: var(--ds-space-2) var(--ds-space-3); border-radius: var(--ds-radius-md); }
+.ds-glass-backing[data-tone="secondary"] { color: var(--ds-text-2); }
+.ds-glass-backing[data-tone="accent"] { color: var(--ds-accent-text); }
+
+/* Scrim under sheets and dialogs: dim + a light blur. */
+.ds-scrim { position: fixed; inset: 0; background: var(--ds-overlay); -webkit-backdrop-filter: blur(var(--ds-blur-2)); backdrop-filter: blur(var(--ds-blur-2)); }
+
+/* The kit's floating surfaces in Depth style use the same glass tokens. */
+:root[data-style="depth"] .ds-tabbar {
+  background: var(--ds-glass-tint);
+  -webkit-backdrop-filter: blur(var(--ds-glass-blur)) saturate(var(--ds-glass-saturate));
+  backdrop-filter: blur(var(--ds-glass-blur)) saturate(var(--ds-glass-saturate));
+  box-shadow: var(--ds-glass-highlight), var(--ds-glass-shadow);
+}
+:root[data-style="depth"] .ds-header {
+  background: color-mix(in srgb, var(--ds-bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(var(--ds-blur-3)) saturate(1.4);
+  backdrop-filter: blur(var(--ds-blur-3)) saturate(1.4);
+}
+:root[data-style="depth"][data-theme="light"] .ds-header { background: color-mix(in srgb, var(--ds-bg) 85%, transparent); }
+
+/* ---------- Solid fallbacks ----------
+   [data-theme] lifts the selectors over the light-theme Depth rules in blocks.css. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ds-glass, :root[data-style="depth"][data-theme] .ds-tabbar { background: var(--ds-glass-solid); }
+  :root[data-style="depth"][data-theme] .ds-header { background: var(--ds-bg); }
+  .ds-glass-backing { background: transparent; padding-inline: 0; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ds-glass, :root[data-style="depth"][data-theme] .ds-tabbar { background: var(--ds-glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-style="depth"][data-theme] .ds-header { background: var(--ds-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .ds-glass-backing { background: transparent; padding-inline: 0; }
+  .ds-scrim { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+:root[data-glass="off"] .ds-glass, :root[data-glass="off"][data-theme] .ds-tabbar { background: var(--ds-glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-glass="off"][data-theme] .ds-header { background: var(--ds-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-glass="off"] .ds-glass-backing { background: transparent; padding-inline: 0; }
+:root[data-glass="off"] .ds-scrim { -webkit-backdrop-filter: none; backdrop-filter: none; }
