@@ -43,7 +43,14 @@ pub struct Model {
     words: Vec<(u32, f32)>,
     /// (hash, log10 probability), sorted by hash.
     trigrams: Vec<(u32, f32)>,
+    /// Hashes of the optional extended dictionary's words, sorted. Empty
+    /// unless the user switched it on; see [`Models::with_extended`].
+    extended: Vec<u32>,
 }
+
+/// The log10 probability an extended-dictionary word counts as: a real word,
+/// but a rare one, so it is protected less than everyday vocabulary.
+pub const EXTENDED_LOGP: f32 = -6.0;
 
 /// FNV-1a, 32-bit. Small, fast, no dependency, and good enough for a table
 /// this size — at 50k entries the expected number of collisions is well under
@@ -91,6 +98,7 @@ impl Model {
             lang: lang.into(),
             words: Vec::new(),
             trigrams: Vec::new(),
+            extended: Vec::new(),
         }
     }
 
@@ -148,6 +156,7 @@ impl Model {
             lang: lang.into(),
             words,
             trigrams,
+            extended: Vec::new(),
         }
     }
 
@@ -166,6 +175,12 @@ impl Model {
             .binary_search_by_key(&h, |e| e.0)
             .ok()
             .map(|i| self.words[i].1)
+            .or_else(|| self.extended.binary_search(&h).ok().map(|_| EXTENDED_LOGP))
+    }
+
+    /// Words of the extended dictionary attached to this model.
+    pub fn extended_count(&self) -> usize {
+        self.extended.len()
     }
 
     /// True when the word table contains this exact (normalized) word.
@@ -396,6 +411,7 @@ impl Model {
             lang,
             words,
             trigrams,
+            extended: Vec::new(),
         })
     }
 
@@ -420,6 +436,52 @@ impl<'a> Cursor<'a> {
         let s = &self.buf[self.pos..self.pos + n];
         self.pos += n;
         Ok(s)
+    }
+}
+
+/// The optional extended dictionary: names, places, brands, services and new
+/// words that the corpus lacks, per language. Text files, one word a line,
+/// `#` comments; built by tools/modelgen/src/bin/extgen.rs.
+#[derive(Debug, Default, Clone)]
+pub struct ExtendedWords {
+    by_lang: HashMap<String, Vec<String>>,
+}
+
+impl ExtendedWords {
+    /// Read every `<lang>.txt` in `dir`. A missing folder is an empty
+    /// dictionary, not an error: the setting then simply has no effect.
+    pub fn load_dir(dir: &Path) -> io::Result<ExtendedWords> {
+        let mut by_lang = HashMap::new();
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(ExtendedWords::default()),
+            Err(e) => return Err(e),
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "txt") {
+                continue;
+            }
+            let Some(lang) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let words: Vec<String> = fs::read_to_string(&path)?
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                .map(str::to_string)
+                .collect();
+            by_lang.insert(lang.to_string(), words);
+        }
+        Ok(ExtendedWords { by_lang })
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_lang.values().map(Vec::len).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -456,6 +518,24 @@ impl Models {
 
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
+    }
+
+    /// A copy with the extended dictionary attached to the matching models.
+    /// `self` is left as it is, so switching the dictionary off is going
+    /// back to the original.
+    pub fn with_extended(&self, extended: &ExtendedWords) -> Models {
+        let mut map = (*self.map).clone();
+        for (lang, words) in &extended.by_lang {
+            if let Some(model) = map.get_mut(lang) {
+                let mut hashes: Vec<u32> = words.iter().map(|w| hash_str(&normalize(w))).collect();
+                hashes.sort_unstable();
+                hashes.dedup();
+                model.extended = hashes;
+            }
+        }
+        Models {
+            map: std::sync::Arc::new(map),
+        }
     }
 
     /// Load every `*.rkm` file in `dir`. Missing directory is not an error —

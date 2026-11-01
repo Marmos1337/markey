@@ -295,6 +295,18 @@ pub fn models_dir(app: &tauri::AppHandle) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/rekey-core/data/models")
 }
 
+/// The extended dictionary's word lists, bundled beside the models.
+pub fn extended_dir(app: &tauri::AppHandle) -> PathBuf {
+    use tauri::Manager;
+    if let Ok(resources) = app.path().resource_dir() {
+        let bundled = resources.join("extended");
+        if bundled.is_dir() {
+            return bundled;
+        }
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/rekey-core/data/extended")
+}
+
 /// Canonical bundle IDs/executable IDs, preserving the user's existing list.
 pub fn normalize_exclusions(ids: Vec<String>) -> Result<Vec<String>, String> {
     if ids.len() > 512 {

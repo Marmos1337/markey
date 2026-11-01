@@ -48,7 +48,8 @@
       "icons/icon.png"
     ],
     "resources": {
-      "../../crates/rekey-core/data/models": "models"
+      "../../crates/rekey-core/data/models": "models",
+      "../../crates/rekey-core/data/extended": "extended"
     },
     "copyright": "© 2026 marmos. Based on Rekey © Rostislav Ladnov. MIT licensed.",
     "category": "Utility",

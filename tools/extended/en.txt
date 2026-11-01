@@ -1,0 +1,16 @@
+# New words, slang, names of products and services that the 2018 subtitle
+# corpus barely has. Written for MarKey by hand (MIT, like the code).
+chatgpt openai anthropic claude gemini copilot midjourney perplexity deepseek mistral llama huggingface
+tiktok tiktoker instagram whatsapp telegram youtube youtuber zoom figma notion slack discord github gitlab
+jira confluence trello asana miro canva vercel netlify heroku cloudflare kubernetes docker terraform ansible
+iphone ipad macbook airpods applewatch android pixel galaxy xiaomi huawei oneplus playstation xbox nintendo
+wildberries ozon yandex vkontakte sber tinkoff avito kaspersky tesla spacex starlink uber airbnb netflix
+spotify twitch reddit pinterest linkedin snapchat threads bluesky mastodon substack patreon onlyfans
+rizz sus cringe cringy vibe vibes vibing slay yeet bussin stan simp ghosting doomscrolling deepfake deepfakes
+prompt prompts chatbot chatbots livestream livestreaming streamer podcast podcasts unboxing cosplay cosplayer
+meme memes emoji emojis selfie selfies hashtag hashtags influencer influencers blockchain bitcoin ethereum
+crypto nft nfts staking onboarding offboarding webinar webinars standup retro backlog deploy deployed
+deploying devops frontend backend fullstack microservice microservices serverless repo repos refactor
+refactoring codebase linter linting typescript javascript rust golang kotlin swiftui flutter nextjs vite
+smartwatch smartphone smartphones gadget gadgets app apps login logout captcha phishing vpn proxy wifi
+lowkey highkey fomo yolo noob noobs gamer gamers esports speedrun speedrunner modding livestreamer

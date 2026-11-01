@@ -12,7 +12,7 @@ mod settings;
 
 use rekey_core::config::Config;
 use rekey_core::engine::Engine;
-use rekey_core::model::Models;
+use rekey_core::model::{ExtendedWords, Models};
 use service::{Runtime, SharedEngine};
 use settings::Settings;
 use std::collections::HashMap;
@@ -34,6 +34,53 @@ struct AppState {
     icons: Mutex<HashMap<String, Option<String>>>,
     /// The session counts already added to the saved totals.
     flushed: Mutex<rekey_core::engine::Stats>,
+    /// The models as loaded, without the extended dictionary.
+    base_models: Models,
+    /// The extended dictionary, read from disk the first time it is used.
+    extended: Mutex<Option<ExtendedWords>>,
+    extended_dir: std::path::PathBuf,
+}
+
+impl AppState {
+    /// The models the engine should use for `config`.
+    fn models_for(&self, config: &Config) -> Models {
+        if !config.extended_dictionary {
+            return self.base_models.clone();
+        }
+        let Ok(mut extended) = self.extended.lock() else {
+            return self.base_models.clone();
+        };
+        let words = extended.get_or_insert_with(|| load_extended(&self.extended_dir));
+        self.base_models.with_extended(words)
+    }
+
+    /// Words in the extended dictionary on disk (0 when it is missing).
+    fn extended_size(&self) -> usize {
+        self.extended
+            .lock()
+            .ok()
+            .map(|mut e| {
+                e.get_or_insert_with(|| load_extended(&self.extended_dir))
+                    .len()
+            })
+            .unwrap_or(0)
+    }
+}
+
+fn load_extended(dir: &std::path::Path) -> ExtendedWords {
+    match ExtendedWords::load_dir(dir) {
+        Ok(words) => {
+            log::info!("extended dictionary: {} words", words.len());
+            words
+        }
+        Err(e) => {
+            log::warn!(
+                "cannot read the extended dictionary in {}: {e}",
+                dir.display()
+            );
+            ExtendedWords::default()
+        }
+    }
 }
 
 /// Add this session's new corrections to the totals kept across launches.
@@ -84,6 +131,8 @@ struct UiState {
     can_hold: bool,
     available_layouts: Vec<LayoutInfo>,
     models_loaded: Vec<String>,
+    /// Words in the bundled extended dictionary; 0 when it is missing.
+    extended_words: usize,
     version: String,
     platform: String,
 }
@@ -164,6 +213,7 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         can_hold: state.runtime.can_hold.load(Ordering::Relaxed),
         available_layouts: layout_catalog(),
         models_loaded,
+        extended_words: state.extended_size(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: std::env::consts::OS.to_string(),
         config,
@@ -336,8 +386,19 @@ fn set_config(
         *settings = next;
         settings.clone()
     };
+    // Built outside the engine lock: attaching the dictionary copies the
+    // models, and the keyboard hook needs the engine meanwhile.
+    let extended_changed = state
+        .engine
+        .lock()
+        .map(|e| e.config().extended_dictionary != config.extended_dictionary)
+        .unwrap_or(false);
+    let models = extended_changed.then(|| state.models_for(&config));
     {
         let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
+        if let Some(models) = models {
+            engine.detector.models = models;
+        }
         engine.set_config(config);
         engine.invalidate_caret();
         // The assist is rebuilt rather than toggled, so switching it off drops
@@ -742,6 +803,17 @@ fn main() {
                 );
             }
 
+            let extended_dir = settings::extended_dir(&handle);
+            let base_models = models.clone();
+            let mut extended_words = None;
+            let models = if settings.config.extended_dictionary {
+                let words = load_extended(&extended_dir);
+                let with = models.with_extended(&words);
+                extended_words = Some(words);
+                with
+            } else {
+                models
+            };
             let mut engine_inner = Engine::new(models, settings.config.clone());
             attach_assist(&mut engine_inner, &settings);
             let engine: SharedEngine = Arc::new(Mutex::new(engine_inner));
@@ -775,6 +847,9 @@ fn main() {
                 vibrancy: Mutex::new(vibrancy),
                 icons: Mutex::new(HashMap::new()),
                 flushed: Mutex::new(Default::default()),
+                base_models,
+                extended: Mutex::new(extended_words),
+                extended_dir,
             });
             refresh_tray(&handle);
 
