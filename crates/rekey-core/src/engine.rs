@@ -1955,4 +1955,155 @@ mod tests {
         assert!(e.take_tap());
         assert!(!e.take_tap(), "reported once");
     }
+
+    /// What ends up on screen after typing `typed` on `layout`, keys held.
+    fn screen_after(typed: &str, layout: &str) -> String {
+        let mut e = engine();
+        let mut screen = Screen::new(true);
+        for ch in typed.chars() {
+            let ev = match ch {
+                ' ' => special(Key::Space),
+                _ => key(ch),
+            };
+            screen.key(&mut e, ev, layout);
+        }
+        screen.text
+    }
+
+    #[test]
+    fn russian_letters_on_english_punctuation_keys_are_converted() {
+        // х ъ ё ю б ж э live on [ ] ` . , ; ' of a US keyboard.
+        for (typed, shown) in [
+            ("[jhjij ", "хорошо "),
+            ("j,]zdktybt ", "объявление "),
+            ("dc` ", "всё "),
+            ("t` ", "её "),
+            ("`krf ", "ёлка "),
+            (".u ", "юг "),
+            (".hbcn ", "юрист "),
+            (",snm ", "быть "),
+            (";bpym ", "жизнь "),
+            ("'nj ", "это "),
+            // The last letter is on a punctuation key: not a full stop.
+            ("ve; ", "муж "),
+            ("lf. ", "даю "),
+        ] {
+            assert_eq!(screen_after(typed, "us"), shown, "typed {typed:?}");
+        }
+    }
+
+    #[test]
+    fn short_russian_words_are_converted() {
+        for (typed, shown) in [
+            ("lj ", "до "),
+            ("jq ", "ой "),
+            ("yt ", "не "),
+            ("lf ", "да "),
+            ("z ", "я "),
+        ] {
+            assert_eq!(screen_after(typed, "us"), shown, "typed {typed:?}");
+        }
+    }
+
+    #[test]
+    fn punctuation_typed_the_russian_way_is_kept() {
+        for (typed, layout, shown) in [
+            // Shift+/ is the Russian comma, / the Russian full stop.
+            ("ghbdtn? ", "us", "привет, "),
+            ("ghbdtn/ ", "us", "привет. "),
+            ("ghbdtn, ", "us", "привет, "),
+            ("ghbdtn! ", "us", "привет! "),
+            ("ghbdtn: ", "us", "привет: "),
+            ("ghbdtn rfr ltkf? ", "us", "привет как дела, "),
+            // English typed on the Russian layout, punctuation typed for the
+            // Russian layout: Shift+7 is ?, not &.
+            ("руддщ? ", "ru", "hello? "),
+            ("руддщ. ", "ru", "hello. "),
+            ("руддщ; ", "ru", "hello; "),
+            ("руддщ: ", "ru", "hello: "),
+            ("руддщб ", "ru", "hello, "),
+        ] {
+            assert_eq!(
+                screen_after(typed, layout),
+                shown,
+                "typed {typed:?} on {layout}"
+            );
+        }
+    }
+
+    #[test]
+    fn typed_punctuation_survives_only_where_the_key_is_a_symbol() {
+        use crate::detect::keep_typed_punctuation as keep;
+        assert_eq!(keep("руддщ?", "hello&"), "hello?");
+        assert_eq!(keep("\"руддщ\"", "@hello@"), "\"hello\"");
+        assert_eq!(keep("ghbdtn?", "привет,"), "привет,");
+        assert_eq!(keep("ve;", "муж"), "муж");
+        assert_eq!(keep("abc", "ab"), "ab", "different lengths are left alone");
+    }
+
+    /// The commonest Russian words with х ъ ё ю б ж э, typed on a US
+    /// keyboard. Needs the corpora (tools/fetch_corpora.sh); skipped without.
+    #[test]
+    fn common_words_with_punctuation_key_letters_are_recognised() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tools/.cache/ru_50k.txt");
+        let Ok(text) = std::fs::read_to_string(path) else {
+            return;
+        };
+        let e = engine();
+        let (mut total, mut missed) = (0, Vec::new());
+        for line in text.lines().take(3000) {
+            let Some(word) = line.split_whitespace().next() else {
+                continue;
+            };
+            // Lone letters follow the one-letter rule; this is about words.
+            if word.chars().count() < 2
+                || !word.chars().any(|c| "хъёюбжэ".contains(c))
+                || !word.chars().all(|c| ('а'..='я').contains(&c) || c == 'ё')
+            {
+                continue;
+            }
+            let Some(typed) = layout::convert_by_id(word, "ru", "us") else {
+                continue;
+            };
+            total += 1;
+            if !matches!(e.detector.evaluate(&typed, "us"), Verdict::Switch(c) if c.converted == word)
+            {
+                missed.push(word.to_string());
+            }
+        }
+        assert!(total > 500, "only {total} words checked");
+        assert!(
+            missed.is_empty(),
+            "{} of {total} missed: {missed:?}",
+            missed.len()
+        );
+    }
+
+    /// English words followed by punctuation stay English.
+    #[test]
+    fn english_words_with_trailing_punctuation_are_left_alone() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tools/.cache/en_50k.txt");
+        let Ok(text) = std::fs::read_to_string(path) else {
+            return;
+        };
+        let e = engine();
+        let mut wrong = Vec::new();
+        for line in text.lines().take(5000) {
+            let Some(word) = line.split_whitespace().next() else {
+                continue;
+            };
+            if word.len() < 3 || !word.chars().all(|c| c.is_ascii_alphabetic()) {
+                continue;
+            }
+            for p in [".", ",", ";", ":", "'", "?", "!"] {
+                let typed = format!("{word}{p}");
+                if let Verdict::Switch(c) = e.detector.evaluate(&typed, "us") {
+                    wrong.push(format!("{typed} -> {}", c.converted));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:?}");
+    }
 }

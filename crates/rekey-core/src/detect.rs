@@ -144,6 +144,45 @@ const AMBIGUOUS_BAND: f32 = 1.5;
 /// a letter on any layout Rekey ships, so rejecting them costs nothing.
 const STRUCTURAL: &[char] = &['@', ':', '\\', '|', '<', '>', '{', '}', '=', '_', '+'];
 
+/// Punctuation that opens a word: quotes and brackets.
+const OPENING_PUNCTUATION: &[char] = &['(', '"', '\'', '«', '“', '„', '['];
+
+/// Put back punctuation the user typed around a word when the same key means
+/// a symbol, not punctuation, on the other layout.
+///
+/// Someone typing English with the Russian layout still types `?` the
+/// Russian way, with Shift+7 — which is `&` on a US keyboard. `руддщ?` means
+/// `hello?`, not `hello&`. A key that is punctuation on both layouts follows
+/// the conversion (`ghbdtn?` is `привет,`: Shift+/ is the Russian comma), and
+/// a key that is a letter on the other layout is a letter (`ve;` is `муж`).
+pub fn keep_typed_punctuation(typed: &str, converted: &str) -> String {
+    let typed: Vec<char> = typed.chars().collect();
+    let mut out: Vec<char> = converted.chars().collect();
+    if typed.len() != out.len() {
+        return converted.to_string();
+    }
+    let fix = |set: &[char], t: char, c: &mut char| -> bool {
+        if !set.contains(&t) || c.is_alphabetic() {
+            return false;
+        }
+        if !set.contains(c) {
+            *c = t;
+        }
+        true
+    };
+    for i in 0..out.len() {
+        if !fix(OPENING_PUNCTUATION, typed[i], &mut out[i]) {
+            break;
+        }
+    }
+    for i in (0..out.len()).rev() {
+        if !fix(SENTENCE_PUNCTUATION, typed[i], &mut out[i]) {
+            break;
+        }
+    }
+    out.into_iter().collect()
+}
+
 /// A single `/` is allowed because it is the Arabic letter ظ on a US keyboard
 /// and `.` on Russian, but two or more mean a path or URL.
 const MAX_SLASHES: usize = 1;
@@ -189,7 +228,8 @@ const LITERAL_TAIL_PENALTY: f32 = 0.5;
 
 /// Punctuation that ends a word in running text, set aside before the typed
 /// word is judged.
-const SENTENCE_PUNCTUATION: &[char] = &[',', '.', '!', '?', ';', ':', ')', '"', '\'', '»', '…'];
+const SENTENCE_PUNCTUATION: &[char] =
+    &[',', '.', '!', '?', ';', ':', ')', '"', '\'', '»', '…', '”'];
 
 /// How common a two- or three-letter reading must be to count as a word.
 const SHORT_WORD_FLOOR: f32 = -5.5;
@@ -311,11 +351,15 @@ impl Detector {
         let sentence_trimmed =
             lead_trimmed.trim_end_matches(|c: char| SENTENCE_PUNCTUATION.contains(&c));
         // Only when a real word is left behind: `j,` is not `j` and a comma.
+        // And not when that final "punctuation" is the last letter of a
+        // common word on another layout: `ve;` is `муж` and `lf.` is `даю`,
+        // not `ve` and `lf` followed by a semicolon and a full stop.
         let typed_core = if sentence_trimmed
             .chars()
             .filter(|c| c.is_alphabetic())
             .count()
             >= 2
+            && !self.trailing_key_is_a_letter(lead_trimmed, sentence_trimmed, from, src_model)
         {
             sentence_trimmed
         } else {
@@ -576,7 +620,7 @@ impl Detector {
         model: &Model,
     ) -> Vec<(String, Reading, f32)> {
         let mut out = Vec::new();
-        let converted = layout::convert(token, from, to);
+        let converted = keep_typed_punctuation(token, &layout::convert(token, from, to));
         let mut plain_known = false;
         // No language starts a word with `,` or `[`; a typed letter that comes
         // out as leading punctuation means the typed text was the word.
@@ -749,7 +793,12 @@ impl Detector {
         {
             return Some(Skip::NotAWord);
         }
-        if token.chars().any(|c| STRUCTURAL.contains(&c)) {
+        // One colon closing a word is prose (`привет:`), not structure.
+        let body = token
+            .strip_suffix(':')
+            .filter(|b| b.chars().last().is_some_and(|c| c != ':'))
+            .unwrap_or(token);
+        if body.chars().any(|c| STRUCTURAL.contains(&c)) {
             return Some(Skip::NotAWord);
         }
         if token.chars().filter(|c| *c == '/').count() > MAX_SLASHES {
@@ -799,6 +848,39 @@ impl Detector {
                 let tok = to.token_at(idx, shifted);
                 !tok.is_empty() && tok.chars().all(|ch| ch.is_alphabetic())
             })
+        })
+    }
+
+    /// Whether the characters `full` has beyond `trimmed` are keys that make
+    /// `full` a common word on another enabled layout — and a commoner one
+    /// than `trimmed` is as typed. Then they are letters, not sentence
+    /// punctuation, and the word is judged whole: `ve;` is `муж`, `lf.` is
+    /// `даю`, even though subtitles are full of `ve` and `lf`.
+    fn trailing_key_is_a_letter(
+        &self,
+        full: &str,
+        trimmed: &str,
+        from: &Layout,
+        src: &Model,
+    ) -> bool {
+        if full.len() == trimmed.len() {
+            return false;
+        }
+        let typed_known = src.word_logp(&crate::model::normalize(trimmed));
+        self.config.alternatives(from.def.id).iter().any(|alt| {
+            let Some(to) = layout::layout(alt) else {
+                return false;
+            };
+            let Some(model) = self.models.get(to.def.lang) else {
+                return false;
+            };
+            let converted = layout::convert(full, from, to);
+            if !converted.chars().all(char::is_alphabetic) {
+                return false;
+            }
+            model
+                .word_logp(&crate::model::normalize(&converted))
+                .is_some_and(|lp| lp >= COMMON_WORD_FLOOR && typed_known.is_none_or(|t| lp > t))
         })
     }
 
