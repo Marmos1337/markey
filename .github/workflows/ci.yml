@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "audit/**", "claude/**", "feature/**"]
   pull_request:
 
 env:
@@ -78,5 +78,20 @@ jobs:
           node --check app/ui/dev-mock.js
       # If the development mock ever activated inside the packaged app it would
       # show invented statistics and dead controls while looking entirely normal.
-      - name: The dev mock must never activate in the packaged app
-        run: node app/ui/test/dev-mock.test.mjs
+      - name: Syntax-check the vendored kit and the update dialog
+        run: |
+          for f in app/ui/*.js; do node --check "$f"; done
+      # Every app/ui/test/*.test.mjs, including the dev-mock guard: if the
+      # mock ever activated inside the packaged app it would show invented
+      # statistics and dead controls while looking entirely normal.
+      - name: UI tests
+        run: node --test app/ui/test/
+
+  deny:
+    name: Dependencies (licences, advisories, sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses sources bans

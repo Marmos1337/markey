@@ -14,8 +14,10 @@ version = "0.2.0"
 edition = "2021"
 rust-version = "1.77"
 license = "MIT"
-repository = "https://github.com/rstqDev/rekey"
-authors = ["Rostislav Ladnov"]
+repository = "https://github.com/Marmos1337/MarKey"
+homepage = "https://github.com/Marmos1337/MarKey"
+# MarKey is a fork of Rekey (https://github.com/rstqDev/rekey, MIT).
+authors = ["marmos", "Rostislav Ladnov (Rekey)"]
 
 [workspace.dependencies]
 rekey-core = { path = "crates/rekey-core" }

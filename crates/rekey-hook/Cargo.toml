@@ -2,8 +2,11 @@
 name = "rekey-hook"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
+authors.workspace = true
+homepage.workspace = true
 description = "Keyboard observation and text injection for Rekey, per platform."
 
 [dependencies]

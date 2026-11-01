@@ -6,8 +6,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  version:
+    name: Tag matches the version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # A release whose tag says one version and whose app says another
+      # breaks the update check, which compares the two.
+      - name: Compare the tag with Cargo.toml and tauri.conf.json
+        shell: bash
+        run: |
+          cargo_version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          tauri_version=$(python3 -c 'import json;print(json.load(open("app/src-tauri/tauri.conf.json"))["version"])')
+          echo "Cargo.toml: $cargo_version  tauri.conf.json: $tauri_version"
+          test -n "$cargo_version"
+          test "$cargo_version" = "$tauri_version"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/v}"
+            echo "tag: $tag"
+            test "$tag" = "$cargo_version"
+          fi
+
   build:
     name: Build (${{ matrix.os }})
+    needs: version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -66,13 +88,33 @@ jobs:
         with:
           path: artifacts
 
+      # The in-app updater downloads SHA256SUMS from the same release and
+      # refuses an installer whose hash is not listed there.
+      - name: Checksums
+        run: |
+          mkdir release
+          find artifacts -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) -exec cp {} release/ \;
+          cd release
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create the release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: release/*
           draft: true
           generate_release_notes: true
+          # The update dialog shows the "Что нового" section (and "What's new"
+          # for English); fill both in before publishing the draft.
           body: |
+            ## Что нового
+
+            - 
+
+            ## What's new
+
+            - 
+
             ## Installing
 
             **macOS** — open the `.dmg`, drag MarKey to Applications, then grant

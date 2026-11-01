@@ -2,8 +2,11 @@
 name = "rekey-ai"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
+authors.workspace = true
+homepage.workspace = true
 description = "Optional, opt-in Claude assist for words Rekey's local models find ambiguous."
 
 [dependencies]

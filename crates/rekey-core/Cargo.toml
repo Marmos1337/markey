@@ -2,8 +2,11 @@
 name = "rekey-core"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
+authors.workspace = true
+homepage.workspace = true
 description = "Layout tables, language models and the wrong-layout detection engine for Rekey."
 
 [dependencies]

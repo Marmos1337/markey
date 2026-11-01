@@ -57,17 +57,26 @@ cargo tauri build                                                     # или: 
 
 Готовое приложение появится в `target/release/bundle/macos/MarKey.app`. Перенесите его в «Программы», запустите и разрешите доступ: Системные настройки → Конфиденциальность и безопасность → Универсальный доступ → MarKey. Перезапуск не нужен.
 
-macOS привязывает разрешение Универсального доступа к подписи приложения. У ad-hoc-сборки подпись меняется при каждой пересборке: в настройках MarKey остаётся включённым, но доступа у него уже нет. Тогда удалите его из списка кнопкой «−» и добавьте снова, либо выполните `tccutil reset Accessibility com.marmos.markey`. Подпись настоящим сертификатом (`APPLE_SIGNING_IDENTITY`) решает проблему насовсем.
+macOS привязывает разрешение Универсального доступа к подписи приложения. У ad-hoc-сборки подпись меняется при каждой пересборке: в настройках MarKey остаётся включённым, но доступа у него уже нет. Тогда удалите его из списка кнопкой «−» и добавьте снова, либо выполните `tccutil reset Accessibility com.marmos.markey`. Постоянная подпись решает проблему: один раз выполните `./scripts/create-dev-identity.sh` (создаёт самоподписанный сертификат «MarKey Dev» в связке ключей сборочного Mac) и собирайте с `APPLE_SIGNING_IDENTITY="MarKey Dev" cargo tauri build`. Это не Developer ID: на других Mac Gatekeeper всё равно предупредит, нотаризации нет.
 
-Настройки лежат в `~/Library/Application Support/com.marmos.markey/`. Настройки от сборки Rekey переносятся автоматически при первом запуске. Там же находится журнал `markey.log`: в него пишутся решения и длины слов, сами слова никогда.
+Релизы собирает `.github/workflows/release.yml` по тегу `vX.Y.Z`. Он проверяет, что тег совпадает с версией в `Cargo.toml` и `tauri.conf.json`, и кладёт в черновик релиза `SHA256SUMS`. Окно обновления в приложении сверяет скачанный установщик с этим файлом и отказывается ставить файл с другой суммой.
+
+Настройки лежат в `~/Library/Application Support/com.marmos.markey/settings.json` (права 0600). Настройки от сборки Rekey переносятся автоматически при первом запуске. API-ключ Anthropic хранится в Связке ключей macOS (в Windows — в Диспетчере учётных данных), в файл настроек он не пишется. Ключ, оставшийся в файле от версии 0.2.0, при первом запуске переносится в Связку ключей, а из всех файлов настроек удаляется.
+
+Там же лежит журнал `markey.log`: решения и длины слов, сами слова никогда. Он пишется из отдельного потока и не тормозит перехват клавиатуры. Журнал ротируется: `markey.log`, `.1`, `.2`, каждый до 1 МБ. Журнал прошлого запуска сохраняется. Уровень по умолчанию `info`; подробнее: `MARKEY_LOG=debug`. Если macOS отключает перехват клавиатуры, в журнале видно, почему (таймаут или ввод пользователя), сколько раз и сколько занимал самый медленный обработчик. Окно настроек показывает «Система отключает перехват», если это случилось три раза за минуту.
 
 ## Проверки
 
 ```sh
-cargo test --workspace --exclude rekey-app     # ядро, модели, хук
+cargo test -p rekey-core -p rekey-hook -p rekey-app   # ядро, хук, приложение (с замером пути хука)
+cargo clippy -p rekey-core -p rekey-hook -p rekey-app --all-targets -- -D warnings
 cargo run --release -p eval -- tools/.cache crates/rekey-core/data/models
-node app/ui/test/dev-mock.test.mjs && node app/ui/test/save-queue.test.mjs
+node --test app/ui/test/                              # окно настроек
+cargo deny check                                      # лицензии и уязвимости зависимостей
+node ../path/to/mar-ui/tools/vendor.mjs app/ui/vendor/mar-ui --check   # дизайн-кит не разошёлся
 ```
+
+CI (`.github/workflows/ci.yml`) запускает то же на macOS и Windows при пуше в `main`, `audit/**`, `claude/**`, `feature/**` и для PR.
 
 ## Устройство
 
@@ -82,6 +91,17 @@ node app/ui/test/dev-mock.test.mjs && node app/ui/test/save-queue.test.mjs
 
 Внутренние имена crate (`rekey-*`) оставлены, чтобы не ломать историю. Исходная документация Rekey лежит в [docs/REKEY-UPSTREAM.md](docs/REKEY-UPSTREAM.md), архив прошлой разработки — в `archive/`.
 
+## Что ещё лежит в репозитории
+
+Приложению нужны только `crates/`, `app/` и `tools/`. Остальное:
+
+- `automation/`: скрипты для постов в X и карточек к ним (`post.py`, `x_client.py`, `make_cards.py`). Ключи X берутся только из переменных окружения (`X_API_KEY` и другие, см. `automation/README.md`) и на диск не пишутся. Каталог и его история проверены поиском по шаблонам ключей (`sk-`, `ghp_`, `xox*`, приватные ключи, присвоенные токены): секретов нет (01.11.2026).
+- `web/`: статический лендинг с демо.
+- `archive/`: история разработки Rekey до переименования (логи проверок, заметки). В сборку не попадает.
+- `scripts/create-dev-identity.sh`: постоянная подпись для сборочного Mac, см. «Сборка».
+
 ## Лицензия
 
-MIT, см. [LICENSE](LICENSE). Частотные словари — [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (MIT), корпус OpenSubtitles.
+Код — MIT, см. [LICENSE](LICENSE). MarKey основан на [Rekey](https://github.com/rstqDev/rekey) Ростислава Ладнова (MIT).
+
+Языковые модели строятся из частотных списков [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (корпус OpenSubtitles 2018). У этого репозитория код под MIT, а сами списки под **CC BY-SA 4.0**. Поэтому модели в `crates/rekey-core/data/models` — производные данные под CC BY-SA 4.0 с указанием источника. Подробности в [docs/DATA-LICENSES.md](docs/DATA-LICENSES.md).

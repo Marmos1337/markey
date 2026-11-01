@@ -2,9 +2,12 @@
 name = "rekey-app"
 version.workspace = true
 edition.workspace = true
+publish = false
 license.workspace = true
 repository.workspace = true
-description = "MarKey — fixes text typed on the wrong keyboard layout."
+authors.workspace = true
+homepage.workspace = true
+description = "MarKey — fixes text typed on the wrong keyboard layout. Based on Rekey."
 default-run = "markey"
 
 [[bin]]

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Download word-frequency lists used to train Rekey's language models.
 #
-# Source: hermitdave/FrequencyWords (MIT), built from the OpenSubtitles corpus.
+# Source: hermitdave/FrequencyWords, built from the OpenSubtitles 2018 corpus.
+# Its code is MIT; the word lists themselves are CC BY-SA 4.0, so the models
+# built from them are too (see docs/DATA-LICENSES.md).
 # Subtitles are transcribed speech, so these lists are unusually rich in slang,
 # contractions and profanity — exactly the vocabulary a layout switcher has to
 # recognise and that dictionary-based word lists miss.
