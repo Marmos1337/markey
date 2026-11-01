@@ -140,6 +140,8 @@ struct UiState {
     check_updates: bool,
     /// A newer version waiting in the update dialog.
     update: Option<updater::Update>,
+    /// A one-off message from the keyboard side.
+    notice: Option<String>,
     version: String,
     platform: String,
 }
@@ -223,6 +225,7 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         extended_words: state.extended_size(),
         check_updates: settings.check_updates,
         update: state.update.lock().ok().and_then(|u| u.clone()),
+        notice: state.runtime.notice.lock().ok().and_then(|mut n| n.take()),
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: std::env::consts::OS.to_string(),
         config,
@@ -367,6 +370,7 @@ fn set_config(
     mut config: Config,
     api_key: Option<String>,
     launch_at_login: Option<bool>,
+    ai_consent: Option<bool>,
 ) -> Result<(), String> {
     config.excluded_apps = settings::normalize_exclusions(config.excluded_apps)?;
     config.validate()?;
@@ -390,6 +394,17 @@ fn set_config(
         }
         if let Some(launch) = launch_at_login {
             next.launch_at_login = launch;
+        }
+        // Consent comes only from the dialog; switching the assist off
+        // withdraws it, so turning it on again asks again.
+        if let Some(consent) = ai_consent {
+            next.ai_consent = consent;
+        }
+        if !config.ai_assist {
+            next.ai_consent = false;
+        }
+        if config.ai_assist && !next.ai_consent {
+            return Err("Сначала подтвердите отправку слов в Anthropic".into());
         }
         next.save().map_err(|e| e.to_string())?;
         *settings = next;
@@ -429,7 +444,7 @@ fn set_config(
 /// Requires both the setting *and* a key: an assist that can only fail is
 /// worse than none, because it looks enabled while doing nothing.
 fn attach_assist(engine: &mut Engine, settings: &Settings) {
-    if !settings.config.ai_assist {
+    if !settings.config.ai_assist || !settings.ai_consent {
         engine.set_assist(None);
         return;
     }
@@ -528,7 +543,7 @@ fn remove_exception(
         .config()
         .clone();
     config.exceptions.retain(|w| !w.eq_ignore_ascii_case(&word));
-    set_config(app, state, config, None, None)
+    set_config(app, state, config, None, None, None)
 }
 
 /// Look for a newer version. `manual` (the button) also shows a version the
@@ -563,6 +578,11 @@ fn dismiss_update(state: State<'_, AppState>) {
 /// «Пропустить»: never offer this version again by itself.
 #[tauri::command]
 fn skip_update(state: State<'_, AppState>, version: String) -> Result<(), String> {
+    // Only the version actually on offer can be skipped.
+    let pending = pending_update(&state)?;
+    if pending.version != version {
+        return Err("Это не та версия, что предлагается".into());
+    }
     if let Ok(mut pending) = state.update.lock() {
         *pending = None;
     }
@@ -584,6 +604,27 @@ fn set_update_checks(app: AppHandle, state: State<'_, AppState>, on: bool) -> Re
     Ok(())
 }
 
+/// One download or install at a time: a second click waits for nothing and
+/// is refused.
+static UPDATE_BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+struct UpdateGuard;
+
+impl UpdateGuard {
+    fn take() -> Result<UpdateGuard, String> {
+        UPDATE_BUSY
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map(|_| UpdateGuard)
+            .map_err(|_| "Обновление уже скачивается".to_string())
+    }
+}
+
+impl Drop for UpdateGuard {
+    fn drop(&mut self) {
+        UPDATE_BUSY.store(false, Ordering::SeqCst);
+    }
+}
+
 fn pending_update(state: &AppState) -> Result<updater::Update, String> {
     state
         .update
@@ -597,9 +638,10 @@ fn pending_update(state: &AppState) -> Result<updater::Update, String> {
 #[tauri::command(async)]
 fn download_update(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
     use tauri_plugin_opener::OpenerExt;
+    let _busy = UpdateGuard::take()?;
     let update = pending_update(&state)?;
     let dir = dirs::download_dir().unwrap_or_else(updater::cache_dir);
-    let path = updater::download_verified(&update, &dir)?;
+    let (path, _) = updater::download_verified(&update, &dir)?;
     let _ = app.opener().reveal_item_in_dir(&path);
     Ok(path.display().to_string())
 }
@@ -607,9 +649,10 @@ fn download_update(app: AppHandle, state: State<'_, AppState>) -> Result<String,
 /// «Установить и перезапустить»: download, verify, replace, relaunch.
 #[tauri::command(async)]
 fn install_update(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let _busy = UpdateGuard::take()?;
     let update = pending_update(&state)?;
-    let path = updater::download_verified(&update, &updater::cache_dir())?;
-    updater::install(&path)?;
+    let (path, verified) = updater::download_verified(&update, &updater::cache_dir())?;
+    updater::install(&path, &verified)?;
     log::info!("update {} installed; restarting", update.version);
     flush_stats(&app);
     app.exit(0);

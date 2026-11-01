@@ -153,6 +153,7 @@ async function pollLiveFields() {
   for (const key of ["status", "corrections", "undos", "manual", "has_permission", "hook_running", "can_hold", "update"]) {
     state[key] = fresh[key];
   }
+  showNotice(fresh.notice);
   if (state.update && state.update.version !== shownUpdate) openUpdate(state.update);
   $("update-dot").hidden = !state.update;
   if (fresh.config.enabled !== state.config.enabled || fresh.config.excluded_apps.length !== state.config.excluded_apps.length || fresh.config.exceptions.length !== state.config.exceptions.length) {
@@ -901,7 +902,9 @@ $("ai").addEventListener("change", (e) => {
 $("ai-consent").addEventListener("close", () => {
   if ($("ai-consent").returnValue === "ok") {
     $("ai").checked = true;
-    save({ ai_assist: true });
+    // The consent itself is stored on the Rust side; without it the assist
+    // is refused there.
+    save({ ai_assist: true }, { aiConsent: true });
   }
 });
 $("launch").addEventListener("change", (e) => save({}, { launchAtLogin: e.target.checked }));
@@ -912,6 +915,20 @@ $("api-key").addEventListener("change", (e) => {
   save({}, { apiKey: key });
 });
 $("open-log").addEventListener("click", () => invoke("open_log"));
+
+// -- notices ------------------------------------------------------------------
+
+let noticeTimer = null;
+
+/** A one-off message from the keyboard side, e.g. a selection too big. */
+function showNotice(text) {
+  if (!text) return;
+  const banner = $("notice");
+  banner.textContent = text;
+  banner.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => (banner.hidden = true), 8000);
+}
 
 // -- updates ------------------------------------------------------------------
 

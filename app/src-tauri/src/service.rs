@@ -91,6 +91,8 @@ pub struct Runtime {
     pub health: Arc<TapHealth>,
     /// The keyboard layout active right now, for the menu bar badge.
     pub layout: Arc<Mutex<Option<String>>>,
+    /// A message for the user that the window shows once (taken by get_state).
+    pub notice: Arc<Mutex<Option<String>>>,
     queue: SharedQueue,
 }
 
@@ -538,6 +540,7 @@ fn spawn_injector(
                 Job::Act(Action::ConvertSelection { select_word, to }, _) => {
                     let active = context.lock().ok().and_then(|c| c.layout.clone());
                     convert_selection(
+                        &runtime,
                         &handle,
                         &injector,
                         &engine,
@@ -648,7 +651,11 @@ fn replay(injector: &Injector, raw: &RawKey) {
 /// Convert the selected text, or the word before the caret, through the
 /// clipboard — which is the one way to read and replace a selection that every
 /// application supports. The user's clipboard is put back afterwards.
+// Each argument is a different piece of the injector thread's state; a struct
+// for one call site would only rename them.
+#[allow(clippy::too_many_arguments)]
 fn convert_selection(
+    runtime: &Runtime,
     handle: &AppHandle,
     injector: &Injector,
     engine: &SharedEngine,
@@ -663,6 +670,12 @@ fn convert_selection(
         return;
     }
     let Ok(snapshot) = platform::pasteboard_snapshot() else {
+        if let Ok(mut notice) = runtime.notice.lock() {
+            *notice = Some(format!(
+                "Выделение не переведено: в буфере обмена больше {} МБ (картинка или файл), и MarKey не стал его трогать. Скопируйте что-нибудь короткое и нажмите клавишу снова.",
+                rekey_hook::MAX_PASTEBOARD_SNAPSHOT / (1024 * 1024)
+            ));
+        }
         log::info!(
             "shortcut: the clipboard holds over {} MB; selection left alone",
             rekey_hook::MAX_PASTEBOARD_SNAPSHOT / (1024 * 1024)

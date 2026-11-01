@@ -34,6 +34,9 @@ pub struct Settings {
     pub check_updates: bool,
     /// A version the user chose to skip in the update dialog.
     pub skipped_version: Option<String>,
+    /// The user agreed, in the window's dialog, that words may be sent to
+    /// Anthropic. The assist never runs without it (K-05).
+    pub ai_consent: bool,
 }
 
 /// How much MarKey has done, ever.
@@ -123,8 +126,10 @@ impl Settings {
                     String::new()
                 }
             };
-            // A temp file from an interrupted save may still hold an old key.
+            // A temp file from an interrupted save, or the Rekey-era file,
+            // may still hold an old key.
             scrub_file(&paths.tmp());
+            scrub_file(&paths.legacy);
             return settings;
         }
         match secrets.set(&found) {
@@ -133,6 +138,8 @@ impl Settings {
                 settings.api_key = found;
                 if let Err(e) = settings.save_to(paths) {
                     log::warn!("cannot rewrite settings without the key: {e}");
+                    // The key is in the store; it must not stay in the file.
+                    scrub_file(&paths.current);
                 }
                 for stale in [&paths.legacy, &paths.tmp()] {
                     scrub_file(stale);
@@ -184,6 +191,11 @@ impl Settings {
             self.config.shortcut = Shortcut::Tap {
                 modifier: Modifier::platform_default(),
             };
+        }
+        // Sending words needs explicit consent. 0.2 had no consent dialog, so
+        // an assist switched on there stays off until the user agrees.
+        if self.config.ai_assist && !self.ai_consent {
+            self.config.ai_assist = false;
         }
         if self.version < 4 {
             // 0.3 made two behaviours settings of their own, off for new
@@ -410,6 +422,21 @@ mod migration_tests {
     }
 
     const KEY: &str = "sk-ant-test-0000-plaintext";
+
+    #[test]
+    fn an_assist_switched_on_without_consent_is_switched_off() {
+        // 0.2 settings: assist on, no consent ever asked.
+        let mut s: Settings =
+            serde_json::from_str(r#"{"version":3,"config":{"ai_assist":true}}"#).unwrap();
+        s.migrate();
+        assert!(!s.config.ai_assist);
+        // With consent given in the dialog it stays on.
+        let mut s: Settings =
+            serde_json::from_str(r#"{"version":4,"ai_consent":true,"config":{"ai_assist":true}}"#)
+                .unwrap();
+        s.migrate();
+        assert!(s.config.ai_assist);
+    }
 
     #[test]
     fn a_plaintext_key_moves_to_secure_storage_and_leaves_no_copy() {

@@ -41,6 +41,9 @@ fn event_text(event: &CGEvent) -> String {
     const MAX: usize = 8;
     let mut buffer = [0u16; MAX];
     let mut actual: usize = 0;
+    // SAFETY: `event` is a live CGEvent borrowed for this call; the buffer
+    // has room for MAX u16s and the function writes at most MAX of them and
+    // the count into `actual`, which is then clamped to MAX below.
     unsafe {
         CGEventKeyboardGetUnicodeString(
             event.as_ptr(),
@@ -155,6 +158,9 @@ where
                 let port = port.load(Ordering::Relaxed);
                 if port != 0 {
                     health.record_disabled(kind);
+                    // SAFETY: `port` is the tap's mach port, stored after
+                    // CGEventTap::new succeeded; the tap (and port) live for
+                    // the whole run loop this callback runs on.
                     unsafe { CGEventTapEnable(port as *mut c_void, true) };
                     // Whatever was tracked may have changed while deaf.
                     if let Ok(mut handler) = handler.try_lock() {
@@ -310,6 +316,8 @@ where
         .map_err(|_| HookError::Os("cannot create a run loop source".into()))?;
 
     let run_loop = CFRunLoop::get_current();
+    // SAFETY: the source and the current run loop are valid CF objects and
+    // kCFRunLoopCommonModes is a constant exported by Core Foundation.
     unsafe {
         run_loop.add_source(&loop_source, kCFRunLoopCommonModes);
     }

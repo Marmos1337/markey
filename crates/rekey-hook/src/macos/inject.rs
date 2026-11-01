@@ -16,8 +16,12 @@ pub struct MacInjector {
     gap_micros: std::sync::atomic::AtomicU64,
 }
 
-// CGEventSource is a Core Foundation object; MarKey only injects from its one
-// injector thread.
+// SAFETY: CGEventSource is a reference-counted Core Foundation object whose
+// functions are thread-safe to call (Quartz Event Services documents event
+// creation and posting as usable from any thread). The injector is created
+// once and then used only from the markey-inject thread; the other field is
+// an atomic. Moving it there (Send) and sharing &self (Sync) therefore never
+// mutates the source concurrently.
 unsafe impl Send for MacInjector {}
 unsafe impl Sync for MacInjector {}
 

@@ -182,11 +182,15 @@ fn get(url: &str, timeout: Duration) -> Result<ureq::http::Response<ureq::Body>,
     if !allowed(url) {
         return Err(format!("refusing a non-https address: {url}"));
     }
+    // A redirect must not take an https download to plain http; only the
+    // local fixtures are http to begin with.
+    let https_only = url.starts_with("https://");
     ureq::get(url)
         .header("User-Agent", USER_AGENT)
         .header("Accept", "application/vnd.github+json")
         .config()
         .timeout_global(Some(timeout))
+        .https_only(https_only)
         .build()
         .call()
         .map_err(|e| e.to_string())
@@ -259,7 +263,8 @@ pub fn expected_hash(sums: &str, name: &str) -> Option<String> {
 
 /// Download the installer into `dir` and verify it. On any mismatch the file
 /// is removed and an error returned: nothing unverified is left behind.
-pub fn download_verified(update: &Update, dir: &Path) -> Result<PathBuf, String> {
+/// Returns the file and its verified SHA-256, which `install` checks again.
+pub fn download_verified(update: &Update, dir: &Path) -> Result<(PathBuf, String), String> {
     let sums_url = update
         .sums_url
         .as_deref()
@@ -272,12 +277,11 @@ pub fn download_verified(update: &Update, dir: &Path) -> Result<PathBuf, String>
         .map_err(|e| e.to_string())?;
     let expected = expected_hash(&sums, &update.asset_name)
         .ok_or("установщика нет в SHA256SUMS — устанавливать без проверки нельзя")?;
-    // A plain file name only: the name comes from the release.
-    if update.asset_name.contains(['/', '\\']) || update.asset_name.starts_with('.') {
+    if !plain_file_name(&update.asset_name) {
         return Err("странное имя файла в релизе".into());
     }
 
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    create_private_dir(dir)?;
     let path = dir.join(&update.asset_name);
     let partial = dir.join(format!("{}.part", update.asset_name));
     let result = (|| -> Result<String, String> {
@@ -318,7 +322,37 @@ pub fn download_verified(update: &Update, dir: &Path) -> Result<PathBuf, String>
     }
     std::fs::rename(&partial, &path).map_err(|e| e.to_string())?;
     log::info!("update {}: downloaded and verified", update.version);
-    Ok(path)
+    Ok((path, expected))
+}
+
+/// A bare file name that stays inside the download folder: no separators,
+/// no drive prefix (`C:`), no leading dot.
+fn plain_file_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('.')
+        && !name.contains(['/', '\\', ':'])
+        && Path::new(name).file_name().and_then(|n| n.to_str()) == Some(name)
+}
+
+/// The download folder, only the user's: nothing else can swap the verified
+/// file before it is installed.
+fn create_private_dir(dir: &Path) -> Result<(), String> {
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(dir).map_err(|e| e.to_string())
+}
+
+/// SHA-256 of a file, hex.
+pub fn sha256_file(path: &Path) -> Result<String, String> {
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher).map_err(|e| e.to_string())?;
+    Ok(hex(&hasher.finalize()))
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -345,8 +379,14 @@ fn current_bundle() -> Option<PathBuf> {
 /// Install the verified file and start the new version. Returns once the
 /// relaunch is scheduled; the caller then quits.
 #[cfg(target_os = "macos")]
-pub fn install(file: &Path) -> Result<(), String> {
+pub fn install(file: &Path, expected: &str) -> Result<(), String> {
     use std::process::Command;
+    // Hashed again right before it is opened: the file must be the one that
+    // was verified, not one swapped in since.
+    if sha256_file(file)? != expected {
+        let _ = std::fs::remove_file(file);
+        return Err("файл обновления изменился после проверки — установка отменена".into());
+    }
     let target =
         current_bundle().ok_or("MarKey запущен не из .app — установите обновление вручную")?;
     let parent = target.parent().ok_or("нет папки приложения")?;
@@ -428,8 +468,12 @@ pub fn install(file: &Path) -> Result<(), String> {
 /// Windows: run the verified installer; it replaces the running copy after
 /// MarKey quits.
 #[cfg(target_os = "windows")]
-pub fn install(file: &Path) -> Result<(), String> {
+pub fn install(file: &Path, expected: &str) -> Result<(), String> {
     use std::process::Command;
+    if sha256_file(file)? != expected {
+        let _ = std::fs::remove_file(file);
+        return Err("файл обновления изменился после проверки — установка отменена".into());
+    }
     let is_msi = file
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("msi"));
@@ -442,7 +486,7 @@ pub fn install(file: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub fn install(_file: &Path) -> Result<(), String> {
+pub fn install(_file: &Path, _expected: &str) -> Result<(), String> {
     Err("обновление ставится только на macOS и Windows".into())
 }
 
@@ -634,8 +678,16 @@ mod tests {
             ),
         );
         let dir = temp("ok");
-        let path = download_verified(&update_for(&f, true), &dir).unwrap();
+        let (path, hash) = download_verified(&update_for(&f, true), &dir).unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), installer);
+        assert_eq!(hash, sha(&installer));
+        assert_eq!(sha256_file(&path).unwrap(), hash);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o700);
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -669,6 +721,21 @@ mod tests {
         assert!(download_verified(&update_for(&f, true), &dir).is_err());
         assert!(!dir.join("MarKey_0.3.0_aarch64.dmg").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn asset_names_cannot_leave_the_folder() {
+        assert!(plain_file_name("MarKey_0.3.0_aarch64.dmg"));
+        for bad in [
+            "../x.dmg",
+            "a/b.dmg",
+            "a\\b.exe",
+            "C:evil.exe",
+            ".hidden",
+            "",
+        ] {
+            assert!(!plain_file_name(bad), "{bad}");
+        }
     }
 
     #[test]
