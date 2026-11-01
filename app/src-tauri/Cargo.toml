@@ -32,7 +32,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
-env_logger = "0.11"
+# Only the filter syntax (MARKEY_LOG / RUST_LOG); writing is our own, off the
+# keyboard thread (src/logging.rs).
+env_filter = "2"
 dirs = "6"
 
 [features]

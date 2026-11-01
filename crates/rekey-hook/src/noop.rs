@@ -69,7 +69,11 @@ pub fn secure_input_active() -> bool {
     false
 }
 
-pub fn run<F, R>(_on_ready: R, _on_key: F) -> Result<(), HookError>
+pub fn run<F, R>(
+    _on_ready: R,
+    _on_key: F,
+    _health: std::sync::Arc<crate::TapHealth>,
+) -> Result<(), HookError>
 where
     F: FnMut(KeyEvent, Option<RawKey>) -> Disposition + Send + 'static,
     R: FnOnce(Capabilities),
@@ -108,8 +112,8 @@ pub fn pasteboard_change_count() -> isize {
     0
 }
 
-pub fn pasteboard_snapshot() -> PasteboardSnapshot {
-    PasteboardSnapshot
+pub fn pasteboard_snapshot() -> Result<PasteboardSnapshot, crate::SnapshotTooLarge> {
+    Ok(PasteboardSnapshot)
 }
 
 pub fn pasteboard_restore(_snapshot: &PasteboardSnapshot) {}

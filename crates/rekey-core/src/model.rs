@@ -385,9 +385,13 @@ impl<'a> Cursor<'a> {
 }
 
 /// All loaded language models, keyed by language tag.
+///
+/// Shared, so cloning is a reference-count bump: the app takes a copy of the
+/// detector to convert a selection without holding the engine's lock, which
+/// the keyboard hook needs on every keystroke.
 #[derive(Debug, Default, Clone)]
 pub struct Models {
-    map: HashMap<String, Model>,
+    map: std::sync::Arc<HashMap<String, Model>>,
 }
 
 impl Models {
@@ -396,7 +400,7 @@ impl Models {
     }
 
     pub fn insert(&mut self, model: Model) {
-        self.map.insert(model.lang.clone(), model);
+        std::sync::Arc::make_mut(&mut self.map).insert(model.lang.clone(), model);
     }
 
     pub fn get(&self, lang: &str) -> Option<&Model> {

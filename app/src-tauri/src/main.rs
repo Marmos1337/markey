@@ -5,6 +5,7 @@
 //! MarKey — fixes text typed on the wrong keyboard layout.
 
 mod assist;
+mod logging;
 mod service;
 mod settings;
 
@@ -142,6 +143,8 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         "starting"
     } else if rekey_hook::platform::secure_input_active() {
         "secure_input"
+    } else if state.runtime.tap_unstable() {
+        "unstable"
     } else {
         "ready"
     };
@@ -393,13 +396,19 @@ fn open_accessibility_settings(app: AppHandle) {
 /// the "try it" box in the settings window.
 #[tauri::command]
 fn preview(state: State<'_, AppState>, text: String, layout: String) -> PreviewResult {
-    let engine = state.engine.lock().expect("engine lock");
+    // A snapshot, so typing in the try box never holds the engine the
+    // keyboard hook needs.
+    let engine = state
+        .engine
+        .lock()
+        .expect("engine lock")
+        .detector_snapshot();
     let mut out = Vec::new();
     let mut changed = false;
     let mut previous_lang: Option<&'static str> = None;
     for token in text.split_whitespace() {
         let hint = rekey_core::detect::Hint { previous_lang };
-        match engine.detector.evaluate_with(token, &layout, hint) {
+        match engine.evaluate_with(token, &layout, hint) {
             rekey_core::detect::Verdict::Switch(c) => {
                 previous_lang = rekey_core::layout::layout(c.to_layout).map(|l| l.def.lang);
                 out.push(c.converted.clone());
@@ -667,56 +676,8 @@ fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Send logs to a file as well as stderr.
-///
-/// A menu bar app launched from Finder has nowhere to write stderr, so the one
-/// time the log matters — a user reporting that something misbehaved — there
-/// is nothing to read. The file is small, truncated each launch, and lives
-/// beside the settings. It never records what is typed: entries note
-/// decisions and lengths, never the words.
-fn init_logging() {
-    use std::io::Write;
-
-    let path = settings::config_dir().join("markey.log");
-    let file = std::fs::create_dir_all(settings::config_dir())
-        .ok()
-        .and_then(|_| std::fs::File::create(&path).ok());
-
-    let mut builder = env_logger::Builder::from_env(
-        env_logger::Env::default()
-            .default_filter_or("info,rekey=debug,rekey_core=debug,rekey_hook=debug"),
-    );
-    if let Some(file) = file {
-        let file = std::sync::Mutex::new(file);
-        builder.format(move |buf, record| {
-            let line = format!(
-                "[{} {} {}] {}",
-                timestamp(),
-                record.level(),
-                record.target(),
-                record.args()
-            );
-            if let Ok(mut file) = file.lock() {
-                let _ = writeln!(file, "{line}");
-                let _ = file.flush();
-            }
-            writeln!(buf, "{line}")
-        });
-    }
-    builder.init();
-    log::info!("logging to {}", path.display());
-}
-
-/// Seconds since the Unix epoch, with milliseconds.
-fn timestamp() -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    format!("{}.{:03}", now.as_secs(), now.subsec_millis())
-}
-
 fn main() {
-    init_logging();
+    logging::init(settings::config_dir().join("markey.log"));
 
     tauri::Builder::default()
         // Registered first, so a second launch exits before doing anything.

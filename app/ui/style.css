@@ -250,7 +250,8 @@ kbd {
 }
 
 .brand-status[data-state="permission"] i,
-.brand-status[data-state="secure_input"] i {
+.brand-status[data-state="secure_input"] i,
+.brand-status[data-state="unstable"] i {
   background: var(--warn);
 }
 
@@ -474,6 +475,7 @@ kbd {
 
 .hero[data-state="permission"] .hero-icon,
 .hero[data-state="secure_input"] .hero-icon,
+.hero[data-state="unstable"] .hero-icon,
 .hero[data-state="starting"] .hero-icon {
   background: linear-gradient(160deg, #ffb340, #ff9500);
 }

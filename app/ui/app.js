@@ -67,6 +67,7 @@ const STATUS = {
   permission: ["Нужен доступ", "Без Универсального доступа MarKey не видит клавиатуру."],
   starting: ["Запускается…", "Подключение к клавиатуре."],
   secure_input: ["Поле пароля", "Пока активен ввод пароля, MarKey ничего не трогает."],
+  unstable: ["Система отключает перехват", "macOS несколько раз за минуту выключала перехват клавиатуры. MarKey включает его снова; подробности — в журнале."],
 };
 
 /** Last snapshot from Rust; the basis for every save. */
@@ -189,6 +190,7 @@ function renderStatus() {
     permission: "Нужен доступ",
     starting: "Запуск…",
     secure_input: "Ввод пароля",
+    unstable: "Перехват сбоит",
   }[code] ?? "";
 }
 

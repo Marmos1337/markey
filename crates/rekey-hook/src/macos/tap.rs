@@ -1,7 +1,10 @@
 //! The keyboard event tap: what the user types, as it happens.
 
 use super::REKEY_SIGNATURE;
-use crate::{Capabilities, Disposition, HookError, Key, KeyEvent, Modifiers, RawKey};
+use crate::{
+    Capabilities, DisableKind, Disposition, DragGate, HookError, Key, KeyEvent, Modifiers, RawKey,
+    TapHealth,
+};
 use core_foundation::base::TCFType;
 use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
 use core_graphics::event::{
@@ -13,6 +16,7 @@ use foreign_types::ForeignType;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
@@ -99,9 +103,11 @@ fn classify(keycode: u16, character: Option<char>, modifiers: Modifiers) -> Key 
 /// Install the tap and run the event loop on the calling thread.
 ///
 /// `on_ready` is told what the installed tap can do before the first event.
-/// This never returns while the hook is running, so callers put it on a
-/// dedicated thread.
-pub fn run<F, R>(on_ready: R, on_key: F) -> Result<(), HookError>
+/// `health` collects timings and disables; the callback itself never logs or
+/// touches the disk, because a callback that blocks is exactly what gets a tap
+/// switched off. This never returns while the hook is running, so callers put
+/// it on a dedicated thread.
+pub fn run<F, R>(on_ready: R, on_key: F, health: Arc<TapHealth>) -> Result<(), HookError>
 where
     F: FnMut(KeyEvent, Option<RawKey>) -> Disposition + Send + 'static,
     R: FnOnce(Capabilities),
@@ -113,6 +119,8 @@ where
     // The tap callback is `Fn`, but the handler needs to mutate state. The tap
     // only ever fires on this one thread, so the lock is uncontended.
     let handler = Arc::new(Mutex::new(on_key));
+    let drags = Arc::new(DragGate::default());
+    let clock = Instant::now();
 
     let events = vec![
         CGEventType::KeyDown,
@@ -125,6 +133,8 @@ where
 
     let make_callback = |active: bool, port: Arc<AtomicUsize>| {
         let handler = handler.clone();
+        let health = health.clone();
+        let drags = drags.clone();
         move |_proxy: core_graphics::event::CGEventTapProxy,
               event_type: CGEventType,
               event: &CGEvent|
@@ -132,14 +142,19 @@ where
             // macOS switches a tap off if its callback is ever too slow, or if
             // the user's own input trips the watchdog, and it stays off until
             // explicitly re-armed. Without this the app goes quietly deaf.
-            if matches!(
-                event_type,
-                CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput
-            ) {
+            // Re-arm first; the health monitor thread does the logging.
+            let disabled = match event_type {
+                CGEventType::TapDisabledByTimeout => Some(DisableKind::Timeout),
+                CGEventType::TapDisabledByUserInput => Some(DisableKind::UserInput),
+                _ => None,
+            };
+            if let Some(kind) = disabled {
                 let port = port.load(Ordering::Relaxed);
                 if port != 0 {
+                    health.record_disabled(kind);
+                    unsafe { CGEventTapEnable(port as *mut c_void, true) };
                     // Whatever was tracked may have changed while deaf.
-                    if let Ok(mut handler) = handler.lock() {
+                    if let Ok(mut handler) = handler.try_lock() {
                         let _ = handler(
                             KeyEvent {
                                 character: None,
@@ -150,10 +165,23 @@ where
                             None,
                         );
                     }
-                    log::warn!("keyboard tap was disabled by the system; re-arming");
-                    unsafe { CGEventTapEnable(port as *mut c_void, true) };
                 }
                 return CallbackResult::Keep;
+            }
+
+            let started = Instant::now();
+            match event_type {
+                CGEventType::LeftMouseDown
+                | CGEventType::RightMouseDown
+                | CGEventType::OtherMouseDown => drags.reset(),
+                // Only the first drag of a press and then one per 50 ms reach
+                // the engine; the rest say nothing new.
+                CGEventType::LeftMouseDragged
+                    if !drags.admit(clock.elapsed().as_millis() as u64) =>
+                {
+                    return CallbackResult::Keep;
+                }
+                _ => {}
             }
 
             let synthetic = event.get_integer_value_field(EventField::EVENT_SOURCE_USER_DATA)
@@ -229,10 +257,12 @@ where
                 _ => return CallbackResult::Keep,
             };
 
+            // Only this thread runs the handler, so the lock is uncontended.
             let disposition = match handler.lock() {
                 Ok(mut handler) => handler(key_event, raw),
                 Err(_) => Disposition::Pass,
             };
+            health.record_event(started.elapsed());
             if active && disposition == Disposition::Drop {
                 CallbackResult::Drop
             } else {

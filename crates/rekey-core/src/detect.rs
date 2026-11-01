@@ -100,6 +100,8 @@ pub struct Hint<'a> {
     pub previous_lang: Option<&'a str>,
 }
 
+/// Cheap to clone: the models are shared.
+#[derive(Clone)]
 pub struct Detector {
     pub models: Models,
     pub config: Config,

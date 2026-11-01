@@ -15,21 +15,28 @@ pub fn pasteboard_change_count() -> isize {
     objc2_app_kit::NSPasteboard::generalPasteboard().changeCount()
 }
 
-pub fn pasteboard_snapshot() -> PasteboardSnapshot {
+/// Copy everything on the pasteboard, or refuse when it holds more than
+/// [`crate::MAX_PASTEBOARD_SNAPSHOT`] (a large image or file): the caller then
+/// leaves the pasteboard alone rather than risk not putting it back.
+pub fn pasteboard_snapshot() -> Result<PasteboardSnapshot, crate::SnapshotTooLarge> {
     let pasteboard = objc2_app_kit::NSPasteboard::generalPasteboard();
+    let mut budget = crate::SnapshotBudget::default();
     let mut items = Vec::new();
     if let Some(list) = pasteboard.pasteboardItems() {
         for item in list.iter() {
             let mut entries = Vec::new();
             for kind in item.types().iter() {
                 if let Some(data) = item.dataForType(&kind) {
+                    // Checked before copying, so an oversized item is never
+                    // duplicated into this process.
+                    budget.spend(data.length())?;
                     entries.push((kind.to_string(), data.to_vec()));
                 }
             }
             items.push(entries);
         }
     }
-    PasteboardSnapshot { items }
+    Ok(PasteboardSnapshot { items })
 }
 
 pub fn pasteboard_restore(snapshot: &PasteboardSnapshot) {

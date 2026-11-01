@@ -148,6 +148,7 @@ struct MouseState {
 
 struct HookState {
     handler: Handler,
+    health: std::sync::Arc<crate::TapHealth>,
     mods: ModState,
     mouse: MouseState,
 }
@@ -564,10 +565,13 @@ pub fn pasteboard_change_count() -> isize {
     unsafe { GetClipboardSequenceNumber() as isize }
 }
 
-pub fn pasteboard_snapshot() -> PasteboardSnapshot {
+/// Copy everything on the clipboard, or refuse past
+/// [`crate::MAX_PASTEBOARD_SNAPSHOT`]; see the macOS twin.
+pub fn pasteboard_snapshot() -> Result<PasteboardSnapshot, crate::SnapshotTooLarge> {
     let mut items = Vec::new();
+    let mut budget = crate::SnapshotBudget::default();
     let Some(_open) = OpenedClipboard::open() else {
-        return PasteboardSnapshot { items };
+        return Ok(PasteboardSnapshot { items });
     };
     let mut format = 0u32;
     loop {
@@ -579,12 +583,15 @@ pub fn pasteboard_snapshot() -> PasteboardSnapshot {
             continue;
         }
         if let Ok(handle) = unsafe { GetClipboardData(format) } {
+            // Sized before reading: a format too big to copy must stop the
+            // snapshot, not be skipped and then lost on restore.
+            budget.spend(unsafe { GlobalSize(HGLOBAL(handle.0)) })?;
             if let Some(bytes) = global_bytes(handle) {
                 items.push((format, bytes));
             }
         }
     }
-    PasteboardSnapshot { items }
+    Ok(PasteboardSnapshot { items })
 }
 
 pub fn pasteboard_restore(snapshot: &PasteboardSnapshot) {
@@ -885,8 +892,15 @@ fn raw_flags(info: &KBDLLHOOKSTRUCT, mods: Modifiers) -> u64 {
 }
 
 fn dispatch(event: KeyEvent, raw: Option<RawKey>) -> Disposition {
+    let started = std::time::Instant::now();
     STATE.with(|s| match s.borrow_mut().as_mut() {
-        Some(state) => (state.handler)(event, raw),
+        Some(state) => {
+            let disposition = (state.handler)(event, raw);
+            // Windows silently drops a low-level hook that keeps answering
+            // late, so the same timings are kept as on the Mac.
+            state.health.record_event(started.elapsed());
+            disposition
+        }
         None => Disposition::Pass,
     })
 }
@@ -1037,7 +1051,11 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
 ///
 /// Low-level hooks only deliver events to a thread with a message loop, so
 /// this blocks and callers put it on a dedicated thread.
-pub fn run<F, R>(on_ready: R, on_key: F) -> Result<(), HookError>
+pub fn run<F, R>(
+    on_ready: R,
+    on_key: F,
+    health: std::sync::Arc<crate::TapHealth>,
+) -> Result<(), HookError>
 where
     F: FnMut(KeyEvent, Option<RawKey>) -> Disposition + Send + 'static,
     R: FnOnce(Capabilities),
@@ -1049,6 +1067,7 @@ where
     STATE.with(|s| {
         *s.borrow_mut() = Some(HookState {
             handler: Box::new(on_key),
+            health,
             mods,
             mouse: MouseState::default(),
         })

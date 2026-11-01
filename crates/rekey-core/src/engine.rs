@@ -1027,14 +1027,24 @@ impl Engine {
     /// Convert a stretch of text the platform read from the selection.
     /// Returns the converted text and the layout it is now in.
     pub fn convert_text(&mut self, text: &str, active: Option<&str>) -> Option<(String, String)> {
-        let active = active
-            .map(str::to_string)
-            .or_else(|| self.detector.config.layouts.first().cloned())?;
-        let (converted, target) = self.detector.convert_text(text, &active)?;
+        let result = convert_with(&self.detector, text, active)?;
+        self.note_converted(&result.1);
+        Some(result)
+    }
+
+    /// A copy of the detector for work that must not hold the engine: the
+    /// keyboard hook takes the engine on every keystroke, and converting a
+    /// long selection while holding it is what stalled the hook. Cheap — the
+    /// models are shared.
+    pub fn detector_snapshot(&self) -> Detector {
+        self.detector.clone()
+    }
+
+    /// Record a conversion done with [`convert_with`] on a snapshot.
+    pub fn note_converted(&mut self, target: &str) {
         self.stats.manual += 1;
         self.expected_layout = Some(target.to_string());
         self.forget();
-        Some((converted, target.to_string()))
     }
 
     /// Undo the most recent automatic correction. Kept as an explicit menu
@@ -1072,6 +1082,21 @@ impl Engine {
 }
 
 /// Words and their terminators as they appear on screen.
+/// Convert selected `text` with a detector, typically a
+/// [`Engine::detector_snapshot`] taken so the engine stays free meanwhile.
+/// Returns the converted text and the layout it is now in.
+pub fn convert_with(
+    detector: &Detector,
+    text: &str,
+    active: Option<&str>,
+) -> Option<(String, String)> {
+    let active = active
+        .map(str::to_string)
+        .or_else(|| detector.config.layouts.first().cloned())?;
+    let (converted, target) = detector.convert_text(text, &active)?;
+    Some((converted, target.to_string()))
+}
+
 fn join<'a>(parts: impl Iterator<Item = (&'a str, char)>) -> String {
     let mut out = String::new();
     for (word, terminator) in parts {

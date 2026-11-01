@@ -12,13 +12,13 @@
 //! lands in the middle of a correction.
 
 use rekey_core::config::Config;
-use rekey_core::engine::{Action, Engine};
-use rekey_core::input::{Context, TextWriter};
-use rekey_hook::{platform, Capabilities, Disposition, RawKey};
+use rekey_core::engine::{convert_with, Action, Engine};
+use rekey_core::input::{Context, KeyEvent, TextWriter};
+use rekey_hook::{platform, Capabilities, Disposition, RawKey, TapHealth, TapHealthSnapshot};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, TryLockError};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
@@ -63,6 +63,14 @@ const COPY_TIMEOUT: Duration = Duration::from_millis(450);
 /// clipboard is put back. The paste is handled asynchronously by the app.
 const PASTE_SETTLE: Duration = Duration::from_millis(250);
 
+/// How often the tap's health counters are read and logged.
+const HEALTH_INTERVAL: Duration = Duration::from_secs(2);
+
+/// This many disables within [`UNSTABLE_WINDOW`] and the settings window says
+/// that the system keeps switching the keyboard filter off.
+pub const UNSTABLE_DISABLES: usize = 3;
+pub const UNSTABLE_WINDOW: Duration = Duration::from_secs(60);
+
 /// The longest selection the shortcut converts. Beyond this it is not a
 /// mistyped phrase, and replacing it through the clipboard is a risk.
 const MAX_SELECTION: usize = 4000;
@@ -79,10 +87,18 @@ pub struct Runtime {
     /// The last application the user worked in, other than MarKey and the
     /// system shell — what "this app" means in the tray menu.
     pub last_app: Arc<Mutex<Option<String>>>,
+    /// Timings and disables of the keyboard hook.
+    pub health: Arc<TapHealth>,
     queue: SharedQueue,
 }
 
 impl Runtime {
+    /// The system switched the keyboard filter off several times in the last
+    /// minute. MarKey re-arms it each time, but the user should know.
+    pub fn tap_unstable(&self) -> bool {
+        self.health.disables_within(UNSTABLE_WINDOW) >= UNSTABLE_DISABLES
+    }
+
     /// Carry out an action that did not come from a keystroke — the menu's
     /// undo, for instance.
     pub fn perform(&self, action: Action) {
@@ -136,6 +152,7 @@ pub fn spawn(
     refresh_system_layouts(app);
 
     let queue: SharedQueue = runtime.queue.clone();
+    spawn_health_monitor(runtime.health.clone());
     spawn_injector(
         app,
         engine.clone(),
@@ -170,83 +187,10 @@ pub fn spawn(
                 }
             };
 
-            let handler =
-                move |event: rekey_core::input::KeyEvent, raw: Option<RawKey>| -> Disposition {
-                    // Our own typing passes untouched and unexamined.
-                    if event.synthetic {
-                        return Disposition::Pass;
-                    }
-                    let ctx = match context.lock() {
-                        Ok(current) => current.clone(),
-                        Err(poisoned) => poisoned.into_inner().clone(),
-                    };
-                    // MarKey's own windows are never corrected.
-                    if ctx.app.as_deref().is_some_and(is_own_app) {
-                        return Disposition::Pass;
-                    }
-                    let hold = can_hold.load(Ordering::Relaxed);
-                    let (lock, wake) = &*queue;
-                    let mut q = match lock.lock() {
-                        Ok(q) => q,
-                        Err(poisoned) => poisoned.into_inner(),
-                    };
-                    // Keys typed while a correction is going in wait behind it.
-                    let busy = hold
-                        && q.writing
-                        && q.since.is_some_and(|t| t.elapsed() < MAX_HOLD)
-                        && raw.is_some();
+            let mut router = KeyRouter::new(engine, context, queue, can_hold, flag.health.clone());
+            let handler = move |event: KeyEvent, raw: Option<RawKey>| router.route(event, raw);
 
-                    let (action, tapped, caps_lock) = {
-                        let mut engine = match engine.lock() {
-                            Ok(engine) => engine,
-                            Err(poisoned) => {
-                                // A panic in the engine must not silently stop
-                                // corrections for the rest of the session.
-                                log::error!("engine mutex was poisoned; recovering");
-                                poisoned.into_inner()
-                            }
-                        };
-                        let action = engine.on_key(&event, &ctx);
-                        let caps = engine.take_caps_lock();
-                        (action, engine.take_tap(), caps)
-                    };
-
-                    let swallow = hold && action.swallows_key();
-                    let mut disposition = if tapped {
-                        Disposition::Mask
-                    } else {
-                        Disposition::Pass
-                    };
-                    if busy && !swallow {
-                        if let Some(raw) = raw.clone() {
-                            q.jobs.push_back(Job::Replay(raw));
-                            disposition = Disposition::Drop;
-                        }
-                    }
-                    if !matches!(action, Action::None) {
-                        // A held key goes back exactly as it was pressed —
-                        // Option+Space, Shift+Return and all.
-                        let held = if swallow {
-                            disposition = Disposition::Drop;
-                            raw
-                        } else {
-                            None
-                        };
-                        q.jobs.push_back(Job::Act(action, held));
-                    }
-                    if caps_lock {
-                        q.jobs.push_back(Job::CapsLockOff);
-                    }
-                    if !q.jobs.is_empty() && !q.writing {
-                        q.writing = true;
-                        q.since = Some(Instant::now());
-                    }
-                    drop(q);
-                    wake.notify_one();
-                    disposition
-                };
-
-            let result = platform::run(on_ready, handler);
+            let result = platform::run(on_ready, handler, flag.health.clone());
             flag.running.store(false, Ordering::SeqCst);
             if let Err(e) = result {
                 log::error!("keyboard hook stopped: {e}");
@@ -255,6 +199,199 @@ pub fn spawn(
         .map_err(|e| rekey_hook::HookError::Os(e.to_string()))?;
 
     Ok(runtime)
+}
+
+/// Decides what happens to each keystroke, inside the keyboard hook.
+///
+/// This runs on the hook's own thread with the OS waiting for the answer, so
+/// it never waits for anything another thread may hold for long:
+/// * the engine is taken with `try_lock`; if the injector or the settings
+///   window has it, the key passes through untouched and the engine is told
+///   to forget the word in progress, because it missed a keystroke of it;
+/// * the frontmost-app context falls back to the last one seen;
+/// * the queue is only ever held for a push or a pop, and never together
+///   with the engine.
+pub struct KeyRouter {
+    engine: SharedEngine,
+    context: Arc<Mutex<Context>>,
+    queue: SharedQueue,
+    can_hold: Arc<AtomicBool>,
+    health: Arc<TapHealth>,
+    last_context: Context,
+    /// A keystroke went by without the engine; its idea of the word under
+    /// the caret is stale.
+    missed: bool,
+}
+
+impl KeyRouter {
+    fn new(
+        engine: SharedEngine,
+        context: Arc<Mutex<Context>>,
+        queue: SharedQueue,
+        can_hold: Arc<AtomicBool>,
+        health: Arc<TapHealth>,
+    ) -> KeyRouter {
+        KeyRouter {
+            engine,
+            context,
+            queue,
+            can_hold,
+            health,
+            last_context: Context::default(),
+            missed: false,
+        }
+    }
+
+    pub fn route(&mut self, event: KeyEvent, raw: Option<RawKey>) -> Disposition {
+        // Our own typing passes untouched and unexamined.
+        if event.synthetic {
+            return Disposition::Pass;
+        }
+        match self.context.try_lock() {
+            Ok(current) => self.last_context = current.clone(),
+            Err(TryLockError::Poisoned(poisoned)) => {
+                self.last_context = poisoned.into_inner().clone()
+            }
+            // The sampler is writing a fresh one this instant; the previous
+            // sample is at most 40 ms old.
+            Err(TryLockError::WouldBlock) => {}
+        }
+        // MarKey's own windows are never corrected.
+        if self.last_context.app.as_deref().is_some_and(is_own_app) {
+            return Disposition::Pass;
+        }
+
+        let engine = self.engine.clone();
+        let (action, tapped, caps_lock) = match engine.try_lock() {
+            Ok(mut engine) => self.decide(&mut engine, &event),
+            Err(TryLockError::Poisoned(poisoned)) => {
+                // A panic in the engine must not silently stop corrections
+                // for the rest of the session.
+                log::error!("engine mutex was poisoned; recovering");
+                self.decide(&mut poisoned.into_inner(), &event)
+            }
+            Err(TryLockError::WouldBlock) => {
+                self.missed = true;
+                self.health.record_skipped();
+                (Action::None, false, false)
+            }
+        };
+
+        let hold = self.can_hold.load(Ordering::Relaxed);
+        let swallow = hold && action.swallows_key();
+        let mut disposition = if tapped {
+            Disposition::Mask
+        } else {
+            Disposition::Pass
+        };
+        let (lock, wake) = &*self.queue;
+        let mut q = match lock.lock() {
+            Ok(q) => q,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        // Keys typed while a correction is going in wait behind it.
+        let busy =
+            hold && q.writing && q.since.is_some_and(|t| t.elapsed() < MAX_HOLD) && raw.is_some();
+        if busy && !swallow {
+            if let Some(raw) = raw.clone() {
+                q.jobs.push_back(Job::Replay(raw));
+                disposition = Disposition::Drop;
+            }
+        }
+        if !matches!(action, Action::None) {
+            // A held key goes back exactly as it was pressed — Option+Space,
+            // Shift+Return and all.
+            let held = if swallow {
+                disposition = Disposition::Drop;
+                raw
+            } else {
+                None
+            };
+            q.jobs.push_back(Job::Act(action, held));
+        }
+        if caps_lock {
+            q.jobs.push_back(Job::CapsLockOff);
+        }
+        if !q.jobs.is_empty() && !q.writing {
+            q.writing = true;
+            q.since = Some(Instant::now());
+        }
+        drop(q);
+        wake.notify_one();
+        disposition
+    }
+
+    fn decide(&mut self, engine: &mut Engine, event: &KeyEvent) -> (Action, bool, bool) {
+        if std::mem::take(&mut self.missed) {
+            engine.invalidate_caret();
+        }
+        let action = engine.on_key(event, &self.last_context);
+        let caps = engine.take_caps_lock();
+        (action, engine.take_tap(), caps)
+    }
+}
+
+/// Read the hook's health counters off the keyboard path and log what changed:
+/// disables with their kind and count, slow callbacks with their duration.
+fn spawn_health_monitor(health: Arc<TapHealth>) {
+    std::thread::Builder::new()
+        .name("markey-tap-health".into())
+        .spawn(move || {
+            let mut seen = TapHealthSnapshot::default();
+            loop {
+                std::thread::sleep(HEALTH_INTERVAL);
+                let now = health.snapshot();
+                for line in health_report(&seen, &now, health.disables_within(UNSTABLE_WINDOW)) {
+                    log::warn!("{line}");
+                }
+                seen = now;
+            }
+        })
+        .ok();
+}
+
+/// What to log about the hook between two readings of its counters.
+fn health_report(
+    before: &TapHealthSnapshot,
+    now: &TapHealthSnapshot,
+    last_minute: usize,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    let ms = |micros: u64| micros as f64 / 1000.0;
+    for (kind, was, is) in [
+        ("timeout", before.disabled_timeout, now.disabled_timeout),
+        ("user input", before.disabled_user, now.disabled_user),
+    ] {
+        if is > was {
+            lines.push(format!(
+                "keyboard tap was disabled by the system ({kind}) {}x; re-armed. \
+                 This session: {} by timeout, {} by user input, {last_minute} in the last minute; \
+                 last slow callback {:.1} ms, slowest {:.1} ms",
+                is - was,
+                now.disabled_timeout,
+                now.disabled_user,
+                ms(now.last_slow_micros),
+                ms(now.slowest_micros),
+            ));
+        }
+    }
+    if now.slow > before.slow {
+        lines.push(format!(
+            "{} keyboard callback(s) took over {} ms (last {:.1} ms, slowest {:.1} ms, {} events so far)",
+            now.slow - before.slow,
+            rekey_hook::SLOW_CALLBACK.as_millis(),
+            ms(now.last_slow_micros),
+            ms(now.slowest_micros),
+            now.events,
+        ));
+    }
+    if now.skipped_busy > before.skipped_busy {
+        lines.push(format!(
+            "{} keystroke(s) passed through while the engine was busy",
+            now.skipped_busy - before.skipped_busy
+        ));
+    }
+    lines
 }
 
 /// Poll the OS for the frontmost app, active layout and secure-input state,
@@ -486,7 +623,13 @@ fn convert_selection(
         log::info!("shortcut: the app reports no selection");
         return;
     }
-    let snapshot = platform::pasteboard_snapshot();
+    let Ok(snapshot) = platform::pasteboard_snapshot() else {
+        log::info!(
+            "shortcut: the clipboard holds over {} MB; selection left alone",
+            rekey_hook::MAX_PASTEBOARD_SNAPSHOT / (1024 * 1024)
+        );
+        return;
+    };
     let before = platform::pasteboard_change_count();
     if select_word {
         injector.select_word_left();
@@ -517,25 +660,41 @@ fn convert_selection(
         abort("nothing was copied");
         return;
     };
-    let converted = engine
-        .lock()
-        .ok()
-        .and_then(|mut e| e.convert_text(&text, active.as_deref()));
+    // Converted on a copy of the detector: the keyboard hook needs the engine
+    // on every keystroke, and a long selection takes a while to score.
+    let detector = engine.lock().ok().map(|e| e.detector_snapshot());
+    let converted = detector.and_then(|d| convert_with(&d, &text, active.as_deref()));
     let Some((converted, target)) = converted else {
         abort("no other reading");
         return;
     };
+    if let Ok(mut e) = engine.lock() {
+        e.note_converted(&target);
+    }
     if config.switch_layout {
         select_layout_and_wait(handle, &target);
     }
     platform::pasteboard_set_string(&converted);
+    let ours = platform::pasteboard_change_count();
     injector.paste();
     std::thread::sleep(PASTE_SETTLE);
-    platform::pasteboard_restore(&snapshot);
+    // Put the user's clipboard back — unless something else wrote to it in
+    // the meantime (the user copied again, or a clipboard manager did): then
+    // that newer content is what they expect to find.
+    if should_restore_clipboard(ours, platform::pasteboard_change_count()) {
+        platform::pasteboard_restore(&snapshot);
+    } else {
+        log::info!("shortcut: the clipboard changed during the paste; left as it is");
+    }
     log::info!(
         "shortcut: converted a selection of {} chars",
         converted.chars().count()
     );
+}
+
+/// Whether the clipboard still holds what MarKey put there for the paste.
+fn should_restore_clipboard(ours: isize, now: isize) -> bool {
+    ours == now
 }
 
 /// Select `layout` on the main thread and confirm it took effect.
@@ -601,4 +760,162 @@ fn new_injector() -> Result<Injector, rekey_hook::HookError> {
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn new_injector() -> Result<Injector, rekey_hook::HookError> {
     Ok(rekey_hook::noop::RecordingInjector::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rekey_core::input::{Key, Modifiers};
+    use rekey_core::model::Models;
+
+    fn router(engine: SharedEngine) -> (KeyRouter, Arc<TapHealth>) {
+        let health = Arc::new(TapHealth::new());
+        let context = Arc::new(Mutex::new(Context {
+            app: Some("com.apple.TextEdit".into()),
+            layout: Some("us".into()),
+            secure_input: false,
+        }));
+        let router = KeyRouter::new(
+            engine,
+            context,
+            Arc::new((Mutex::new(Queue::default()), Condvar::new())),
+            Arc::new(AtomicBool::new(true)),
+            health.clone(),
+        );
+        (router, health)
+    }
+
+    fn key(c: char) -> KeyEvent {
+        KeyEvent {
+            character: Some(c),
+            key: if c == ' ' { Key::Space } else { Key::Character },
+            modifiers: Modifiers::default(),
+            synthetic: false,
+        }
+    }
+
+    fn raw(c: char) -> Option<RawKey> {
+        Some(RawKey {
+            code: 0,
+            flags: 0,
+            text: c.to_string(),
+        })
+    }
+
+    #[test]
+    fn a_busy_engine_never_blocks_the_keyboard() {
+        let engine: SharedEngine =
+            Arc::new(Mutex::new(Engine::new(Models::new(), Config::default())));
+        let (mut router, health) = router(engine.clone());
+        // Another thread holds the engine, as the injector or the settings
+        // window may.
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let holder = engine.clone();
+        let t = std::thread::spawn(move || {
+            let _guard = holder.lock().unwrap();
+            locked_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+        });
+        locked_rx.recv().unwrap();
+        let started = Instant::now();
+        let disposition = router.route(key('a'), raw('a'));
+        let took = started.elapsed();
+        assert_eq!(disposition, Disposition::Pass);
+        assert!(
+            took < Duration::from_millis(5),
+            "routing took {took:?} with the engine held"
+        );
+        assert_eq!(health.snapshot().skipped_busy, 1);
+        assert!(router.missed, "the engine must learn it missed a key");
+        release_tx.send(()).unwrap();
+        t.join().unwrap();
+        // Next key: the engine is free again and the stale word is dropped.
+        router.route(key('b'), raw('b'));
+        assert!(!router.missed);
+        assert_eq!(health.snapshot().skipped_busy, 1);
+    }
+
+    #[test]
+    fn the_queue_and_the_engine_are_never_held_together() {
+        // The injector takes the queue, then the engine, in separate steps.
+        // If routing nested them the other way round, this would deadlock.
+        let engine: SharedEngine =
+            Arc::new(Mutex::new(Engine::new(Models::new(), Config::default())));
+        let (mut router, _) = router(engine.clone());
+        let queue = router.queue.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let worker_stop = stop.clone();
+        let worker = std::thread::spawn(move || {
+            while !worker_stop.load(Ordering::Relaxed) {
+                let q = queue.0.lock().unwrap();
+                let _e = engine.lock().unwrap();
+                drop(q);
+            }
+        });
+        for i in 0..20_000 {
+            router.route(key(if i % 7 == 0 { ' ' } else { 'a' }), raw('a'));
+        }
+        stop.store(true, Ordering::Relaxed);
+        worker.join().unwrap();
+    }
+
+    /// Times the hook path with the real language models, as a regression
+    /// guard for the "keyboard tap was disabled by the system" bug. Skipped
+    /// when the models have not been built.
+    #[test]
+    fn routing_with_real_models_stays_under_the_slow_threshold() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../crates/rekey-core/data/models");
+        let Ok(models) = Models::load_dir(&dir) else {
+            return;
+        };
+        if models.is_empty() {
+            return;
+        }
+        let config = Config {
+            layouts: vec!["us".into(), "ru".into()],
+            ..Config::default()
+        };
+        let engine: SharedEngine = Arc::new(Mutex::new(Engine::new(models, config)));
+        let (mut router, _) = router(engine);
+        let text = "ghbdtn rfr ltkf z nen hello world xnj nfrjt vs gjlevfkb ";
+        let mut times: Vec<Duration> = Vec::new();
+        for c in text.chars().cycle().take(5_000) {
+            let started = Instant::now();
+            router.route(key(c), raw(c));
+            times.push(started.elapsed());
+        }
+        times.sort();
+        let p99 = times[times.len() * 99 / 100];
+        let max = *times.last().unwrap();
+        eprintln!("routing 5000 keys: p99 {p99:?}, max {max:?}");
+        assert!(p99 < rekey_hook::SLOW_CALLBACK, "p99 {p99:?}");
+    }
+
+    #[test]
+    fn the_health_report_names_the_kind_count_and_timing() {
+        let before = TapHealthSnapshot::default();
+        let now = TapHealthSnapshot {
+            events: 900,
+            slow: 2,
+            slowest_micros: 7_400,
+            last_slow_micros: 5_100,
+            skipped_busy: 1,
+            disabled_timeout: 1,
+            disabled_user: 0,
+        };
+        let lines = health_report(&before, &now, 1);
+        assert_eq!(lines.len(), 3, "{lines:?}");
+        assert!(lines[0].contains("(timeout) 1x"));
+        assert!(lines[0].contains("slowest 7.4 ms"));
+        assert!(lines[1].contains("2 keyboard callback(s) took over 5 ms"));
+        assert!(health_report(&now, &now, 0).is_empty());
+    }
+
+    #[test]
+    fn the_clipboard_is_restored_only_if_it_still_holds_our_text() {
+        assert!(should_restore_clipboard(41, 41));
+        assert!(!should_restore_clipboard(41, 42));
+    }
 }

@@ -33,9 +33,11 @@ fn main() {
         let ready = |caps: rekey_hook::Capabilities| {
             println!("tap installed, can hold keys: {}", caps.can_hold)
         };
-        let result = platform::run(ready, move |event, _raw| {
-            let n = counter.fetch_add(1, Ordering::Relaxed);
-            println!(
+        let result = platform::run(
+            ready,
+            move |event, _raw| {
+                let n = counter.fetch_add(1, Ordering::Relaxed);
+                println!(
                 "{n:>3}  {:<18} char={:?} alt={} shift={} ctrl={} cmd={} right-cmd={} right-alt={} synthetic={}",
                 format!("{:?}", event.key),
                 event.character,
@@ -47,8 +49,10 @@ fn main() {
                 event.modifiers.right_alt,
                 event.synthetic,
             );
-            rekey_hook::Disposition::Pass
-        });
+                rekey_hook::Disposition::Pass
+            },
+            Arc::new(rekey_hook::TapHealth::new()),
+        );
         if let Err(e) = result {
             eprintln!("hook failed: {e}");
         }
