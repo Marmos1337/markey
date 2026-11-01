@@ -830,6 +830,7 @@ button {
 .keycaps {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 64px;
   gap: var(--ds-space-2);
 }
 
@@ -839,6 +840,7 @@ button {
 }
 
 .keycap {
+  position: relative;
   appearance: none;
   border: 1px solid var(--keycap-border);
   border-bottom-width: 2px;
@@ -850,7 +852,7 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-height: 60px;
+  height: 100%;
   justify-content: center;
   transition: transform 80ms var(--ds-ease), box-shadow var(--ds-motion-micro) var(--ds-ease), border-color var(--ds-motion-micro) var(--ds-ease);
 }
@@ -870,9 +872,18 @@ button {
   white-space: nowrap;
 }
 
+/* «лучший выбор»: a small corner badge, so the selected key keeps the same
+   symbol and label positions as every other key. */
 .keycap-tag {
-  font-size: 10px;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 6px;
+  border-radius: var(--ds-radius-full);
+  background: var(--accent-soft);
   color: var(--accent-ink);
+  font-size: 10px;
+  line-height: 14px;
   font-weight: var(--ds-weight-semibold);
 }
 
@@ -886,9 +897,20 @@ button {
   font-weight: var(--ds-weight-semibold);
 }
 
-.keycap.off .keycap-symbol {
-  font-size: var(--ds-text-body);
-  color: var(--text-secondary);
+.keycap-symbol {
+  height: 19px;
+  display: grid;
+  place-items: center;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Label and value: the label never wraps, the value takes the rest. */
+.row-pair {
+  display: grid;
+  grid-template-columns: max-content 1fr;
 }
 
 .fn-note {
@@ -1315,7 +1337,6 @@ button {
   border-radius: var(--ds-radius-full);
   background: var(--control-hover);
   border: 1px solid var(--group-border);
-  font-family: var(--font-mono);
   font-size: var(--size-detail);
 }
 
@@ -1380,8 +1401,8 @@ button {
 .abbr-list .abbr-from {
   width: 112px;
   flex: none;
-  font-family: var(--font-mono);
-  font-size: var(--size-detail);
+  font: inherit;
+  font-weight: var(--ds-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1433,8 +1454,10 @@ button {
   margin-top: var(--ds-space-2);
 }
 
-/* A strip of menu bar the badge sits in, at its real height. */
+/* A strip of menu bar the badge sits in, at its real height, next to the
+   size switch it previews. */
 .menubar-strip {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;

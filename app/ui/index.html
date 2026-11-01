@@ -170,7 +170,7 @@
               </div>
             </div>
             <div class="row fn-note" id="fn-note" hidden>
-              <span class="row-detail">Чтобы клавиша 🌐 не открывала эмодзи и не меняла язык сама, в Системных настройках → Клавиатура выберите «Нажатие клавиши 🌐: Ничего не делать».</span>
+              <span class="row-detail">Чтобы <span class="nowrap">клавиша <kbd class="ds-kbd">Fn</kbd></span> не открывала эмодзи и не меняла язык сама, в Системных настройках → Клавиатура выберите «Нажатие клавиши <span class="nowrap">Fn: Ничего</span> не делать».</span>
             </div>
           </section>
 
@@ -372,12 +372,8 @@
               </div>
             </div>
             <div class="row" id="menu-size-row">
-              <div class="row-text">
-                <span class="row-title">Размер</span>
-                <div class="menubar-preview" aria-hidden="true">
-                  <span class="menubar-strip"><canvas id="menu-preview" width="120" height="44"></canvas></span>
-                </div>
-              </div>
+              <span class="row-title">Размер</span>
+              <span class="menubar-strip" aria-hidden="true"><canvas id="menu-preview" width="120" height="44"></canvas></span>
               <div class="segmented" id="menu-size" role="radiogroup" aria-label="Размер значка">
                 <button data-value="small" role="radio">Мелкий</button>
                 <button data-value="medium" role="radio">Средний</button>
@@ -425,11 +421,11 @@
 
           <h2 class="group-header">Диагностика</h2>
           <section class="group">
-            <div class="row">
+            <div class="row row-pair">
               <span class="row-title">Режим перехвата</span>
               <span class="row-value" id="diag-mode"></span>
             </div>
-            <div class="row">
+            <div class="row row-pair">
               <span class="row-title">Языковые модели</span>
               <span class="row-value" id="diag-models"></span>
             </div>

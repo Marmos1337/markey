@@ -245,7 +245,7 @@ function renderShortcut() {
   for (const key of keys) {
     const names = keyNames(key.id);
     const button = document.createElement("button");
-    button.className = "keycap" + (key.id === "off" ? " off" : "");
+    button.className = "keycap";
     button.setAttribute("role", "radio");
     button.setAttribute("aria-checked", String(key.id === modifier));
     button.title = names.label;
@@ -256,6 +256,10 @@ function renderShortcut() {
       const globe = document.createElement("span");
       globe.dataset.kitIcon = "globe";
       symbol.append(globe);
+    } else if (key.id === "off") {
+      // «No key»: a struck-through circle, the same size as the key symbols.
+      symbol.innerHTML =
+        '<svg class="ds-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg>';
     } else {
       symbol.textContent = names.symbol;
     }
@@ -269,7 +273,8 @@ function renderShortcut() {
     if (key.id === best) {
       const tag = document.createElement("span");
       tag.className = "keycap-tag";
-      tag.textContent = "лучший выбор";
+      tag.textContent = "лучший";
+      button.title = `${names.label} — лучший выбор`;
       button.append(tag);
     }
     if (taken.has(key.id)) {

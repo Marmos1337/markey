@@ -136,8 +136,8 @@ if (!window.__TAURI__ && isLocalDevServer()) {
   const UPDATE = {
     version: "0.3.0",
     current: "0.2.0",
-    notes_ru: "- Расширенный словарь: имена, города, бренды и новые слова\n- Горячие клавиши «Всегда раскладка 1 / 2» и «В исключения», клавиша 🌐\n- Сокращения: «спс» → «спасибо»\n- Исправление при Return и Tab, две заглавные, явные опечатки\n- Раскладка в строке меню, три размера\n- Перехват клавиатуры больше не отключается системой при нагрузке",
-    notes_en: "- Extended dictionary: names, places, brands and new words\n- Hotkeys for layout 1 / 2 and for exceptions, the 🌐 key\n- Abbreviations\n- The keyboard tap no longer gets disabled under load",
+    notes_ru: "- Расширенный словарь: имена, города, бренды и новые слова\n- Горячие клавиши «Всегда раскладка 1 / 2» и «В исключения», клавиша Fn\n- Сокращения: «спс» → «спасибо»\n- Исправление при Return и Tab, две заглавные, явные опечатки\n- Раскладка в строке меню, три размера\n- Перехват клавиатуры больше не отключается системой при нагрузке",
+    notes_en: "- Extended dictionary: names, places, brands and new words\n- Hotkeys for layout 1 / 2 and for exceptions, the Fn key\n- Abbreviations\n- The keyboard tap no longer gets disabled under load",
     page: "https://github.com/Marmos1337/MarKey/releases/tag/v0.3.0",
     asset_name: "MarKey_0.3.0_aarch64.dmg",
     size: 9437184,
