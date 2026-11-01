@@ -89,6 +89,8 @@ pub struct Runtime {
     pub last_app: Arc<Mutex<Option<String>>>,
     /// Timings and disables of the keyboard hook.
     pub health: Arc<TapHealth>,
+    /// The keyboard layout active right now, for the menu bar badge.
+    pub layout: Arc<Mutex<Option<String>>>,
     queue: SharedQueue,
 }
 
@@ -148,7 +150,12 @@ pub fn spawn(
 ) -> Result<Arc<Runtime>, rekey_hook::HookError> {
     let runtime = Arc::new(Runtime::default());
     let context: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context::default()));
-    spawn_context_sampler(app, context.clone(), runtime.last_app.clone());
+    spawn_context_sampler(
+        app,
+        context.clone(),
+        runtime.last_app.clone(),
+        runtime.layout.clone(),
+    );
     refresh_system_layouts(app);
 
     let queue: SharedQueue = runtime.queue.clone();
@@ -404,6 +411,7 @@ fn spawn_context_sampler(
     app: &AppHandle,
     context: Arc<Mutex<Context>>,
     last_app: Arc<Mutex<Option<String>>>,
+    layout: Arc<Mutex<Option<String>>>,
 ) {
     let handle = app.clone();
     std::thread::Builder::new()
@@ -411,8 +419,24 @@ fn spawn_context_sampler(
         .spawn(move || loop {
             let slot = context.clone();
             let last = last_app.clone();
+            let current_layout = layout.clone();
+            let tray = handle.clone();
             let posted = handle.run_on_main_thread(move || {
                 let sampled = platform::current_context();
+                // The menu bar badge follows the layout.
+                let changed = current_layout
+                    .lock()
+                    .map(|mut l| {
+                        let changed = *l != sampled.layout;
+                        if changed {
+                            l.clone_from(&sampled.layout);
+                        }
+                        changed
+                    })
+                    .unwrap_or(false);
+                if changed {
+                    crate::refresh_tray_icon(&tray);
+                }
                 if let Some(app) = sampled.app.as_deref().filter(|a| !is_shell(a)) {
                     if let Ok(mut last) = last.lock() {
                         if last.as_deref() != Some(app) {

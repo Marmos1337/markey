@@ -9,6 +9,7 @@ mod logging;
 mod secrets;
 mod service;
 mod settings;
+mod tray_badge;
 
 use rekey_core::config::Config;
 use rekey_core::engine::Engine;
@@ -410,6 +411,8 @@ fn set_config(
         apply_launch_at_login(&app, launch);
     }
     refresh_tray(&app);
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || refresh_tray_icon(&handle));
     Ok(())
 }
 
@@ -601,6 +604,45 @@ fn refresh_tray(app: &AppHandle) {
     let _ = items.exclude.set_text(label);
 }
 
+/// The menu bar icon: the MarKey keycap, or the current layout's badge.
+///
+/// # Must be called on the main thread
+pub(crate) fn refresh_tray_icon(app: &AppHandle) {
+    let (Some(tray), Some(state)) = (app.tray_by_id("markey"), app.try_state::<AppState>()) else {
+        return;
+    };
+    let (icon, size) = match state.engine.lock() {
+        Ok(e) => (e.config().menu_bar_icon, e.config().menu_bar_size),
+        Err(_) => return,
+    };
+    let layout = state.runtime.layout.lock().ok().and_then(|l| l.clone());
+    let template = cfg!(target_os = "macos");
+    let image = match (icon, layout) {
+        (rekey_core::config::MenuBarIcon::Layout, Some(layout))
+            if !tray_badge::code_for(&layout).is_empty() =>
+        {
+            let (rgba, w, h) = tray_badge::render(&layout, size, template);
+            tauri::image::Image::new_owned(rgba, w, h)
+        }
+        _ => match default_tray_icon() {
+            Ok(image) => image,
+            Err(_) => return,
+        },
+    };
+    let _ = tray.set_icon(Some(image));
+    let _ = tray.set_icon_as_template(template);
+}
+
+fn default_tray_icon() -> tauri::Result<tauri::image::Image<'static>> {
+    // macOS tints a template icon to match the menu bar. Windows draws icons
+    // as they are, and a black template would vanish on a dark taskbar.
+    #[cfg(target_os = "macos")]
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/trayTemplate@2x.png"))?;
+    #[cfg(not(target_os = "macos"))]
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
+    Ok(icon)
+}
+
 /// The app the user was working in. MarKey never becomes frontmost itself —
 /// it is a menu bar app — so this is the app behind the menu.
 fn frontmost_app_name(app: &AppHandle) -> Option<(String, String)> {
@@ -692,12 +734,7 @@ fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
         exclude: exclude.clone(),
     });
 
-    // macOS tints a template icon to match the menu bar. Windows draws icons
-    // as they are, and a black template would vanish on a dark taskbar.
-    #[cfg(target_os = "macos")]
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/trayTemplate@2x.png"))?;
-    #[cfg(not(target_os = "macos"))]
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
+    let icon = default_tray_icon()?;
     TrayIconBuilder::with_id("markey")
         .icon(icon)
         .icon_as_template(cfg!(target_os = "macos"))
