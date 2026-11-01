@@ -4,6 +4,7 @@
 //! network. That keeps the interesting logic testable and lets the same crate
 //! back the macOS and Windows apps.
 
+pub mod apps;
 pub mod assist;
 pub mod buffer;
 pub mod config;

@@ -465,8 +465,10 @@ impl Engine {
         // was typed is gone from under the caret once the key lands. Correct
         // only while the key can be held back, and remember nothing after it.
         let final_key = event.key != Key::Space;
-        let can_correct =
-            !final_key || (self.hold_boundaries && self.detector.config.correct_on_enter_tab);
+        let can_correct = !final_key
+            || (self.hold_boundaries
+                && self.detector.config.correct_on_enter_tab
+                && (event.key != Key::Enter || crate::apps::holds_return(ctx.app.as_deref())));
         self.last_change = None;
 
         // The word before the caret was converted by the shortcut mid-word;
@@ -2570,5 +2572,43 @@ mod tests {
         let mut s = Screen::new(true);
         s.type_str(e, typed, layout);
         s.text
+    }
+
+    #[test]
+    fn return_is_never_held_in_outlook() {
+        let mut e = engine_with_options(|c| c.correct_on_enter_tab = true);
+        e.set_hold_boundaries(true);
+        let outlook = Context {
+            app: Some("com.microsoft.Outlook".into()),
+            ..ctx("us")
+        };
+        for ch in "ghbdtn".chars() {
+            e.on_key(&key(ch), &outlook);
+        }
+        assert_eq!(e.on_key(&special(Key::Enter), &outlook), Action::None);
+        // Space still corrects there.
+        for ch in "ghbdtn".chars() {
+            e.on_key(&key(ch), &outlook);
+        }
+        assert!(e.on_key(&special(Key::Space), &outlook) != Action::None);
+    }
+
+    /// Hours of typing must not grow the engine: history and the word in
+    /// progress are bounded.
+    #[test]
+    fn long_typing_keeps_the_engine_bounded() {
+        let mut e = engine();
+        let c = ctx("us");
+        let text = "ghbdtn rfr ltkf hello world aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ";
+        for ch in text.chars().cycle().take(200_000) {
+            let ev = if ch == ' ' {
+                special(Key::Space)
+            } else {
+                key(ch)
+            };
+            e.on_key(&ev, &c);
+            assert!(e.history.len() <= HISTORY);
+        }
+        assert!(e.buffer.current().chars().count() <= 64);
     }
 }

@@ -87,6 +87,11 @@ pub trait TextWriter: Send + Sync {
         false
     }
 
+    /// How long to pause between keystrokes from now on; see
+    /// [`crate::apps::keystroke_gap`]. Platforms that send a whole
+    /// correction as one batch ignore it.
+    fn set_keystroke_gap(&self, _gap: std::time::Duration) {}
+
     /// Delete `count` characters behind the caret.
     fn backspace(&self, count: usize);
     /// Type `text` as if the user had.

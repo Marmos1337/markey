@@ -11,6 +11,9 @@ use std::time::Duration;
 
 pub struct MacInjector {
     source: CGEventSource,
+    /// Pause between keystrokes, in microseconds; see
+    /// [`rekey_core::apps::keystroke_gap`].
+    gap_micros: std::sync::atomic::AtomicU64,
 }
 
 // CGEventSource is a Core Foundation object; MarKey only injects from its one
@@ -25,7 +28,7 @@ unsafe impl Sync for MacInjector {}
 /// replacement that deleted one character too few. A real keyboard never
 /// produces keystrokes this close together, and a few milliseconds each is
 /// imperceptible.
-const KEYSTROKE_GAP: Duration = Duration::from_millis(3);
+const KEYSTROKE_GAP: Duration = rekey_core::apps::DEFAULT_KEYSTROKE_GAP;
 
 /// Virtual keycodes for the keys the layout tables do not cover.
 const VK_DELETE: u16 = 51;
@@ -45,7 +48,10 @@ impl MacInjector {
         // inherit it.
         let source = CGEventSource::new(CGEventSourceStateID::Private)
             .map_err(|_| crate::HookError::Os("cannot create a CGEventSource".into()))?;
-        Ok(MacInjector { source })
+        Ok(MacInjector {
+            source,
+            gap_micros: std::sync::atomic::AtomicU64::new(KEYSTROKE_GAP.as_micros() as u64),
+        })
     }
 
     fn post(&self, event: &CGEvent, flags: CGEventFlags) {
@@ -56,6 +62,11 @@ impl MacInjector {
         event.post(CGEventTapLocation::HID);
     }
 
+    fn pause(&self) {
+        let micros = self.gap_micros.load(std::sync::atomic::Ordering::Relaxed);
+        std::thread::sleep(Duration::from_micros(micros));
+    }
+
     /// Press and release one key with exactly these modifiers.
     fn press(&self, keycode: u16, flags: CGEventFlags) {
         for down in [true, false] {
@@ -63,7 +74,7 @@ impl MacInjector {
                 self.post(&event, flags);
             }
         }
-        std::thread::sleep(KEYSTROKE_GAP);
+        self.pause();
     }
 
     /// ⌘C.
@@ -101,11 +112,16 @@ impl MacInjector {
             }
             self.post(&event, flags);
         }
-        std::thread::sleep(KEYSTROKE_GAP);
+        self.pause();
     }
 }
 
 impl Injector for MacInjector {
+    fn set_keystroke_gap(&self, gap: Duration) {
+        self.gap_micros
+            .store(gap.as_micros() as u64, std::sync::atomic::Ordering::Relaxed);
+    }
+
     fn backspace(&self, count: usize) {
         for _ in 0..count {
             self.press(VK_DELETE, CGEventFlags::empty());
@@ -166,7 +182,7 @@ impl Injector for MacInjector {
                 event.set_string(&encoded);
                 self.post(&event, CGEventFlags::empty());
             }
-            std::thread::sleep(KEYSTROKE_GAP);
+            self.pause();
         }
     }
 

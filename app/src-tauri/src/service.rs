@@ -496,6 +496,9 @@ fn spawn_injector(
                 .lock()
                 .map(|e| e.config().clone())
                 .unwrap_or_default();
+            // Browsers and web chats drop keys sent too close together.
+            let app = context.lock().ok().and_then(|c| c.app.clone());
+            injector.set_keystroke_gap(rekey_core::apps::keystroke_gap(app.as_deref()));
             match job {
                 Job::Replay(raw) => replay(&injector, &raw),
                 Job::CapsLockOff => platform::caps_lock_off(),

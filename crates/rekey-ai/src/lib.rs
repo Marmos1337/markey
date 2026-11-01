@@ -17,8 +17,8 @@
 //! app says so plainly in its settings, and the verdict cache means a given
 //! word is sent at most once.
 
-use std::collections::HashMap;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::collections::{HashMap, HashSet};
+use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -108,11 +108,26 @@ impl std::fmt::Display for AiError {
 
 impl std::error::Error for AiError {}
 
+/// Questions waiting for the worker. A slow or unreachable API must not let
+/// this grow without end: past it, new words are simply not asked this time.
+pub const MAX_QUEUED: usize = 64;
+
+/// Verdicts kept in memory. Each is a few dozen bytes; when the cache is full
+/// the oldest tenth is forgotten (and asked again if it comes back).
+pub const MAX_CACHED: usize = 20_000;
+
 /// Verdicts learned so far, shared with the engine so the local path can use
 /// them without waiting for anything.
 #[derive(Debug, Default, Clone)]
 pub struct VerdictCache {
-    inner: Arc<Mutex<HashMap<String, Verdict>>>,
+    inner: Arc<Mutex<CacheInner>>,
+}
+
+#[derive(Debug, Default)]
+struct CacheInner {
+    map: HashMap<String, Verdict>,
+    /// Keys in insertion order, for evicting the oldest.
+    order: std::collections::VecDeque<String>,
 }
 
 impl VerdictCache {
@@ -121,17 +136,28 @@ impl VerdictCache {
     }
 
     pub fn get(&self, question: &Question) -> Option<Verdict> {
-        self.inner.lock().ok()?.get(&question.key()).copied()
+        self.inner.lock().ok()?.map.get(&question.key()).copied()
     }
 
     pub fn insert(&self, question: &Question, verdict: Verdict) {
-        if let Ok(mut map) = self.inner.lock() {
-            map.insert(question.key(), verdict);
+        let Ok(mut inner) = self.inner.lock() else {
+            return;
+        };
+        let key = question.key();
+        if inner.map.insert(key.clone(), verdict).is_none() {
+            inner.order.push_back(key);
+        }
+        if inner.map.len() > MAX_CACHED {
+            for _ in 0..MAX_CACHED / 10 {
+                if let Some(old) = inner.order.pop_front() {
+                    inner.map.remove(&old);
+                }
+            }
         }
     }
 
     pub fn len(&self) -> usize {
-        self.inner.lock().map(|m| m.len()).unwrap_or(0)
+        self.inner.lock().map(|m| m.map.len()).unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -229,36 +255,53 @@ fn parse_verdict(response: &serde_json::Value) -> Result<Verdict, AiError> {
 
 /// Background worker that answers questions without blocking typing.
 pub struct Assist {
-    tx: Sender<Question>,
+    tx: SyncSender<Question>,
     cache: VerdictCache,
+    /// Words queued or being asked right now, so typing one word ten times
+    /// while the network is slow queues it once.
+    pending: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Assist {
     /// Start the worker thread. It exits when the sender is dropped.
     pub fn start(config: AiConfig) -> Assist {
-        let (tx, rx): (Sender<Question>, Receiver<Question>) = mpsc::channel();
+        Assist::start_with(move |question| ask(&config, question))
+    }
+
+    /// The worker with any way of answering; tests pass a stand-in.
+    pub fn start_with<F>(mut answer: F) -> Assist
+    where
+        F: FnMut(&Question) -> Result<Verdict, AiError> + Send + 'static,
+    {
+        let (tx, rx): (SyncSender<Question>, Receiver<Question>) = mpsc::sync_channel(MAX_QUEUED);
         let cache = VerdictCache::new();
+        let pending: Arc<Mutex<HashSet<String>>> = Arc::default();
         let worker_cache = cache.clone();
+        let worker_pending = pending.clone();
 
         std::thread::Builder::new()
             .name("rekey-ai".into())
             .spawn(move || {
                 for question in rx {
-                    if worker_cache.get(&question).is_some() {
-                        continue;
-                    }
-                    match ask(&config, &question) {
-                        Ok(verdict) => {
-                            log::debug!("ai: {:?} -> {verdict:?}", question.typed);
-                            worker_cache.insert(&question, verdict);
+                    if worker_cache.get(&question).is_none() {
+                        // Never the word itself in the log: only its length.
+                        let len = question.typed.chars().count();
+                        match answer(&question) {
+                            Ok(verdict) => {
+                                log::debug!("ai: a word of {len} chars -> {verdict:?}");
+                                worker_cache.insert(&question, verdict);
+                            }
+                            Err(e) => log::warn!("ai assist failed for a word of {len} chars: {e}"),
                         }
-                        Err(e) => log::warn!("ai assist failed for {:?}: {e}", question.typed),
+                    }
+                    if let Ok(mut p) = worker_pending.lock() {
+                        p.remove(&question.key());
                     }
                 }
             })
             .expect("spawn ai worker");
 
-        Assist { tx, cache }
+        Assist { tx, cache, pending }
     }
 
     /// The verdict for this word if it has already been learned.
@@ -267,12 +310,30 @@ impl Assist {
     }
 
     /// Queue a word to be asked about. Returns immediately; never blocks the
-    /// keystroke path even if the worker is busy or the network is down.
+    /// keystroke path even if the worker is busy or the network is down. A
+    /// word already waiting is not queued twice, and a full queue drops it.
     pub fn enqueue(&self, question: Question) {
         if self.cache.get(&question).is_some() {
             return;
         }
-        let _ = self.tx.send(question);
+        let key = question.key();
+        let Ok(mut pending) = self.pending.lock() else {
+            return;
+        };
+        if pending.contains(&key) {
+            return;
+        }
+        match self.tx.try_send(question) {
+            Ok(()) => {
+                pending.insert(key);
+            }
+            Err(TrySendError::Full(_) | TrySendError::Disconnected(_)) => {}
+        }
+    }
+
+    /// Words queued or in flight.
+    pub fn pending(&self) -> usize {
+        self.pending.lock().map(|p| p.len()).unwrap_or(0)
     }
 
     pub fn learned(&self) -> usize {
@@ -376,5 +437,49 @@ mod tests {
         assert!(p.contains("привет"));
         assert!(p.contains("en"));
         assert!(p.contains("ru"));
+    }
+
+    fn word(i: usize) -> Question {
+        Question {
+            typed: format!("word{i}"),
+            alternative: format!("слово{i}"),
+            typed_language: "en".into(),
+            alternative_language: "ru".into(),
+        }
+    }
+
+    #[test]
+    fn a_stuck_api_cannot_grow_the_queue() {
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let release_rx = Mutex::new(release_rx);
+        let assist = Assist::start_with(move |_| {
+            // The first request hangs, as a dead network would.
+            let _ = release_rx.lock().unwrap().recv();
+            Ok(Verdict::Keep)
+        });
+        for i in 0..10_000 {
+            assist.enqueue(word(i));
+        }
+        assert!(
+            assist.pending() <= MAX_QUEUED + 1,
+            "{} pending",
+            assist.pending()
+        );
+        // The same word typed again while waiting is queued once.
+        let before = assist.pending();
+        assist.enqueue(word(0));
+        assert_eq!(assist.pending(), before);
+        drop(release_tx);
+    }
+
+    #[test]
+    fn the_cache_forgets_its_oldest_when_full() {
+        let cache = VerdictCache::new();
+        for i in 0..MAX_CACHED + 1 {
+            cache.insert(&word(i), Verdict::Keep);
+        }
+        assert!(cache.len() <= MAX_CACHED);
+        assert!(cache.get(&word(0)).is_none(), "the oldest went first");
+        assert!(cache.get(&word(MAX_CACHED)).is_some());
     }
 }
