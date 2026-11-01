@@ -10,6 +10,7 @@ mod secrets;
 mod service;
 mod settings;
 mod tray_badge;
+mod updater;
 
 use rekey_core::config::Config;
 use rekey_core::engine::Engine;
@@ -37,6 +38,8 @@ struct AppState {
     flushed: Mutex<rekey_core::engine::Stats>,
     /// The models as loaded, without the extended dictionary.
     base_models: Models,
+    /// A newer version found by the last check, until the user acts on it.
+    update: Mutex<Option<updater::Update>>,
     /// The extended dictionary, read from disk the first time it is used.
     extended: Mutex<Option<ExtendedWords>>,
     extended_dir: std::path::PathBuf,
@@ -134,6 +137,9 @@ struct UiState {
     models_loaded: Vec<String>,
     /// Words in the bundled extended dictionary; 0 when it is missing.
     extended_words: usize,
+    check_updates: bool,
+    /// A newer version waiting in the update dialog.
+    update: Option<updater::Update>,
     version: String,
     platform: String,
 }
@@ -215,6 +221,8 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         available_layouts: layout_catalog(),
         models_loaded,
         extended_words: state.extended_size(),
+        check_updates: settings.check_updates,
+        update: state.update.lock().ok().and_then(|u| u.clone()),
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: std::env::consts::OS.to_string(),
         config,
@@ -523,6 +531,129 @@ fn remove_exception(
     set_config(app, state, config, None, None)
 }
 
+/// Look for a newer version. `manual` (the button) also shows a version the
+/// user skipped before.
+#[tauri::command(async)]
+fn check_update(
+    state: State<'_, AppState>,
+    manual: bool,
+) -> Result<Option<updater::Update>, String> {
+    let found = updater::check(&updater::feed_url(), env!("CARGO_PKG_VERSION"))
+        .map_err(|e| format!("Не удалось проверить обновления: {e}"))?;
+    let skipped = state
+        .settings
+        .lock()
+        .ok()
+        .and_then(|s| s.skipped_version.clone());
+    let found = found.filter(|u| manual || skipped.as_deref() != Some(u.version.as_str()));
+    if let Ok(mut pending) = state.update.lock() {
+        pending.clone_from(&found);
+    }
+    Ok(found)
+}
+
+/// «Позже»: close the dialog; the next check offers it again.
+#[tauri::command]
+fn dismiss_update(state: State<'_, AppState>) {
+    if let Ok(mut pending) = state.update.lock() {
+        *pending = None;
+    }
+}
+
+/// «Пропустить»: never offer this version again by itself.
+#[tauri::command]
+fn skip_update(state: State<'_, AppState>, version: String) -> Result<(), String> {
+    if let Ok(mut pending) = state.update.lock() {
+        *pending = None;
+    }
+    let mut settings = state.settings.lock().map_err(|e| e.to_string())?;
+    settings.skipped_version = Some(version);
+    settings.save().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_update_checks(app: AppHandle, state: State<'_, AppState>, on: bool) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().map_err(|e| e.to_string())?;
+        settings.check_updates = on;
+        settings.save().map_err(|e| e.to_string())?;
+    }
+    if on {
+        spawn_update_checks(&app);
+    }
+    Ok(())
+}
+
+fn pending_update(state: &AppState) -> Result<updater::Update, String> {
+    state
+        .update
+        .lock()
+        .ok()
+        .and_then(|u| u.clone())
+        .ok_or_else(|| "Обновление не найдено — проверьте ещё раз".to_string())
+}
+
+/// «Скачать»: the verified installer into Downloads, shown in Finder.
+#[tauri::command(async)]
+fn download_update(app: AppHandle, state: State<'_, AppState>) -> Result<String, String> {
+    use tauri_plugin_opener::OpenerExt;
+    let update = pending_update(&state)?;
+    let dir = dirs::download_dir().unwrap_or_else(updater::cache_dir);
+    let path = updater::download_verified(&update, &dir)?;
+    let _ = app.opener().reveal_item_in_dir(&path);
+    Ok(path.display().to_string())
+}
+
+/// «Установить и перезапустить»: download, verify, replace, relaunch.
+#[tauri::command(async)]
+fn install_update(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let update = pending_update(&state)?;
+    let path = updater::download_verified(&update, &updater::cache_dir())?;
+    updater::install(&path)?;
+    log::info!("update {} installed; restarting", update.version);
+    flush_stats(&app);
+    app.exit(0);
+    Ok(())
+}
+
+/// With update checks on: one check shortly after launch, then daily. A
+/// newer version opens the settings window, where the dialog shows it.
+fn spawn_update_checks(app: &AppHandle) {
+    use std::sync::atomic::AtomicBool;
+    static RUNNING: AtomicBool = AtomicBool::new(false);
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let handle = app.clone();
+    std::thread::Builder::new()
+        .name("markey-updates".into())
+        .spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(15));
+            while let Some(state) = handle.try_state::<AppState>() {
+                let on = state
+                    .settings
+                    .lock()
+                    .map(|s| s.check_updates)
+                    .unwrap_or(false);
+                if !on {
+                    break;
+                }
+                match check_update(state, false) {
+                    Ok(Some(update)) => {
+                        log::info!("update {} is available", update.version);
+                        let window = handle.clone();
+                        let _ = handle.run_on_main_thread(move || show_settings(&window));
+                    }
+                    Ok(None) => {}
+                    Err(e) => log::warn!("{e}"),
+                }
+                std::thread::sleep(std::time::Duration::from_secs(24 * 60 * 60));
+            }
+            RUNNING.store(false, Ordering::SeqCst);
+        })
+        .ok();
+}
+
 #[tauri::command]
 fn open_log(app: AppHandle) {
     use tauri_plugin_opener::OpenerExt;
@@ -807,7 +938,13 @@ fn main() {
             open_accessibility_settings,
             preview,
             remove_exception,
-            open_log
+            open_log,
+            check_update,
+            dismiss_update,
+            skip_update,
+            set_update_checks,
+            download_update,
+            install_update
         ])
         .setup(|app| {
             // Tauri sets NSApplicationActivationPolicyRegular by default, which
@@ -851,6 +988,7 @@ fn main() {
             } else {
                 models
             };
+            let check_updates = settings.check_updates;
             let mut engine_inner = Engine::new(models, settings.config.clone());
             attach_assist(&mut engine_inner, &settings);
             let engine: SharedEngine = Arc::new(Mutex::new(engine_inner));
@@ -887,7 +1025,11 @@ fn main() {
                 base_models,
                 extended: Mutex::new(extended_words),
                 extended_dir,
+                update: Mutex::new(None),
             });
+            if check_updates {
+                spawn_update_checks(&handle);
+            }
             refresh_tray(&handle);
 
             // Keep the totals current without writing on every keystroke.

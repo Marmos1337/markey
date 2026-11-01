@@ -30,6 +30,10 @@ pub struct Settings {
     pub version: u32,
     /// Running totals across launches, for the settings window.
     pub totals: Totals,
+    /// Look for a new version on GitHub once a day. Off unless switched on.
+    pub check_updates: bool,
+    /// A version the user chose to skip in the update dialog.
+    pub skipped_version: Option<String>,
 }
 
 /// How much MarKey has done, ever.

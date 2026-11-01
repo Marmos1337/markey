@@ -2968,11 +2968,13 @@ dependencies = [
  "rekey-hook",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
+ "ureq",
  "windows 0.62.2",
 ]
 

@@ -39,6 +39,9 @@ log = { workspace = true }
 # keyboard thread (src/logging.rs).
 env_filter = "2"
 dirs = "6"
+# Update check and download (updater.rs); the same HTTP client as rekey-ai.
+ureq = { version = "3", features = ["json"] }
+sha2 = "0.10"
 
 # The API key lives in the Keychain (Security.framework, through Core
 # Foundation types) or the Windows Credential Manager; see src/secrets.rs.
