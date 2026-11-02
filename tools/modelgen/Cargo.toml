@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
+# Two binaries since extgen; CI and release run `cargo run -p modelgen`.
+default-run = "modelgen"
 description = "Trains Rekey's per-language scoring models from frequency lists."
 
 [dependencies]
