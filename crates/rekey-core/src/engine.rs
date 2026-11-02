@@ -1419,19 +1419,29 @@ mod tests {
         }
     }
 
-    fn right_cmd(down: bool) -> Modifiers {
-        Modifiers {
-            meta: down,
-            right_meta: down,
-            ..Default::default()
+    /// The default shortcut key held down: right Command on a Mac, right Ctrl
+    /// on Windows (see `Modifier::platform_default`).
+    fn shortcut_key(down: bool) -> Modifiers {
+        if cfg!(windows) {
+            Modifiers {
+                control: down,
+                right_control: down,
+                ..Default::default()
+            }
+        } else {
+            Modifiers {
+                meta: down,
+                right_meta: down,
+                ..Default::default()
+            }
         }
     }
 
-    /// Tap the default shortcut, right Command.
+    /// Tap the platform's default shortcut.
     fn tap_shortcut(e: &mut Engine, layout: &str) -> Action {
         let c = ctx(layout);
-        e.on_key(&modifier_event(right_cmd(true)), &c);
-        e.on_key(&modifier_event(right_cmd(false)), &c)
+        e.on_key(&modifier_event(shortcut_key(true)), &c);
+        e.on_key(&modifier_event(shortcut_key(false)), &c)
     }
 
     fn tap(e: &mut Engine, layout: &str, held: Modifiers) -> Action {
@@ -1730,9 +1740,9 @@ mod tests {
         }
         assert_eq!(e.on_key(&special(Key::Space), &terminal), Action::None);
         // The shortcut does nothing there either.
-        e.on_key(&modifier_event(right_cmd(true)), &terminal);
+        e.on_key(&modifier_event(shortcut_key(true)), &terminal);
         assert_eq!(
-            e.on_key(&modifier_event(right_cmd(false)), &terminal),
+            e.on_key(&modifier_event(shortcut_key(false)), &terminal),
             Action::None
         );
     }
@@ -1755,12 +1765,12 @@ mod tests {
         let mut e = engine();
         type_str(&mut e, "hello ", "us");
         let c = ctx("us");
-        e.on_key(&modifier_event(right_cmd(true)), &c);
+        e.on_key(&modifier_event(shortcut_key(true)), &c);
         let mut copy = key('c');
-        copy.modifiers = right_cmd(true);
+        copy.modifiers = shortcut_key(true);
         e.on_key(&copy, &c);
         assert_eq!(
-            e.on_key(&modifier_event(right_cmd(false)), &c),
+            e.on_key(&modifier_event(shortcut_key(false)), &c),
             Action::None
         );
     }
