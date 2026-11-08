@@ -91,16 +91,7 @@ pub fn parse_version(text: &str) -> Option<(u64, u64, u64)> {
 
 /// Only https, or plain http to this machine (fixtures).
 fn allowed(url: &str) -> bool {
-    if url.starts_with("https://") {
-        return true;
-    }
-    let Some(rest) = url.strip_prefix("http://") else {
-        return false;
-    };
-    let authority = rest.split('/').next().unwrap_or("");
-    ["127.0.0.1", "localhost", "[::1]"]
-        .iter()
-        .any(|host| authority == *host || authority.starts_with(&format!("{host}:")))
+    url::Url::parse(url).is_ok_and(|url| crate::identity::allowed_url(&url))
 }
 
 /// The installer for this machine among the release's files.
@@ -184,7 +175,7 @@ fn get(url: &str, timeout: Duration) -> Result<ureq::http::Response<ureq::Body>,
     }
     // A redirect must not take an https download to plain http; only the
     // local fixtures are http to begin with.
-    let https_only = url.starts_with("https://");
+    let https_only = url::Url::parse(url).is_ok_and(|u| u.scheme() == "https");
     ureq::get(url)
         .header("User-Agent", USER_AGENT)
         .header("Accept", "application/vnd.github+json")
@@ -745,6 +736,8 @@ mod tests {
         assert!(allowed("http://localhost/latest"));
         assert!(!allowed("http://example.com/latest"));
         assert!(!allowed("http://127.0.0.1.evil.com/latest"));
+        assert!(!allowed("http://127.0.0.1:80@evil.com/latest"));
+        assert!(!allowed("https://user:pw@api.github.com/x"));
         assert!(!allowed("file:///etc/passwd"));
     }
 

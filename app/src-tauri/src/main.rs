@@ -4,11 +4,20 @@
 
 //! MarKey — fixes text typed on the wrong keyboard layout.
 
+mod account;
 mod assist;
+mod cloud;
+mod identity;
 mod logging;
+mod mar_report;
+mod marhub_open;
+mod private_files;
+mod sealed;
 mod secrets;
 mod service;
 mod settings;
+#[cfg(test)]
+mod testing;
 mod tray_badge;
 mod updater;
 
@@ -22,7 +31,8 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_deep_link::DeepLinkExt;
 
 /// Everything the UI can read or change.
 struct AppState {
@@ -43,6 +53,13 @@ struct AppState {
     /// The extended dictionary, read from disk the first time it is used.
     extended: Mutex<Option<ExtendedWords>>,
     extended_dir: std::path::PathBuf,
+    /// Taken around anything that replaces the configuration, so the cloud
+    /// never writes back a merge of settings the user has just changed. Never
+    /// held across a network call.
+    config_gate: Mutex<()>,
+    account: Arc<account::Account>,
+    cloud: Arc<cloud::Cloud>,
+    reporter: mar_report::Reporter,
 }
 
 impl AppState {
@@ -367,6 +384,24 @@ fn base64(bytes: &[u8]) -> String {
 fn set_config(
     app: AppHandle,
     state: State<'_, AppState>,
+    config: Config,
+    api_key: Option<String>,
+    launch_at_login: Option<bool>,
+    ai_consent: Option<bool>,
+) -> Result<(), String> {
+    {
+        let _gate = state.config_gate.lock().map_err(|e| e.to_string())?;
+        apply_config(&app, &state, config, api_key, launch_at_login, ai_consent)?;
+    }
+    state.cloud.changed();
+    Ok(())
+}
+
+/// Validate a whole configuration and put it into effect: settings file,
+/// engine, models and tray. The caller holds `config_gate`.
+fn apply_config(
+    app: &AppHandle,
+    state: &AppState,
     mut config: Config,
     api_key: Option<String>,
     launch_at_login: Option<bool>,
@@ -429,14 +464,225 @@ fn set_config(
         // the worker and its cache instead of leaving them idling.
         attach_assist(&mut engine, &snapshot);
     }
-    service::refresh_system_layouts(&app);
+    service::refresh_system_layouts(app);
     if let Some(launch) = launch_at_login {
-        apply_launch_at_login(&app, launch);
+        apply_launch_at_login(app, launch);
     }
-    refresh_tray(&app);
+    // Posted, because the cloud's worker comes through here too and the tray
+    // asks AppKit which app is in front.
     let handle = app.clone();
-    let _ = app.run_on_main_thread(move || refresh_tray_icon(&handle));
+    let _ = app.run_on_main_thread(move || {
+        refresh_tray(&handle);
+        refresh_tray_icon(&handle);
+    });
     Ok(())
+}
+
+// -- MarMic ID ---------------------------------------------------------------
+
+fn account_view(state: &AppState) -> account::AccountView {
+    let sync_words = state
+        .settings
+        .lock()
+        .map(|s| s.cloud_sync_words)
+        .unwrap_or(false);
+    state.account.view(state.cloud.view(), sync_words)
+}
+
+#[tauri::command]
+fn get_account(state: State<'_, AppState>) -> account::AccountView {
+    account_view(&state)
+}
+
+/// «Войти». Off the main thread: opening MarHub waits for `open` to return.
+#[tauri::command(async)]
+fn account_sign_in(state: State<'_, AppState>) -> account::AccountView {
+    state.account.sign_in();
+    account_view(&state)
+}
+
+#[tauri::command]
+fn account_cancel(state: State<'_, AppState>) -> account::AccountView {
+    state.account.cancel();
+    account_view(&state)
+}
+
+#[tauri::command(async)]
+fn account_sign_out(state: State<'_, AppState>) -> account::AccountView {
+    state.account.sign_out();
+    account_view(&state)
+}
+
+/// Whether the exception words go to the cloud. Switching on fetches them
+/// now; switching off leaves whatever is already there.
+#[tauri::command]
+fn set_cloud_words(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    on: bool,
+) -> Result<account::AccountView, String> {
+    // Without an account yet, the next sign-in, even a silent one, would
+    // upload the list before anyone was asked in that account.
+    if on && !state.account.is_signed_in() {
+        return Err("signed out".to_string());
+    }
+    {
+        let mut settings = state.settings.lock().map_err(|e| e.to_string())?;
+        settings.cloud_sync_words = on;
+        settings.save().map_err(|e| e.to_string())?;
+    }
+    if on {
+        state.cloud.pull();
+    }
+    let _ = app.emit("account-changed", ());
+    Ok(account_view(&state))
+}
+
+/// The real ways out of MarKey for sign-in links.
+struct Opener(AppHandle);
+
+impl account::LinkOpener for Opener {
+    fn open_hub(&self, url: &str, silent: bool) -> bool {
+        marhub_open::open_hub(url, silent)
+    }
+
+    fn open_browser(&self, url: &str) -> bool {
+        use tauri_plugin_opener::OpenerExt;
+        self.0.opener().open_url(url, None::<&str>).is_ok()
+    }
+}
+
+struct SettingsPrefs(Arc<Mutex<Settings>>);
+
+impl account::Prefs for SettingsPrefs {
+    fn signed_out_by_user(&self) -> bool {
+        self.0.lock().map(|s| s.signed_out_by_user).unwrap_or(false)
+    }
+
+    fn set_signed_out_by_user(&self, value: bool) {
+        let Ok(mut settings) = self.0.lock() else {
+            return;
+        };
+        if settings.signed_out_by_user != value {
+            settings.signed_out_by_user = value;
+            if let Err(e) = settings.save() {
+                log::warn!("cannot save settings: {e}");
+            }
+        }
+    }
+}
+
+struct AccountHost(AppHandle);
+
+impl account::AccountEvents for AccountHost {
+    fn changed(&self) {
+        let _ = self.0.emit("account-changed", ());
+        if let Some(state) = self.0.try_state::<AppState>() {
+            state.reporter.touch();
+        }
+    }
+
+    fn signed_in(&self, interactive: bool) {
+        if let Some(state) = self.0.try_state::<AppState>() {
+            state.cloud.signed_in(interactive);
+        }
+        // The user asked and came back from MarHub or the browser. A silent
+        // sign-in happens behind their back and must stay there.
+        if interactive {
+            let handle = self.0.clone();
+            let _ = self.0.run_on_main_thread(move || show_settings(&handle));
+        }
+    }
+}
+
+struct CloudHost(AppHandle);
+
+impl cloud::ConfigHost for CloudHost {
+    fn config(&self) -> Option<Config> {
+        let state = self.0.try_state::<AppState>()?;
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+        Some(engine.config().clone())
+    }
+
+    fn apply(&self, change: &mut dyn FnMut(&mut Config) -> bool) -> Result<bool, String> {
+        let state = self
+            .0
+            .try_state::<AppState>()
+            .ok_or("the app is not ready")?;
+        let _gate = state.config_gate.lock().map_err(|e| e.to_string())?;
+        let mut config = state
+            .engine
+            .lock()
+            .map_err(|e| e.to_string())?
+            .config()
+            .clone();
+        if !change(&mut config) {
+            return Ok(false);
+        }
+        apply_config(&self.0, &state, config, None, None, None)?;
+        let _ = self.0.emit("config-changed", ());
+        Ok(true)
+    }
+
+    fn sync_changed(&self) {
+        let _ = self.0.emit("account-changed", ());
+    }
+
+    fn sync_words(&self) -> bool {
+        self.0
+            .try_state::<AppState>()
+            .and_then(|state| state.settings.lock().ok().map(|s| s.cloud_sync_words))
+            .unwrap_or(false)
+    }
+
+    fn set_sync_words(&self, on: bool) {
+        let Some(state) = self.0.try_state::<AppState>() else {
+            return;
+        };
+        {
+            let Ok(mut settings) = state.settings.lock() else {
+                return;
+            };
+            if settings.cloud_sync_words == on {
+                return;
+            }
+            settings.cloud_sync_words = on;
+            if let Err(e) = settings.save() {
+                log::warn!("cannot save settings: {e}");
+            }
+        }
+        let _ = self.0.emit("account-changed", ());
+    }
+}
+
+/// What the report for MarHub should say right now.
+fn report_snapshot(app: &AppHandle) -> Option<mar_report::Snapshot> {
+    let state = app.try_state::<AppState>()?;
+    let hook_running = state.runtime.running.load(Ordering::Relaxed);
+    Some(mar_report::Snapshot {
+        accessibility: rekey_hook::platform::has_permission(),
+        input_monitoring: hook_running || rekey_hook::platform::has_input_monitoring(),
+        signed_in: state.account.is_signed_in(),
+    })
+}
+
+/// Links that reached MarKey, while running or at launch. A sign-in reply is
+/// handled in the background and never brings up a window; only a bare
+/// `markey://` does that.
+fn handle_links(app: &AppHandle, links: Vec<String>) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    for raw in links {
+        match identity::parse_link(&raw) {
+            Some(identity::Link::Open) => {
+                let handle = app.clone();
+                let _ = app.run_on_main_thread(move || show_settings(&handle));
+            }
+            Some(reply) => state.account.accept(reply),
+            None => log::info!("ignored a markey: link that is not valid"),
+        }
+    }
 }
 
 /// Attach or remove the Claude assist to match the current settings.
@@ -743,11 +989,34 @@ fn show_settings(app: &AppHandle) {
 /// Persist a configuration the engine changed on its own, and let the window
 /// know.
 fn store_config(app: &AppHandle, settings: &Arc<Mutex<Settings>>, config: Config) {
+    let Some(state) = app.try_state::<AppState>() else {
+        save_config(app, settings, config);
+        return;
+    };
+    let Ok(_gate) = state.config_gate.lock() else {
+        return;
+    };
+    // Read again under the gate: a cloud merge may have replaced the engine's
+    // configuration since `config` was taken.
+    let current = state
+        .engine
+        .lock()
+        .map(|e| e.config().clone())
+        .unwrap_or(config);
+    save_config(app, settings, current);
+}
+
+/// Write `config` to the settings file. The caller holds `config_gate`, once
+/// there is one.
+fn save_config(app: &AppHandle, settings: &Arc<Mutex<Settings>>, config: Config) {
     if let Ok(mut s) = settings.lock() {
         s.config = config;
         if let Err(e) = s.save() {
             log::warn!("cannot save settings: {e}");
         }
+    }
+    if let Some(state) = app.try_state::<AppState>() {
+        state.cloud.changed();
     }
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || refresh_tray(&handle));
@@ -850,6 +1119,9 @@ fn update_config(app: &AppHandle, change: impl FnOnce(&mut Config)) {
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
+    let Ok(_gate) = state.config_gate.lock() else {
+        return;
+    };
     let config = {
         let Ok(mut engine) = state.engine.lock() else {
             return;
@@ -860,7 +1132,7 @@ fn update_config(app: &AppHandle, change: impl FnOnce(&mut Config)) {
         engine.invalidate_caret();
         config
     };
-    store_config(app, &state.settings, config);
+    save_config(app, &state.settings, config);
 }
 
 fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
@@ -963,9 +1235,14 @@ fn main() {
 
     tauri::Builder::default()
         // Registered first, so a second launch exits before doing anything.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_settings(app);
+        // A launch carrying a link is that link arriving, which comes through
+        // the deep-link plugin and decides for itself about the window.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if !identity::carries_link(&args) {
+                show_settings(app);
+            }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -987,7 +1264,12 @@ fn main() {
             skip_update,
             set_update_checks,
             download_update,
-            install_update
+            install_update,
+            get_account,
+            account_sign_in,
+            account_cancel,
+            account_sign_out,
+            set_cloud_words
         ])
         .setup(|app| {
             // Tauri sets NSApplicationActivationPolicyRegular by default, which
@@ -1058,6 +1340,24 @@ fn main() {
 
             build_tray(&handle, engine.clone())?;
 
+            let identity_base = identity::base_url();
+            let account = Arc::new(account::Account::new(account::Deps {
+                client: Arc::new(identity::Client::new(&identity_base)),
+                store: sealed::system(),
+                clock: Arc::new(account::SystemClock),
+                opener: Arc::new(Opener(handle.clone())),
+                prefs: Arc::new(SettingsPrefs(settings.clone())),
+                events: Arc::new(AccountHost(handle.clone())),
+            }));
+            let cloud = cloud::Cloud::new(
+                &identity_base,
+                cloud::sync_file_path(),
+                account.clone(),
+                Arc::new(CloudHost(handle.clone())),
+            );
+            let report_handle = handle.clone();
+            let reporter = mar_report::Reporter::spawn(move || report_snapshot(&report_handle));
+
             app.manage(AppState {
                 engine,
                 settings,
@@ -1069,7 +1369,40 @@ fn main() {
                 extended: Mutex::new(extended_words),
                 extended_dir,
                 update: Mutex::new(None),
+                config_gate: Mutex::new(()),
+                account: account.clone(),
+                cloud: cloud.clone(),
+                reporter,
             });
+            app.state::<AppState>().reporter.touch();
+
+            let links = handle.clone();
+            app.deep_link().on_open_url(move |event| {
+                handle_links(
+                    &links,
+                    event.urls().iter().map(ToString::to_string).collect(),
+                );
+            });
+            // Also covers a build that was not put in place by the installer.
+            #[cfg(windows)]
+            if let Err(e) = app.deep_link().register_all() {
+                log::warn!("cannot register markey: links: {e}");
+            }
+            // The link MarKey was launched with. On macOS this arrives as an
+            // event instead, moments later.
+            match app.deep_link().get_current() {
+                Ok(Some(current)) => {
+                    handle_links(&handle, current.iter().map(ToString::to_string).collect())
+                }
+                Ok(None) => {}
+                Err(_) => log::warn!("cannot read the link MarKey was launched with"),
+            }
+
+            cloud.spawn();
+            if account.is_signed_in() {
+                cloud.pull();
+            }
+            account.start();
             if check_updates {
                 spawn_update_checks(&handle);
             }
@@ -1106,7 +1439,14 @@ fn main() {
             tauri::RunEvent::ExitRequested { api, code, .. } if code.is_none() => {
                 api.prevent_exit();
             }
-            tauri::RunEvent::Exit => flush_stats(app),
+            tauri::RunEvent::Exit => {
+                flush_stats(app);
+                if let (Some(state), Some(snapshot)) =
+                    (app.try_state::<AppState>(), report_snapshot(app))
+                {
+                    state.reporter.write_final(snapshot);
+                }
+            }
             _ => {}
         });
 }

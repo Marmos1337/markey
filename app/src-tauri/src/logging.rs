@@ -102,6 +102,27 @@ fn create_private(path: &Path) -> io::Result<File> {
     options.open(path)
 }
 
+/// Below info these print what must never reach a file: ureq and rustls the
+/// bytes on the wire, tokens included, and the other two whole `markey://`
+/// links with their codes.
+const NEVER_VERBOSE: [&str; 5] = [
+    "ureq",
+    "ureq_proto",
+    "rustls",
+    "tao",
+    "tauri_plugin_deep_link",
+];
+
+/// Checked in the logger itself, so no `MARKEY_LOG` can turn these back on.
+fn must_stay_quiet(target: &str, level: log::Level) -> bool {
+    level > log::Level::Info
+        && NEVER_VERBOSE.iter().any(|name| {
+            target
+                .strip_prefix(name)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with("::"))
+        })
+}
+
 struct ChannelLogger {
     filter: env_filter::Filter,
     lines: SyncSender<String>,
@@ -110,11 +131,11 @@ struct ChannelLogger {
 
 impl log::Log for ChannelLogger {
     fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-        self.filter.enabled(metadata)
+        self.filter.enabled(metadata) && !must_stay_quiet(metadata.target(), metadata.level())
     }
 
     fn log(&self, record: &log::Record<'_>) {
-        if !self.filter.matches(record) {
+        if !self.filter.matches(record) || must_stay_quiet(record.target(), record.level()) {
             return;
         }
         let line = format!(
@@ -275,6 +296,46 @@ mod tests {
             assert_eq!(mode, 0o600);
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn no_filter_can_bring_back_wire_or_link_dumps() {
+        let (tx, rx) = mpsc::sync_channel(64);
+        let logger = ChannelLogger {
+            filter: env_filter::Builder::new().parse("trace").build(),
+            lines: tx,
+            dropped: Arc::new(AtomicU64::new(0)),
+        };
+        let send = |target: &str, level: log::Level| {
+            log::Log::log(
+                &logger,
+                &log::Record::builder()
+                    .level(level)
+                    .target(target)
+                    .args(format_args!("line"))
+                    .build(),
+            );
+        };
+        for target in [
+            "ureq",
+            "ureq::run",
+            "ureq_proto::util",
+            "rustls::client::hs",
+            "tao::platform_impl",
+            "tauri_plugin_deep_link",
+        ] {
+            send(target, log::Level::Trace);
+            send(target, log::Level::Debug);
+            assert!(rx.try_recv().is_err(), "{target}");
+            // Warnings still arrive: they say that something went wrong.
+            send(target, log::Level::Warn);
+            assert!(rx.try_recv().is_ok(), "{target}");
+        }
+        // Only those crates, and not names that merely start the same.
+        send("markey", log::Level::Trace);
+        assert!(rx.try_recv().is_ok());
+        send("ureqish::x", log::Level::Trace);
+        assert!(rx.try_recv().is_ok());
     }
 
     #[test]

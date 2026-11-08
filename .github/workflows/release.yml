@@ -72,7 +72,6 @@ jobs:
           name: markey-${{ matrix.target }}
           path: |
             target/**/release/bundle/dmg/*.dmg
-            target/**/release/bundle/msi/*.msi
             target/**/release/bundle/nsis/*.exe
           if-no-files-found: error
 
@@ -93,7 +92,7 @@ jobs:
       - name: Checksums
         run: |
           mkdir release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) -exec cp {} release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' \) -exec cp {} release/ \;
           cd release
           sha256sum * > SHA256SUMS
           cat SHA256SUMS

@@ -48,6 +48,11 @@ pub fn has_permission() -> bool {
     false
 }
 
+/// Nothing to ask for on an unsupported platform.
+pub fn has_input_monitoring() -> bool {
+    true
+}
+
 /// No keyboard to switch on an unsupported platform.
 pub fn select_layout(_layout_id: &str) -> bool {
     false

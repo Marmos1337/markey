@@ -30,7 +30,11 @@ tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
 # A second copy would install a second keyboard hook and correct every word
 # twice; launching again just opens the settings of the one already running.
-tauri-plugin-single-instance = "2"
+# The deep-link feature hands a second launch's markey:// argument to the
+# running copy.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+# markey://: replies from MarHub or the sign-in page, and "open MarKey".
+tauri-plugin-deep-link = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
@@ -42,14 +46,25 @@ dirs = "6"
 # Update check and download (updater.rs); the same HTTP client as rekey-ai.
 ureq = { version = "3", features = ["json"] }
 sha2 = "0.10"
+# MarMic ID (identity.rs): links are parsed strictly, PKCE needs the OS RNG.
+url = "2"
+base64 = "0.22"
+getrandom = "0.3"
 
 # The API key lives in the Keychain (Security.framework, through Core
 # Foundation types) or the Windows Credential Manager; see src/secrets.rs.
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
+# The account session is sealed in a file, not the Keychain (see src/sealed.rs).
+aes-gcm = "0.10"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security_Credentials",
+    "Win32_Security_Cryptography",
+    "Win32_System_Registry",
+] }
 
 [features]
 # Tauri's default production behaviour; kept explicit for the release build.

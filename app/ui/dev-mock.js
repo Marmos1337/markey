@@ -145,6 +145,19 @@ if (!window.__TAURI__ && isLocalDevServer()) {
   if (globalThis.location?.search?.includes("update")) state.update = UPDATE;
   const later = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
+  // Signed out and staying that way: the account lives on the Rust side.
+  const ACCOUNT = {
+    accountName: "MarMic ID",
+    status: "signedOut",
+    via: null,
+    error: null,
+    name: null,
+    initials: null,
+    avatar: null,
+    syncWords: false,
+    sync: { state: "off", sets: [] },
+  };
+
   const handlers = {
     get_state: () => structuredClone(state),
     list_apps: () => structuredClone(APPS),
@@ -175,6 +188,11 @@ if (!window.__TAURI__ && isLocalDevServer()) {
     open_accessibility_settings: () => {},
     open_log: () => {},
     remove_exception: () => {},
+    get_account: () => structuredClone(ACCOUNT),
+    account_sign_in: () => structuredClone(ACCOUNT),
+    account_cancel: () => structuredClone(ACCOUNT),
+    account_sign_out: () => structuredClone(ACCOUNT),
+    set_cloud_words: () => structuredClone(ACCOUNT),
     preview: ({ text }) => {
       let changed = false;
       const output = text

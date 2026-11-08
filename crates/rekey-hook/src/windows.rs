@@ -462,6 +462,11 @@ pub fn has_permission() -> bool {
     true
 }
 
+/// Windows has no separate grant for watching input.
+pub fn has_input_monitoring() -> bool {
+    true
+}
+
 pub fn request_permission() -> bool {
     true
 }

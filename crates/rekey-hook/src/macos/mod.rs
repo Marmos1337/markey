@@ -59,6 +59,7 @@ unsafe extern "C" {
     ) -> i32;
     fn AXUIElementSetMessagingTimeout(element: CFTypeRef, seconds: f32) -> i32;
     fn AXValueGetValue(value: CFTypeRef, kind: i32, out: *mut c_void) -> bool;
+    fn CGPreflightListenEventAccess() -> bool;
 }
 
 #[link(name = "Carbon", kind = "framework")]
@@ -71,6 +72,13 @@ unsafe extern "C" {
 /// True when the user has granted Accessibility access.
 pub fn has_permission() -> bool {
     unsafe { AXIsProcessTrusted() }
+}
+
+/// True when macOS already allows this app to listen to input events. Only
+/// looks: unlike `CGRequestListenEventAccess` it never shows a prompt.
+pub fn has_input_monitoring() -> bool {
+    // SAFETY: takes no arguments and only reads the process's TCC state.
+    unsafe { CGPreflightListenEventAccess() }
 }
 
 /// Ask macOS to show the Accessibility prompt. Returns the current state; the

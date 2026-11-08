@@ -37,6 +37,13 @@ pub struct Settings {
     /// The user agreed, in the window's dialog, that words may be sent to
     /// Anthropic. The assist never runs without it (K-05).
     pub ai_consent: bool,
+    /// The user pressed «Выйти» in MarKey. Until they press «Войти» themselves,
+    /// MarKey does not sign back in through MarHub on its own.
+    pub signed_out_by_user: bool,
+    /// Send the exception words to the cloud. Off unless switched on: the
+    /// engine learns these from undone corrections, so the list can hold
+    /// whatever happened to be typed.
+    pub cloud_sync_words: bool,
 }
 
 /// How much MarKey has done, ever.
