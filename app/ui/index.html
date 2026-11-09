@@ -7,6 +7,7 @@
   <!-- Sets data-theme before first paint; the kit's tokens read it. -->
   <script src="theme.js"></script>
   <link rel="stylesheet" href="vendor/mar-ui/desktop.css" />
+  <link rel="stylesheet" href="mar-motion.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="ds-desktop">
@@ -22,55 +23,82 @@
           <span class="brand-status" id="brand-status"><i></i><span>…</span></span>
         </div>
       </div>
-      <nav class="nav" aria-label="Разделы">
-        <button class="nav-item" data-page="general">
+      <nav class="nav" id="nav" aria-label="Разделы">
+        <span class="nav-highlight" aria-hidden="true"></span>
+        <button class="nav-item mar-hover mar-press" data-page="general">
           <span class="ds-tile" data-tile="gray"><span data-kit-icon="settings"></span></span>
           Основное
         </button>
-        <button class="nav-item" data-page="shortcut">
+        <button class="nav-item mar-hover mar-press" data-page="shortcut">
           <span class="ds-tile" data-tile="indigo">
             <svg class="ds-icon" data-icon="command" data-icon-motion="pop" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12a3 3 0 1 1-3-3h12a3 3 0 1 1-3 3V6a3 3 0 1 1 3 3H6a3 3 0 1 1 3-3Z" /></svg>
           </span>
           Горячие клавиши
         </button>
-        <button class="nav-item" data-page="apps">
+        <button class="nav-item mar-hover mar-press" data-page="apps">
           <span class="ds-tile" data-tile="orange"><span data-kit-icon="shield"></span></span>
           Исключения
         </button>
-        <button class="nav-item" data-page="languages">
+        <button class="nav-item mar-hover mar-press" data-page="languages">
           <span class="ds-tile" data-tile="blue"><span data-kit-icon="globe"></span></span>
           Языки
         </button>
-        <button class="nav-item" data-page="words">
+        <button class="nav-item mar-hover mar-press" data-page="words">
           <span class="ds-tile" data-tile="green"><span data-kit-icon="book"></span></span>
           Слова
         </button>
-        <button class="nav-item" data-page="abbreviations">
+        <button class="nav-item mar-hover mar-press" data-page="abbreviations">
           <span class="ds-tile" data-tile="purple"><span data-kit-icon="edit"></span></span>
           Сокращения
         </button>
-        <button class="nav-item" data-page="advanced">
+        <button class="nav-item mar-hover mar-press" data-page="advanced">
           <span class="ds-tile" data-tile="gray"><span data-kit-icon="sliders"></span></span>
           Дополнительно
         </button>
       </nav>
       <div class="sidebar-foot">
-        <span id="version"></span>
-        <span class="update-dot" id="update-dot" hidden>Есть обновление</span>
+        <!-- The line is always reserved, so an error never moves the corner. -->
+        <div class="account-error-slot">
+          <p class="account-error" id="account-error" role="status"></p>
+        </div>
+        <div class="account mk-stack" id="account">
+          <div class="mk-layer" data-account-view="signedOut">
+            <button class="account-row account-row-quiet mar-hover mar-press" id="account-sign-in" type="button">
+              <span class="account-badge"><span data-kit-icon="user"></span></span>
+              <span class="account-label">Войти</span>
+            </button>
+          </div>
+          <div class="mk-layer" data-account-view="pending" role="status">
+            <div class="account-row">
+              <span class="account-badge"><span class="mk-spinner"></span></span>
+              <span class="account-label" id="account-pending"></span>
+              <button class="tool-btn account-cancel mar-hover mar-press" id="account-cancel" type="button" aria-label="Отменить вход" title="Отменить вход"><span data-kit-icon="x"></span></button>
+            </div>
+          </div>
+          <div class="mk-layer" data-account-view="signedIn">
+            <button class="account-row mar-hover mar-press" id="account-open" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="account-menu">
+              <span class="account-badge account-avatar" id="account-avatar"></span>
+              <span class="account-label" id="account-name"></span>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-meta">
+          <span class="sidebar-version" id="version"></span>
+          <span class="update-dot" id="update-dot" title="Есть обновление" hidden>Обновление</span>
+        </div>
       </div>
     </aside>
 
     <main class="content">
       <header class="content-header" data-tauri-drag-region>
-        <h1 id="page-title" data-tauri-drag-region>Основное</h1>
+        <h1 class="mk-stack" id="page-title" data-tauri-drag-region></h1>
       </header>
 
-      <div class="pages">
-        <p id="save-error" class="banner banner-error" role="alert" hidden></p>
-        <p id="notice" class="banner banner-warn" role="status" hidden></p>
-
+      <!-- Every page keeps its own scroll position and stays laid out, so
+           changing pages is a cross-fade and nothing else. -->
+      <div class="pages mk-stack">
         <!-- General -->
-        <section class="page" data-page="general">
+        <section class="page mk-layer" data-page="general">
           <div id="permission" class="banner banner-warn" hidden>
             <div class="banner-icon" aria-hidden="true"><span data-kit-icon="warning"></span></div>
             <div class="banner-body">
@@ -147,11 +175,11 @@
               <select id="try-layout" class="select"></select>
             </div>
           </section>
-          <p class="group-footnote">Всё работает только на вашем Mac. Ничего из набранного никуда не отправляется и не записывается.</p>
+          <p class="group-footnote">Исправление работает на этом компьютере. Наружу уходит только то, что вы включили сами: слова в облако и запросы к Claude.</p>
         </section>
 
         <!-- Hotkeys -->
-        <section class="page" data-page="shortcut" hidden>
+        <section class="page mk-layer" data-page="shortcut">
           <p class="page-intro">Главная клавиша делает всё: отменяет исправление, переводит то, что не исправилось само, или выделенный текст. Модификаторы сами ничего не печатают, поэтому одиночное нажатие безопасно — сочетания вроде <span id="copy-chord">⌘C</span> его не вызывают.</p>
 
           <h2 class="group-header">Главная клавиша</h2>
@@ -165,8 +193,8 @@
                 <span class="row-detail" id="tap-hint"></span>
               </div>
               <div class="segmented" id="tap-kind" role="radiogroup" aria-label="Нажатие">
-                <button data-value="tap" role="radio">Одно</button>
-                <button data-value="doubletap" role="radio">Двойное</button>
+                <button class="mar-hover mar-press" data-value="tap" role="radio">Одно</button>
+                <button class="mar-hover mar-press" data-value="doubletap" role="radio">Двойное</button>
               </div>
             </div>
             <div class="row fn-note" id="fn-note" hidden>
@@ -212,23 +240,23 @@
         </section>
 
         <!-- Apps -->
-        <section class="page" data-page="apps" hidden>
+        <section class="page mk-layer" data-page="apps">
           <p class="page-intro">В этих приложениях MarKey ничего не исправляет и не реагирует на клавишу. Поля паролей защищены всегда, независимо от списка. Добавить приложение можно и из <span id="apps-tray-hint">меню MarKey в строке меню</span> — пункт «Не исправлять в …».</p>
           <section class="group app-list-group">
             <ul id="excluded-apps" class="app-list"></ul>
             <div class="list-toolbar">
-              <button class="tool-btn" id="add-app" aria-label="Добавить приложение" title="Добавить приложение"><span data-kit-icon="plus"></span></button>
+              <button class="tool-btn mar-hover mar-press" id="add-app" aria-label="Добавить приложение" title="Добавить приложение"><span data-kit-icon="plus"></span></button>
               <span class="tool-sep"></span>
-              <button class="tool-btn" id="remove-app" aria-label="Убрать выбранное" title="Убрать выбранное" disabled><span data-kit-icon="minus"></span></button>
+              <button class="tool-btn mar-hover mar-press" id="remove-app" aria-label="Убрать выбранное" title="Убрать выбранное" disabled><span data-kit-icon="minus"></span></button>
               <span class="tool-spacer"></span>
-              <button class="btn btn-small" id="add-app-text">Добавить приложение…</button>
+              <button class="btn btn-small mar-hover mar-press" id="add-app-text">Добавить приложение…</button>
             </div>
           </section>
           <p class="group-footnote" id="apps-footnote"></p>
         </section>
 
         <!-- Languages -->
-        <section class="page" data-page="languages" hidden>
+        <section class="page mk-layer" data-page="languages">
           <p class="page-intro">Отметьте только те языки, на которых пишете. Чем меньше лишних — тем увереннее MarKey. Первые два в списке — «раскладка 1» и «раскладка 2» для горячих клавиш.</p>
           <section class="group">
             <ul id="layouts" class="layouts"></ul>
@@ -237,12 +265,12 @@
         </section>
 
         <!-- Words -->
-        <section class="page" data-page="words" hidden>
+        <section class="page mk-layer" data-page="words">
           <p class="page-intro">Слова, которые MarKey никогда не трогает. Сюда автоматически попадает слово, когда вы отменяете его исправление клавишей.</p>
           <section class="group">
             <div class="row">
               <input id="word-input" class="field" placeholder="Добавить слово, например ghbdtn" spellcheck="false" autocomplete="off" />
-              <button class="btn" id="word-add">Добавить</button>
+              <button class="btn mar-hover mar-press" id="word-add">Добавить</button>
             </div>
             <div class="row row-column" id="exceptions-row">
               <ul id="exceptions" class="chips"></ul>
@@ -263,7 +291,7 @@
         </section>
 
         <!-- Abbreviations -->
-        <section class="page" data-page="abbreviations" hidden>
+        <section class="page mk-layer" data-page="abbreviations">
           <p class="page-intro">Наберите сокращение и пробел — MarKey заменит его полным текстом. Сработает и в неправильной раскладке: «cgc» станет «спасибо». Отменить замену можно главной клавишей.</p>
           <section class="group">
             <div class="row">
@@ -281,7 +309,7 @@
               <input id="abbr-short" class="field abbr-short" placeholder="спс" spellcheck="false" maxlength="32" aria-label="Сокращение" />
               <span class="abbr-arrow" aria-hidden="true"><span data-kit-icon="arrow"></span></span>
               <input id="abbr-full" class="field" placeholder="спасибо" spellcheck="false" maxlength="500" aria-label="Полный текст" />
-              <button class="btn" id="abbr-add" type="submit">Добавить</button>
+              <button class="btn mar-hover mar-press" id="abbr-add" type="submit">Добавить</button>
             </form>
             <p class="row-error" id="abbr-error" role="alert"></p>
             <ul class="abbr-list" id="abbr-list"></ul>
@@ -294,7 +322,7 @@
         </section>
 
         <!-- Advanced -->
-        <section class="page" data-page="advanced" hidden>
+        <section class="page mk-layer" data-page="advanced">
           <h2 class="group-header group-header-first">Исправление</h2>
           <section class="group">
             <div class="row">
@@ -303,9 +331,9 @@
                 <span class="row-detail" id="sensitivity-hint"></span>
               </div>
               <div class="segmented" id="sensitivity" role="radiogroup" aria-label="Уверенность">
-                <button data-value="cautious" role="radio">Осторожно</button>
-                <button data-value="balanced" role="radio">Обычно</button>
-                <button data-value="eager" role="radio">Смело</button>
+                <button class="mar-hover mar-press" data-value="cautious" role="radio">Осторожно</button>
+                <button class="mar-hover mar-press" data-value="balanced" role="radio">Обычно</button>
+                <button class="mar-hover mar-press" data-value="eager" role="radio">Смело</button>
               </div>
             </div>
             <div class="row">
@@ -367,17 +395,17 @@
                 <span class="row-detail">Раскладка — код текущего языка по центру строки меню.</span>
               </div>
               <div class="segmented" id="menu-icon" role="radiogroup" aria-label="Значок в строке меню">
-                <button data-value="logo" role="radio">MarKey</button>
-                <button data-value="layout" role="radio">Раскладка</button>
+                <button class="mar-hover mar-press" data-value="logo" role="radio">MarKey</button>
+                <button class="mar-hover mar-press" data-value="layout" role="radio">Раскладка</button>
               </div>
             </div>
             <div class="row" id="menu-size-row">
               <span class="row-title">Размер</span>
               <span class="menubar-strip" aria-hidden="true"><canvas id="menu-preview" width="120" height="44"></canvas></span>
               <div class="segmented" id="menu-size" role="radiogroup" aria-label="Размер значка">
-                <button data-value="small" role="radio">Мелкий</button>
-                <button data-value="medium" role="radio">Средний</button>
-                <button data-value="large" role="radio">Крупный</button>
+                <button class="mar-hover mar-press" data-value="small" role="radio">Мелкий</button>
+                <button class="mar-hover mar-press" data-value="medium" role="radio">Средний</button>
+                <button class="mar-hover mar-press" data-value="large" role="radio">Крупный</button>
               </div>
             </div>
           </section>
@@ -415,7 +443,7 @@
                 <span class="row-title" id="update-version">MarKey</span>
                 <span class="row-detail" id="update-status">Установщик проверяется по контрольной сумме из того же релиза.</span>
               </div>
-              <button class="btn btn-icon" id="check-now"><span data-kit-icon="refresh"></span>Проверить</button>
+              <button class="btn btn-icon btn-swap mar-state mar-hover mar-press" id="check-now"><span class="btn-face" data-on><span data-kit-icon="refresh"></span>Проверить</span><span class="btn-face" aria-hidden="true"><span class="mk-spinner"></span>Проверяю…</span></button>
             </div>
           </section>
 
@@ -434,15 +462,62 @@
                 <span class="row-title">Журнал</span>
                 <span class="row-detail">Только решения и длины слов — сами слова не записываются.</span>
               </div>
-              <button class="btn btn-icon" id="open-log"><span data-kit-icon="folder"></span><span id="open-log-label">Показать в Finder</span></button>
+              <button class="btn btn-icon mar-hover mar-press" id="open-log"><span data-kit-icon="folder"></span><span id="open-log-label">Показать в Finder</span></button>
             </div>
           </section>
         </section>
       </div>
+
+      <!-- Floating, so a message never pushes the page down. -->
+      <div class="toasts">
+        <div id="save-error" class="toast toast-error mar-sheet" role="alert" hidden>
+          <span class="toast-icon" aria-hidden="true"><span data-kit-icon="alert"></span></span>
+          <span class="toast-text"></span>
+          <button class="tool-btn toast-close mar-hover mar-press" type="button" aria-label="Закрыть" title="Закрыть"><span data-kit-icon="x"></span></button>
+        </div>
+        <div id="notice" class="toast toast-warn mar-sheet" role="status" hidden>
+          <span class="toast-icon" aria-hidden="true"><span data-kit-icon="warning"></span></span>
+          <span class="toast-text"></span>
+          <button class="tool-btn toast-close mar-hover mar-press" type="button" aria-label="Закрыть" title="Закрыть"><span data-kit-icon="x"></span></button>
+        </div>
+      </div>
     </main>
   </div>
 
-  <dialog id="app-picker" class="sheet" aria-labelledby="picker-title">
+  <!-- Outside the sidebar: it is a window drag area and clips what overflows. -->
+  <div class="account-menu mk-pop" id="account-menu" role="dialog" aria-labelledby="account-menu-name" tabindex="-1" inert>
+    <div class="account-menu-head">
+      <span class="account-badge account-badge-large account-avatar" id="account-menu-avatar"></span>
+      <div class="account-menu-who">
+        <span class="account-menu-name" id="account-menu-name"></span>
+        <span class="account-menu-service" id="account-menu-service"></span>
+      </div>
+    </div>
+    <div class="account-menu-body">
+      <div class="account-sync-head">
+        <h2 class="group-header">Синхронизация</h2>
+        <p class="account-sync" id="account-sync" role="status"></p>
+      </div>
+      <ul class="group account-sets" id="account-sets">
+        <li class="row account-set" data-key="word-exceptions">
+          <div class="row-text">
+            <span class="row-title account-set-title">Слова-исключения</span>
+            <span class="row-detail account-set-detail"></span>
+          </div>
+          <label class="switch"><input type="checkbox" id="account-words" switch aria-label="Синхронизировать слова-исключения" /><span class="switch-track"><span class="switch-thumb"></span></span></label>
+        </li>
+      </ul>
+      <p class="group-footnote">В списке слов может быть случайно набранный текст, поэтому синхронизация только по вашему выбору.</p>
+    </div>
+    <div class="account-menu-foot">
+      <button class="account-sign-out mar-hover mar-press" id="account-sign-out" type="button"><span data-kit-icon="logout"></span>Выйти</button>
+    </div>
+  </div>
+
+  <!-- The dimming behind every sheet: the dialogs' own ::backdrop stays clear. -->
+  <div class="sheet-scrim mar-scrim" id="sheet-scrim"></div>
+
+  <dialog id="app-picker" class="sheet mar-sheet" aria-labelledby="picker-title">
     <form method="dialog" class="sheet-inner">
       <h2 id="picker-title">Не исправлять в приложении</h2>
       <input id="app-search" type="search" class="field" placeholder="Поиск" spellcheck="false" autocomplete="off" />
@@ -451,17 +526,17 @@
         <summary>Указать идентификатор вручную</summary>
         <div class="row">
           <input id="app-id" class="field mono" placeholder="com.example.app" spellcheck="false" autocomplete="off" />
-          <button class="btn" id="add-by-id" type="button">Добавить</button>
+          <button class="btn mar-hover mar-press" id="add-by-id" type="button">Добавить</button>
         </div>
         <span class="row-detail" id="app-error" role="alert" hidden></span>
       </details>
       <div class="sheet-actions">
-        <button class="btn btn-primary" value="close">Готово</button>
+        <button class="btn btn-primary mar-hover mar-press" value="close">Готово</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="ai-consent" class="sheet" aria-labelledby="ai-consent-title">
+  <dialog id="ai-consent" class="sheet mar-sheet" aria-labelledby="ai-consent-title">
     <form method="dialog" class="sheet-inner">
       <h2 id="ai-consent-title">Отправлять слова в Anthropic?</h2>
       <p class="sheet-text">Когда локальная модель не уверена, MarKey отправит это слово на серверы Anthropic (api.anthropic.com) и спросит Claude, как его исправить. Ответ сохраняется на этом Mac, и то же слово больше не отправляется.</p>
@@ -472,13 +547,13 @@
         <li>Запросы идут с вашим API-ключом; ключ хранится <span class="key-store">в Связке ключей</span>.</li>
       </ul>
       <div class="sheet-actions">
-        <button class="btn" value="cancel">Не включать</button>
-        <button class="btn btn-primary" value="ok">Включить</button>
+        <button class="btn mar-hover mar-press" value="cancel">Не включать</button>
+        <button class="btn btn-primary mar-hover mar-press" value="ok">Включить</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="update-dialog" class="sheet update-sheet" aria-labelledby="update-title">
+  <dialog id="update-dialog" class="sheet mar-sheet update-sheet" aria-labelledby="update-title">
     <div class="sheet-inner" tabindex="-1" autofocus>
       <div class="update-head">
         <img class="update-logo" src="logo.png" alt="" width="56" height="56" />
@@ -490,19 +565,19 @@
       <div class="update-notes-head">
         <span class="update-notes-title">Что нового</span>
         <div class="segmented segmented-small" id="update-lang" role="radiogroup" aria-label="Язык описания">
-          <button data-value="ru" role="radio" aria-checked="true">RU</button>
-          <button data-value="en" role="radio" aria-checked="false">EN</button>
+          <button class="mar-hover mar-press" data-value="ru" role="radio" aria-checked="true">RU</button>
+          <button class="mar-hover mar-press" data-value="en" role="radio" aria-checked="false">EN</button>
         </div>
       </div>
       <div class="update-notes" id="update-notes" tabindex="0"></div>
       <p class="update-verify"><span data-kit-icon="shield"></span><span>Перед установкой файл проверяется по SHA256SUMS из этого же релиза. Если сумма не совпадёт, MarKey ничего не установит.</span></p>
       <p class="row-error" id="update-error" role="alert"></p>
       <div class="update-actions">
-        <button class="btn btn-plain" id="update-skip">Пропустить</button>
+        <button class="btn btn-plain mar-hover mar-press" id="update-skip">Пропустить</button>
         <span class="tool-spacer"></span>
-        <button class="btn" id="update-later">Позже</button>
-        <button class="btn btn-icon" id="update-download"><span data-kit-icon="download"></span>Скачать</button>
-        <button class="btn btn-primary" id="update-install">Установить и перезапустить</button>
+        <button class="btn mar-hover mar-press" id="update-later">Позже</button>
+        <button class="btn btn-icon btn-swap mar-state mar-hover mar-press" id="update-download"><span class="btn-face" data-on><span data-kit-icon="download"></span>Скачать</span><span class="btn-face" aria-hidden="true"><span class="mk-spinner"></span>Скачиваю…</span></button>
+        <button class="btn btn-primary btn-swap mar-state mar-hover mar-press" id="update-install"><span class="btn-face" data-on>Установить и перезапустить</span><span class="btn-face" aria-hidden="true"><span class="mk-spinner"></span>Скачиваю и проверяю…</span></button>
       </div>
     </div>
   </dialog>

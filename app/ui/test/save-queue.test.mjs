@@ -16,4 +16,10 @@ assert.equal(backend.enabled,false);assert.deepEqual(backend.excluded_apps,['com
 assert(submitted.every(s=>s.enabled===false));
 await Promise.all([writer.enqueue(s=>({excluded_apps:[...s.excluded_apps,'org.mozilla.firefox']})),writer.enqueue(s=>({excluded_apps:s.excluded_apps.filter(id=>id!=='com.apple.TextEdit')}))]);
 assert.deepEqual(backend.excluded_apps,['org.mozilla.firefox']);assert.equal(backend.enabled,false);
+// A cloud merge lands while a save is still queued: the save sees the merge, and the reload that follows shows the result of both.
+let seen=null;let hold;const gate=new Promise(resolve=>hold=resolve);let store={exceptions:['a'],sensitivity:'balanced'};
+const later=context.RekeyConfigWriter({readState:async()=>structuredClone(store),toConfig:s=>s,onState:s=>{seen=s;},writeState:async config=>{await gate;store=structuredClone(config);}});
+const edit=later.enqueue({sensitivity:'eager'});store.exceptions=['a','from-cloud'];const reload=later.reload();
+await new Promise(resolve=>setImmediate(resolve));hold();await Promise.all([edit,reload]);
+assert.deepEqual(seen,{exceptions:['a','from-cloud'],sensitivity:'eager'});
 console.log('PASS: delayed saves preserve OFF, exclusion additions/removals, and subsequent settings');

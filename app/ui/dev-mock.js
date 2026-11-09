@@ -145,17 +145,99 @@ if (!window.__TAURI__ && isLocalDevServer()) {
   if (globalThis.location?.search?.includes("update")) state.update = UPDATE;
   const later = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
-  // Signed out and staying that way: the account lives on the Rust side.
+  // The account, chosen from the URL so every state can be opened directly:
+  //   ?account=signedOut|pending|signedIn|error
+  //   &via=marhub|browser   where a pending sign-in is waiting
+  //   &error=denied|network|rejected|server|expired|open|session|storage
+  //   &sync=idle|syncing|error|refused|off
+  //   &long=1     a very long name
+  //   &avatar=1   a picture instead of initials
+  //   &words=1    the exception words already go to the cloud
+  //   &sets=0     no sets at all (the real app always names its sets)
+  // From the console or a test: __markeyMock.set({...}), .emit(name), .merge(),
+  // .mergeApp(id), .failNext(command, message).
+  const query = new URLSearchParams(globalThis.location?.search ?? "");
+  const startAs = query.get("account") ?? "signedOut";
+
+  const initialsOf = (name) => {
+    const [first, second] = name.split(/\s+/);
+    return (second ? first[0] + second[0] : first.slice(0, 2)).toUpperCase();
+  };
+
+  const PROFILE = {
+    name: query.has("long") ? "Александра-Мария Константиновна Преображенская-Верхнеднепровская" : "Иван Петров",
+    avatar: query.has("avatar")
+      ? "data:image/svg+xml," +
+        encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#6b7280"/><circle cx="32" cy="25" r="12" fill="#e5e7eb"/><rect x="12" y="42" width="40" height="30" rx="15" fill="#e5e7eb"/></svg>')
+      : null,
+  };
+
   const ACCOUNT = {
     accountName: "MarMic ID",
-    status: "signedOut",
-    via: null,
-    error: null,
-    name: null,
-    initials: null,
-    avatar: null,
-    syncWords: false,
-    sync: { state: "off", sets: [] },
+    status: startAs === "error" ? "signedOut" : startAs,
+    via: startAs === "pending" ? query.get("via") ?? "marhub" : null,
+    error: query.get("error") ?? (startAs === "error" ? "network" : null),
+    name: startAs === "signedIn" ? PROFILE.name : null,
+    avatar: startAs === "signedIn" ? PROFILE.avatar : null,
+    syncWords: query.has("words"),
+    syncState: query.get("sync") ?? "idle",
+  };
+
+  const minutesAgo = (n) => new Date(Date.now() - n * 60000).toISOString();
+
+  /** What `get_account` returns right now, built the way account.rs builds it. */
+  function accountView() {
+    const { syncState, ...fields } = ACCOUNT;
+    const signedIn = ACCOUNT.status === "signedIn";
+    const sets = [{ key: "rules", title: "Правила исправления", count: 15, updatedAt: minutesAgo(12) }];
+    if (ACCOUNT.syncWords) {
+      sets.push({ key: "word-exceptions", title: "Слова-исключения", count: state.config.exceptions.length, updatedAt: minutesAgo(1600) });
+    }
+    sets.push({ key: "app-exceptions", title: "Приложения-исключения", count: 3, updatedAt: null });
+    return structuredClone({
+      ...fields,
+      initials: ACCOUNT.name ? initialsOf(ACCOUNT.name) : null,
+      sync: signedIn
+        ? { state: syncState, sets: query.get("sets") === "0" ? [] : sets }
+        : { state: "off", sets: [] },
+    });
+  }
+
+  const listeners = new Map();
+  const emit = (name) => {
+    for (const handler of listeners.get(name) ?? []) handler({ event: name, payload: null });
+  };
+
+  function changeAccount(patch) {
+    Object.assign(ACCOUNT, patch);
+    emit("account-changed");
+    return accountView();
+  }
+
+  let signInTimer = null;
+
+  /** What a sign-in ends in here: confirmed in MarHub after a moment. */
+  function finishSignIn() {
+    changeAccount({ status: "signedIn", via: null, error: null, name: PROFILE.name, avatar: PROFILE.avatar, syncState: "syncing" });
+    setTimeout(() => changeAccount({ syncState: "idle" }), 1200);
+  }
+
+  /** Command name -> what its next call should fail with. */
+  const failures = new Map();
+
+  window.__markeyMock = {
+    set: changeAccount,
+    emit,
+    failNext: (command, message) => failures.set(command, message),
+    // A cloud merge: the stored settings change while the window is open.
+    merge: (word = "облако") => {
+      state.config.exceptions = [...state.config.exceptions, word];
+      emit("config-changed");
+    },
+    mergeApp: (id) => {
+      state.config.excluded_apps = [...state.config.excluded_apps, id];
+      emit("config-changed");
+    },
   };
 
   const handlers = {
@@ -188,11 +270,26 @@ if (!window.__TAURI__ && isLocalDevServer()) {
     open_accessibility_settings: () => {},
     open_log: () => {},
     remove_exception: () => {},
-    get_account: () => structuredClone(ACCOUNT),
-    account_sign_in: () => structuredClone(ACCOUNT),
-    account_cancel: () => structuredClone(ACCOUNT),
-    account_sign_out: () => structuredClone(ACCOUNT),
-    set_cloud_words: () => structuredClone(ACCOUNT),
+    get_account: () => accountView(),
+    account_sign_in: () => {
+      if (ACCOUNT.status === "signedIn") return accountView();
+      clearTimeout(signInTimer);
+      signInTimer = setTimeout(finishSignIn, 2400);
+      return changeAccount({ status: "pending", via: query.get("via") ?? "marhub", error: null });
+    },
+    account_cancel: () => {
+      clearTimeout(signInTimer);
+      return changeAccount({ status: "signedOut", via: null, error: null });
+    },
+    account_sign_out: () => {
+      clearTimeout(signInTimer);
+      return changeAccount({ status: "signedOut", via: null, error: null, name: null, avatar: null });
+    },
+    set_cloud_words: ({ on }) => {
+      if (on && ACCOUNT.status !== "signedIn") throw "signed out";
+      setTimeout(() => changeAccount({ syncState: "idle" }), 900);
+      return changeAccount({ syncWords: on, syncState: "syncing" });
+    },
     preview: ({ text }) => {
       let changed = false;
       const output = text
@@ -212,7 +309,20 @@ if (!window.__TAURI__ && isLocalDevServer()) {
       invoke: async (name, args = {}) => {
         const handler = handlers[name];
         if (!handler) throw new Error(`no mock for command ${name}`);
+        if (failures.has(name)) {
+          const message = failures.get(name);
+          failures.delete(name);
+          throw message;
+        }
         return handler(args);
+      },
+    },
+    event: {
+      listen: async (name, handler) => {
+        const handlers = listeners.get(name) ?? new Set();
+        handlers.add(handler);
+        listeners.set(name, handlers);
+        return () => handlers.delete(handler);
       },
     },
   };

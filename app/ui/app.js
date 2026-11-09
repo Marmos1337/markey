@@ -113,17 +113,105 @@ const number = new Intl.NumberFormat("ru-RU");
 
 // -- navigation -------------------------------------------------------------
 
+const nav = $("nav");
+const content = document.querySelector(".content");
+const pageEls = [...document.querySelectorAll(".page")];
+const navItems = [...document.querySelectorAll(".nav-item")];
+
+// One title per page in the same spot, so the header cross-fades as the
+// content does.
+const titleEls = Object.entries(PAGE_TITLES).map(([name, text]) => {
+  const layer = document.createElement("span");
+  layer.className = "mk-layer";
+  layer.dataset.page = name;
+  layer.textContent = text;
+  $("page-title").append(layer);
+  return layer;
+});
+
+/** Pages that have been on screen; only their first showing cascades. */
+const seenPages = new Set();
+/** A first page reached while the window is still hidden in the tray. */
+let cascadeOnReveal = null;
+
+/** mar-motion.css caps a row's delay at 240 ms, which is step 6, and is done by 600. */
+const CASCADE_LAST_STEP = 6;
+const CASCADE_MS = 640;
+// Not the excluded apps: that list is rebuilt the moment the app names arrive,
+// so its rows would pop in ahead of their turn. It comes in with its card.
+const CASCADE_ROWS = ":scope > .row, :scope > form, :scope > ul:not(#excluded-apps) > li, :scope > .list-toolbar";
+
+/** Everything on a page that arrives on its own, in reading order. */
+function cascadeTargets(pageEl) {
+  const targets = [];
+  for (const child of pageEl.children) {
+    if (child.hidden) continue;
+    const rows = child.matches(".group") ? [...child.querySelectorAll(CASCADE_ROWS)].filter((row) => !row.hidden) : [];
+    if (rows.length) {
+      // A card fades in with its first row and does not travel.
+      targets.push({ el: child, name: "mk-cascade-surface" }, ...rows.map((el) => ({ el, name: "mar-cascade" })));
+    } else {
+      targets.push({ el: child, name: "mar-cascade" });
+    }
+  }
+  return targets;
+}
+
+function playCascade(pageEl) {
+  const targets = cascadeTargets(pageEl);
+  let step = 0;
+  for (const { el, name } of targets) {
+    el.dataset.i = String(Math.min(step, CASCADE_LAST_STEP));
+    el.classList.add(name);
+    if (name === "mar-cascade") step += 1;
+  }
+  setTimeout(() => {
+    for (const { el, name } of targets) {
+      el.classList.remove(name);
+      delete el.dataset.i;
+    }
+  }, CASCADE_MS);
+}
+
+function currentPageEl() {
+  return pageEls.find((el) => el.dataset.page === page);
+}
+
+/** The line under the title appears once the current page is scrolled. */
+function markScrolled() {
+  content.classList.toggle("scrolled", (currentPageEl()?.scrollTop ?? 0) > 2);
+}
+
+/**
+ * Only classes change here, the transitions do the rest. A page stays laid out
+ * when it is not on screen, so it keeps its scroll position by itself, and
+ * clicking faster than the fade just redirects it.
+ */
 function showPage(name) {
   page = name;
-  for (const el of document.querySelectorAll(".page")) {
-    el.hidden = el.dataset.page !== name;
+  const pageEl = currentPageEl();
+  for (const el of pageEls) {
+    const on = el === pageEl;
+    el.classList.toggle("is-current", on);
+    el.inert = !on;
   }
-  for (const el of document.querySelectorAll(".nav-item")) {
-    el.classList.toggle("active", el.dataset.page === name);
-    el.setAttribute("aria-current", el.dataset.page === name ? "page" : "false");
+  for (const el of titleEls) el.classList.toggle("is-current", el.dataset.page === name);
+  navItems.forEach((el, index) => {
+    const on = el.dataset.page === name;
+    el.classList.toggle("active", on);
+    el.setAttribute("aria-current", on ? "page" : "false");
+    if (on) nav.dataset.active = String(index);
+  });
+  // The first placement is not a journey: the highlight only travels from now on.
+  if (!nav.classList.contains("is-live")) {
+    requestAnimationFrame(() => requestAnimationFrame(() => nav.classList.add("is-live")));
   }
-  $("page-title").textContent = PAGE_TITLES[name] ?? "";
-  document.querySelector(".pages").scrollTop = 0;
+  markScrolled();
+  if (!seenPages.has(name)) {
+    seenPages.add(name);
+    if (document.hidden) cascadeOnReveal = pageEl;
+    else playCascade(pageEl);
+  }
   try {
     localStorage.setItem("markey.page", name);
   } catch {
@@ -132,8 +220,129 @@ function showPage(name) {
   if (name === "apps") loadApps();
 }
 
-for (const el of document.querySelectorAll(".nav-item")) {
+for (const el of navItems) {
   el.addEventListener("click", () => showPage(el.dataset.page));
+}
+
+// The settings window is created hidden at launch; its first page should
+// arrive when someone can see it.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !cascadeOnReveal) return;
+  if (cascadeOnReveal === currentPageEl()) playCascade(cascadeOnReveal);
+  cascadeOnReveal = null;
+});
+
+// -- motion helpers ---------------------------------------------------------
+
+/** --mar-t-1 in mar-motion.css. */
+const TEXT_FADE_MS = 160;
+/** A little over the longest way out, in case no transition ever runs. */
+const EXIT_SAFETY_MS = 480;
+/** How long a message stays up. */
+const TOAST_MS = 8000;
+
+/** Change a line of text with a short fade; its space is already reserved. */
+function swapText(el, text) {
+  if (el.textContent === text) return;
+  el.textContent = text;
+  el.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: TEXT_FADE_MS, easing: "ease-out" });
+}
+
+const exits = new WeakMap();
+
+function cancelExit(el) {
+  const exit = exits.get(el);
+  if (!exit) return;
+  clearTimeout(exit.timer);
+  el.removeEventListener("transitionend", exit.onEnd);
+  exits.delete(el);
+}
+
+/** Bring up a .mar-sheet. It has to be drawn closed first, to have somewhere to rise from. */
+function riseIn(el) {
+  cancelExit(el);
+  void el.offsetWidth;
+  el.dataset.open = "";
+}
+
+/** Send a .mar-sheet back the way it came, then `done`. Asking twice changes nothing. */
+function riseOut(el, done) {
+  if (exits.has(el)) return;
+  const finish = () => {
+    cancelExit(el);
+    done();
+  };
+  const onEnd = (event) => {
+    if (event.target === el && event.propertyName === "opacity") finish();
+  };
+  el.addEventListener("transitionend", onEnd);
+  exits.set(el, { onEnd, timer: setTimeout(finish, EXIT_SAFETY_MS) });
+  delete el.dataset.open;
+}
+
+const sheets = [...document.querySelectorAll("dialog.sheet")];
+
+/** The dimming follows whether any sheet is on its way in or staying. */
+function syncScrim() {
+  const scrim = $("sheet-scrim");
+  if (sheets.some((dialog) => dialog.open && dialog.dataset.open !== undefined)) scrim.dataset.open = "";
+  else delete scrim.dataset.open;
+}
+
+function openSheet(dialog) {
+  closeAccountMenu();
+  if (!dialog.open) dialog.showModal();
+  riseIn(dialog);
+  syncScrim();
+}
+
+/** Close a dialog the way it came. The real close() waits for the exit. */
+function closeSheet(dialog, value) {
+  if (!dialog.open) return;
+  riseOut(dialog, () => {
+    if (dialog.open) dialog.close(value);
+  });
+  syncScrim();
+}
+
+for (const dialog of sheets) {
+  // <form method="dialog"> and Esc would close at once.
+  dialog.querySelector('form[method="dialog"]')?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    closeSheet(dialog, event.submitter?.value);
+  });
+  // The update dialog has its own Esc: see below.
+  if (dialog.id !== "update-dialog") {
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeSheet(dialog);
+    });
+  }
+  // Chromium lets a second Esc through whatever `cancel` said.
+  dialog.addEventListener("close", () => {
+    cancelExit(dialog);
+    delete dialog.dataset.open;
+    syncScrim();
+  });
+}
+
+const toastTimers = new WeakMap();
+
+function showToast(el, text) {
+  el.querySelector(".toast-text").textContent = text;
+  el.hidden = false;
+  riseIn(el);
+  clearTimeout(toastTimers.get(el));
+  toastTimers.set(el, setTimeout(() => hideToast(el), TOAST_MS));
+}
+
+function hideToast(el) {
+  clearTimeout(toastTimers.get(el));
+  if (!el.hidden) riseOut(el, () => (el.hidden = true));
+}
+
+for (const toast of document.querySelectorAll(".toast")) {
+  toast.querySelector(".toast-close").addEventListener("click", () => hideToast(toast));
 }
 
 // -- state ------------------------------------------------------------------
@@ -181,6 +390,20 @@ function renderPlatformText() {
     : "меню MarKey в строке меню";
 }
 
+const REBUILT_LISTS = "#extra-hotkeys, #layouts, #excluded-apps, #exceptions, #abbr-list, #picker-list";
+const FOCUSABLE = "button, input, select, [tabindex]";
+
+/** Rebuilding a list drops keyboard focus; put it back on the same place. */
+function keepingFocus(rebuild) {
+  const active = document.activeElement;
+  const list = active?.closest?.(REBUILT_LISTS);
+  const index = list ? [...list.querySelectorAll(FOCUSABLE)].indexOf(active) : -1;
+  rebuild();
+  if (index < 0 || document.contains(active)) return;
+  const items = list.querySelectorAll(FOCUSABLE);
+  items[Math.min(index, items.length - 1)]?.focus({ preventScroll: true });
+}
+
 function render() {
   const root = document.documentElement;
   root.dataset.platform = state.platform;
@@ -191,11 +414,13 @@ function render() {
   renderStatus();
   renderStats();
   renderShortcut();
-  renderExtraHotkeys();
-  renderLayouts();
-  renderExcludedApps();
-  renderWords();
-  renderAbbreviations();
+  keepingFocus(() => {
+    renderExtraHotkeys();
+    renderLayouts();
+    renderExcludedApps();
+    renderWords();
+    renderAbbreviations();
+  });
   renderAdvanced();
   renderUpdates();
   updatePreview();
@@ -205,20 +430,20 @@ function renderStatus() {
   const code = state.status;
   const [title, detail] = STATUS[code] ?? STATUS.starting;
   $("hero").dataset.state = code;
-  $("hero-title").textContent = title;
-  $("hero-detail").textContent = detail;
+  swapText($("hero-title"), title);
+  swapText($("hero-detail"), detail);
   $("enabled").checked = state.config.enabled;
   $("permission").hidden = state.has_permission || state.platform !== "macos";
   const brand = $("brand-status");
   brand.dataset.state = code;
-  brand.querySelector("span").textContent = {
+  swapText(brand.querySelector("span"), {
     ready: "Работает",
     paused: "На паузе",
     permission: "Нужен доступ",
     starting: "Запуск…",
     secure_input: "Ввод пароля",
     unstable: "Перехват сбоит",
-  }[code] ?? "";
+  }[code] ?? "");
 }
 
 function renderStats() {
@@ -235,20 +460,23 @@ function shortcutParts() {
   return { kind: s.kind, modifier: s.modifier };
 }
 
-function renderShortcut() {
-  const { kind, modifier } = shortcutParts();
-  const caps = $("keycaps");
+/** The key a tap of which never gets in the way on this system. */
+function bestKey() {
+  // Right Command on a Mac; right Ctrl on Windows, where a tap of the
+  // Windows key belongs to the Start menu.
+  return state.platform === "windows" ? "right_control" : "right_command";
+}
+
+/** Built once: later the same buttons change state, so the change can fade. */
+function buildKeycaps(caps, keys) {
   caps.textContent = "";
-  const keys = availableKeys();
   caps.dataset.count = String(keys.length);
-  const taken = takenKeys("shortcut");
   for (const key of keys) {
     const names = keyNames(key.id);
     const button = document.createElement("button");
-    button.className = "keycap";
+    button.className = "keycap mar-hover mar-press";
+    button.dataset.key = key.id;
     button.setAttribute("role", "radio");
-    button.setAttribute("aria-checked", String(key.id === modifier));
-    button.title = names.label;
     const symbol = document.createElement("span");
     symbol.className = "keycap-symbol";
     if (key.id === "fn") {
@@ -267,25 +495,36 @@ function renderShortcut() {
     label.className = "keycap-label";
     label.textContent = names.label;
     button.append(symbol, label);
-    // Right Command on a Mac; right Ctrl on Windows, where a tap of the
-    // Windows key belongs to the Start menu.
-    const best = state.platform === "windows" ? "right_control" : "right_command";
-    if (key.id === best) {
+    if (key.id === bestKey()) {
       const tag = document.createElement("span");
       tag.className = "keycap-tag";
       tag.textContent = "лучший";
-      button.title = `${names.label} — лучший выбор`;
       button.append(tag);
-    }
-    if (taken.has(key.id)) {
-      button.disabled = true;
-      button.title = `${names.label}: уже занята другой горячей клавишей`;
     }
     button.addEventListener("click", () => {
       const next = key.id === "off" ? { kind: "off" } : { kind: shortcutParts().kind, modifier: key.id };
       save({ shortcut: next });
     });
     caps.append(button);
+  }
+}
+
+function renderShortcut() {
+  const { kind, modifier } = shortcutParts();
+  const caps = $("keycaps");
+  const keys = availableKeys();
+  if (caps.children.length !== keys.length) buildKeycaps(caps, keys);
+  const taken = takenKeys("shortcut");
+  for (const button of caps.children) {
+    const id = button.dataset.key;
+    const { label } = keyNames(id);
+    button.setAttribute("aria-checked", String(id === modifier));
+    button.disabled = taken.has(id);
+    button.title = taken.has(id)
+      ? `${label}: уже занята другой горячей клавишей`
+      : id === bestKey()
+        ? `${label} — лучший выбор`
+        : label;
   }
   $("fn-note").hidden = !usesFn();
   setSegmented("tap-kind", kind);
@@ -335,8 +574,20 @@ function layoutName(index) {
 }
 
 /** «Всегда раскладка 1 / 2» and «В исключения»: a key menu and a tap kind. */
+/** The user just picked a key here: that rebuild is wanted, the dropdown has closed. */
+let hotkeyPicked = false;
+/** A rebuild held back for a focused dropdown, still to be done. */
+let hotkeysOwed = false;
+
 function renderExtraHotkeys() {
   const group = $("extra-hotkeys");
+  // Nothing says whether a <select> has its list open, and a rebuild would shut it.
+  if (group.contains(document.activeElement) && document.activeElement.matches("select") && !hotkeyPicked) {
+    hotkeysOwed = true;
+    return;
+  }
+  hotkeyPicked = false;
+  hotkeysOwed = false;
   group.textContent = "";
   for (const hotkey of EXTRA_HOTKEYS) {
     const current = state.config[hotkey.field] ?? { kind: "off" };
@@ -379,6 +630,7 @@ function renderExtraHotkeys() {
     kind.setAttribute("aria-label", `${title.textContent}: нажатие`);
     for (const [value, label] of [["tap", "Одно"], ["doubletap", "Двойное"]]) {
       const b = document.createElement("button");
+      b.className = "mar-hover mar-press";
       b.dataset.value = value;
       b.setAttribute("role", "radio");
       b.textContent = label;
@@ -390,6 +642,7 @@ function renderExtraHotkeys() {
     const store = (modifier, tapKind) =>
       save({ [hotkey.field]: modifier === "off" ? { kind: "off" } : { kind: tapKind, modifier } });
     select.addEventListener("change", () => {
+      hotkeyPicked = true;
       const k = state.config[hotkey.field];
       store(select.value, k && k.kind !== "off" ? k.kind : "tap");
     });
@@ -403,6 +656,13 @@ function renderExtraHotkeys() {
     group.append(row);
   }
 }
+
+$("extra-hotkeys").addEventListener("focusout", () => {
+  // Once the browser has settled where focus went.
+  setTimeout(() => {
+    if (hotkeysOwed) keepingFocus(renderExtraHotkeys);
+  });
+});
 
 $("tap-kind").addEventListener("click", (e) => {
   const value = e.target.closest("button")?.dataset.value;
@@ -540,7 +800,7 @@ function openPicker() {
   $("app-search").value = "";
   $("app-error").hidden = true;
   renderPicker();
-  $("app-picker").showModal();
+  openSheet($("app-picker"));
   $("app-search").focus();
   loadApps(true);
 }
@@ -613,6 +873,13 @@ $("app-search").addEventListener("input", renderPicker);
 $("app-search").addEventListener("keydown", (e) => {
   // Enter in the search box must not close the sheet.
   if (e.key === "Enter") e.preventDefault();
+});
+
+// Enter here means «Добавить», not the sheet's «Готово».
+$("app-id").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  $("add-by-id").click();
 });
 
 $("add-by-id").addEventListener("click", async () => {
@@ -689,6 +956,7 @@ function renderWords() {
     const li = document.createElement("li");
     li.textContent = word;
     const remove = document.createElement("button");
+    remove.className = "mar-hover mar-press";
     const x = document.createElement("span");
     x.dataset.kitIcon = "x";
     remove.append(x);
@@ -730,7 +998,7 @@ function renderAbbreviations() {
     to.textContent = item.full;
     to.title = item.full;
     const remove = document.createElement("button");
-    remove.className = "tool-btn";
+    remove.className = "tool-btn mar-hover mar-press";
     remove.setAttribute("aria-label", `Убрать ${item.short}`);
     remove.title = "Убрать";
     const trash = document.createElement("span");
@@ -902,7 +1170,7 @@ $("ai").addEventListener("change", (e) => {
   e.target.checked = false;
   const dialog = $("ai-consent");
   dialog.returnValue = "";
-  dialog.showModal();
+  openSheet(dialog);
 });
 $("ai-consent").addEventListener("close", () => {
   if ($("ai-consent").returnValue === "ok") {
@@ -923,16 +1191,10 @@ $("open-log").addEventListener("click", () => invoke("open_log"));
 
 // -- notices ------------------------------------------------------------------
 
-let noticeTimer = null;
-
 /** A one-off message from the keyboard side, e.g. a selection too big. */
 function showNotice(text) {
   if (!text) return;
-  const banner = $("notice");
-  banner.textContent = text;
-  banner.hidden = false;
-  clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => (banner.hidden = true), 8000);
+  showToast($("notice"), text);
 }
 
 // -- updates ------------------------------------------------------------------
@@ -958,32 +1220,32 @@ $("check-updates").addEventListener("change", async (e) => {
   }
 });
 
-function busy(button, on, label) {
-  if (on) {
-    button.dataset.label = button.lastChild.textContent;
-    button.lastChild.textContent = label;
-    button.setAttribute("aria-busy", "true");
-  } else if (button.dataset.label) {
-    button.lastChild.textContent = button.dataset.label;
-    button.removeAttribute("aria-busy");
-  }
+/** Cross-fade a .btn-swap between its idle and its working face. */
+function busy(button, on) {
+  const [idle, working] = button.children;
+  idle.toggleAttribute("data-on", !on);
+  working.toggleAttribute("data-on", on);
+  idle.setAttribute("aria-hidden", String(on));
+  working.setAttribute("aria-hidden", String(!on));
+  if (on) button.setAttribute("aria-busy", "true");
+  else button.removeAttribute("aria-busy");
 }
 
 $("check-now").addEventListener("click", async () => {
   const button = $("check-now");
   button.disabled = true;
-  busy(button, true, "Проверяю…");
+  busy(button, true);
   try {
     const update = await invoke("check_update", { manual: true });
     if (update) {
       state.update = update;
-      $("update-status").textContent = `Доступна версия ${update.version}.`;
+      swapText($("update-status"), `Доступна версия ${update.version}.`);
       openUpdate(update);
     } else {
-      $("update-status").textContent = "У вас последняя версия.";
+      swapText($("update-status"), "У вас последняя версия.");
     }
   } catch (error) {
-    $("update-status").textContent = String(error);
+    swapText($("update-status"), String(error));
   } finally {
     busy(button, false);
     button.disabled = false;
@@ -1037,8 +1299,7 @@ function openUpdate(update) {
   renderNotes(update.notes_ru || update.notes_en);
   $("update-error").textContent = "";
   for (const id of ["update-skip", "update-later", "update-download", "update-install"]) $(id).disabled = false;
-  const dialog = $("update-dialog");
-  if (!dialog.open) dialog.showModal();
+  openSheet($("update-dialog"));
 }
 
 $("update-lang").addEventListener("click", (e) => {
@@ -1050,7 +1311,7 @@ $("update-lang").addEventListener("click", (e) => {
 });
 
 function closeUpdate() {
-  $("update-dialog").close();
+  closeSheet($("update-dialog"));
 }
 
 $("update-later").addEventListener("click", async () => {
@@ -1069,11 +1330,11 @@ $("update-skip").addEventListener("click", async () => {
 });
 
 /** Run a long dialog action with its button busy and the others locked. */
-async function updateAction(id, label, command) {
+async function updateAction(id, command) {
   const ids = ["update-skip", "update-later", "update-download", "update-install"];
   const button = $(id);
   for (const other of ids) $(other).disabled = true;
-  busy(button, true, label);
+  busy(button, true);
   $("update-error").textContent = "";
   try {
     return await invoke(command);
@@ -1087,15 +1348,13 @@ async function updateAction(id, label, command) {
 }
 
 $("update-download").addEventListener("click", async () => {
-  const path = await updateAction("update-download", "Скачиваю и проверяю…", "download_update");
+  const path = await updateAction("update-download", "download_update");
   if (path) $("update-error").textContent = "";
-  if (path) $("update-status").textContent = `Скачано и проверено: ${path}`;
+  if (path) swapText($("update-status"), `Скачано и проверено: ${path}`);
   if (path) closeUpdate();
 });
 
-$("update-install").addEventListener("click", () =>
-  updateAction("update-install", "Скачиваю и проверяю…", "install_update"),
-);
+$("update-install").addEventListener("click", () => updateAction("update-install", "install_update"));
 
 // Esc is «Позже», not a silent close that leaves the badge.
 $("update-dialog").addEventListener("cancel", (e) => {
@@ -1132,6 +1391,328 @@ function updatePreview() {
 $("try-input").addEventListener("input", updatePreview);
 $("try-layout").addEventListener("change", updatePreview);
 
+// -- account ----------------------------------------------------------------
+
+const ACCOUNT_ERRORS = {
+  denied: "Вход отклонён",
+  network: "Нет связи с сервером",
+  rejected: "Сервер отклонил вход",
+  server: "Сервер недоступен",
+  expired: "Время входа истекло",
+  open: "Не удалось открыть вход",
+  session: "Сессия завершилась, войдите снова",
+  storage: "Вход не сохранится на этом компьютере",
+};
+
+const SYNC_LINES = {
+  idle: "Всё сохранено",
+  syncing: "Сохраняем…",
+  error: "Не сохранено, повторим позже",
+  refused: "Список не помещается в облако",
+};
+
+const SET_UNITS = {
+  rules: ["правило", "правила", "правил"],
+  "word-exceptions": ["слово", "слова", "слов"],
+  "app-exceptions": ["приложение", "приложения", "приложений"],
+};
+
+const WORDS_SET = "word-exceptions";
+
+/** What to say when something the user pressed did not go through. */
+const ACCOUNT_ACTIONS = {
+  account_sign_in: "Не удалось начать вход",
+  account_cancel: "Не удалось отменить вход",
+  account_sign_out: "Не удалось выйти",
+  set_cloud_words: "Не удалось сохранить настройку",
+};
+
+/** The one row that holds a control; every other row is built from the data. */
+const wordsRow = $("account-sets").querySelector(`[data-key="${WORDS_SET}"]`);
+
+/** Last snapshot from Rust; the corner and the menu only ever draw this. */
+let account = null;
+/** Answers can overtake each other; only the newest question counts. */
+let accountAsked = 0;
+let accountMenuOpen = false;
+
+async function askAccount(command, args) {
+  const asked = ++accountAsked;
+  try {
+    const view = await invoke(command, args);
+    if (asked !== accountAsked) return;
+    account = view;
+    renderAccount();
+  } catch (error) {
+    console.error(`account: ${command} failed`, error);
+    if (ACCOUNT_ACTIONS[command]) showToast($("save-error"), `${ACCOUNT_ACTIONS[command]}: ${error}`);
+    if (command !== "get_account") askAccount("get_account");
+  }
+}
+
+/** The control of the state on show, for wherever focus has to land. */
+function accountControl() {
+  return $("account").querySelector(".mk-layer.is-current button");
+}
+
+function renderAccount() {
+  const root = $("account");
+  // Going inert would drop focus, so note it first and carry it across.
+  const focused = root.contains(document.activeElement) ? document.activeElement : null;
+  for (const layer of root.children) {
+    const on = layer.dataset.accountView === account.status;
+    layer.classList.toggle("is-current", on);
+    layer.inert = !on;
+  }
+  if (focused && focused.closest(".mk-layer") !== root.querySelector(".mk-layer.is-current")) {
+    accountControl()?.focus({ preventScroll: true });
+  }
+
+  // The layer's own fade covers this change; animating the label as well left
+  // it hidden in Chromium 156.
+  $("account-pending").textContent = account.via === "browser" ? "Ждём браузер…" : "Ждём MarHub…";
+
+  const message = ACCOUNT_ERRORS[account.error] ?? "";
+  const error = $("account-error");
+  // The old text stays while it fades away.
+  if (message) swapText(error, message);
+  error.classList.toggle("is-on", Boolean(message));
+
+  if (account.status !== "signedIn") {
+    closeAccountMenu();
+    return;
+  }
+  const name = account.name || account.accountName;
+  paintAvatar($("account-avatar"));
+  $("account-name").textContent = name;
+  $("account-open").title = name;
+  $("account-open").setAttribute("aria-label", `${name}: открыть меню аккаунта`);
+  renderAccountMenu(name);
+}
+
+/** The picture, the initials on a coloured circle, or a person. */
+function paintAvatar(slot) {
+  const key = `${account.avatar}|${account.initials}`;
+  if (slot.dataset.painted === key) return;
+  slot.dataset.painted = key;
+  slot.textContent = "";
+  const fallback = () => {
+    slot.textContent = "";
+    if (account.initials) {
+      slot.textContent = account.initials;
+    } else {
+      const icon = document.createElement("span");
+      icon.dataset.kitIcon = "user";
+      slot.append(icon);
+    }
+  };
+  if (account.avatar?.startsWith("data:image/")) {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.addEventListener("error", fallback);
+    img.src = account.avatar;
+    slot.append(img);
+  } else {
+    fallback();
+  }
+}
+
+/** When a set was last saved, the way a person would say it. */
+function whenSaved(iso) {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  const now = new Date();
+  const minutes = Math.floor((now - then) / 60000);
+  if (minutes < 1) return "только что";
+  if (minutes < 60) return `${minutes} ${plural(minutes, "минуту", "минуты", "минут")} назад`;
+  const clock = then.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const midnight = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((midnight(now) - midnight(then)) / 86400000);
+  if (days === 0) return `сегодня в ${clock}`;
+  if (days === 1) return `вчера в ${clock}`;
+  if (days < 7) return `${days} ${plural(days, "день", "дня", "дней")} назад`;
+  return then.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    ...(then.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
+function setDetail(set) {
+  const units = SET_UNITS[set.key];
+  const count = set.count === 0 ? "пусто" : units ? `${number.format(set.count)} ${plural(set.count, ...units)}` : number.format(set.count);
+  if (set.updatedAt) {
+    const saved = whenSaved(set.updatedAt);
+    return saved ? `${count} · ${saved}` : count;
+  }
+  // «Not saved yet» is only true while a save is running or has just failed.
+  const unsaved = !set.localOnly && ["syncing", "error"].includes(account.sync.state);
+  return unsaved ? `${count} · ещё не сохранено` : count;
+}
+
+/**
+ * The sets Rust reports. The words are missing while they stay on this
+ * computer; their row is still shown, with the switch that sends them up.
+ */
+function cloudSets() {
+  const sets = [...account.sync.sets];
+  if (sets.length && !sets.some((set) => set.key === WORDS_SET)) {
+    sets.splice(1, 0, {
+      key: WORDS_SET,
+      title: "Слова-исключения",
+      count: state?.config.exceptions.length ?? 0,
+      updatedAt: null,
+      localOnly: true,
+    });
+  }
+  return sets;
+}
+
+function setRow(set) {
+  const li = document.createElement("li");
+  li.className = "row account-set";
+  li.dataset.key = set.key;
+  const text = document.createElement("div");
+  text.className = "row-text";
+  const title = document.createElement("span");
+  title.className = "row-title account-set-title";
+  const detail = document.createElement("span");
+  detail.className = "row-detail account-set-detail";
+  text.append(title, detail);
+  li.append(text);
+  return li;
+}
+
+function skeletonRows() {
+  return [0, 1, 2].map(() => {
+    const li = document.createElement("li");
+    li.className = "row row-column account-set account-set-skeleton";
+    for (const size of ["ds-skeleton--line", "ds-skeleton--line ds-skeleton--line-sm"]) {
+      const bar = document.createElement("span");
+      bar.className = `ds-skeleton ${size}`;
+      li.append(bar);
+    }
+    return li;
+  });
+}
+
+function renderCloudSets() {
+  const list = $("account-sets");
+  const sets = cloudSets();
+  if (!sets.length) {
+    // Rust always names its sets; this is only for an answer without any.
+    list.dataset.empty = account.sync.state;
+    list.textContent = "";
+    if (account.sync.state === "syncing") {
+      list.append(...skeletonRows());
+    } else {
+      const li = document.createElement("li");
+      li.className = "account-sets-empty";
+      li.textContent = "Пока ничего не сохранено";
+      list.append(li);
+    }
+    return;
+  }
+  if (list.dataset.empty) {
+    delete list.dataset.empty;
+    list.textContent = "";
+  }
+  const rows = new Map([...list.children].map((li) => [li.dataset.key, li]));
+  sets.forEach((set, index) => {
+    const li = rows.get(set.key) ?? (set.key === WORDS_SET ? wordsRow : setRow(set));
+    rows.delete(set.key);
+    if (list.children[index] !== li) list.insertBefore(li, list.children[index] ?? null);
+    swapText(li.querySelector(".account-set-title"), set.title);
+    swapText(li.querySelector(".account-set-detail"), setDetail(set));
+    li.querySelector(".account-set-title").title = set.title;
+  });
+  for (const stale of rows.values()) stale.remove();
+}
+
+function renderAccountMenu(name) {
+  paintAvatar($("account-menu-avatar"));
+  const who = $("account-menu-name");
+  who.textContent = name;
+  who.title = name;
+  $("account-menu-service").textContent = account.accountName;
+  renderCloudSets();
+  const line = $("account-sync");
+  line.dataset.state = account.sync.state;
+  swapText(line, SYNC_LINES[account.sync.state] ?? "");
+  line.title = line.textContent;
+  $("account-words").checked = account.syncWords;
+}
+
+function openAccountMenu() {
+  if (accountMenuOpen || account?.status !== "signedIn") return;
+  accountMenuOpen = true;
+  renderAccount();
+  const menu = $("account-menu");
+  menu.inert = false;
+  menu.classList.add("is-open");
+  $("account-open").setAttribute("aria-expanded", "true");
+  menu.focus({ preventScroll: true });
+}
+
+function closeAccountMenu() {
+  if (!accountMenuOpen) return;
+  accountMenuOpen = false;
+  const menu = $("account-menu");
+  const hadFocus = menu.contains(document.activeElement);
+  menu.classList.remove("is-open");
+  menu.inert = true;
+  $("account-open").setAttribute("aria-expanded", "false");
+  if (hadFocus) accountControl()?.focus({ preventScroll: true });
+}
+
+// Rust opens MarHub or the browser before it answers, and that is not instant:
+// a second click in the meantime must not start a second attempt.
+let signInAsked = false;
+$("account-sign-in").addEventListener("click", async () => {
+  if (signInAsked) return;
+  signInAsked = true;
+  await askAccount("account_sign_in");
+  signInAsked = false;
+});
+$("account-cancel").addEventListener("click", () => askAccount("account_cancel"));
+$("account-sign-out").addEventListener("click", () => askAccount("account_sign_out"));
+$("account-open").addEventListener("click", () => (accountMenuOpen ? closeAccountMenu() : openAccountMenu()));
+$("account-words").addEventListener("change", (e) => askAccount("set_cloud_words", { on: e.target.checked }));
+
+// Clicks outside close it; a press on its own trigger is handled by the click.
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (accountMenuOpen && !$("account-menu").contains(event.target) && !$("account-open").contains(event.target)) {
+      closeAccountMenu();
+    }
+  },
+  true,
+);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && accountMenuOpen) closeAccountMenu();
+});
+
+window.addEventListener("blur", closeAccountMenu);
+
+// Tab goes round inside the menu instead of off into the hidden page behind.
+$("account-menu").addEventListener("keydown", (event) => {
+  if (event.key !== "Tab") return;
+  const menu = event.currentTarget;
+  const items = [...menu.querySelectorAll("button, input")];
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || active === menu)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+
 // -- saving -----------------------------------------------------------------
 
 /**
@@ -1146,12 +1727,10 @@ async function save(changes = {}, extras = {}) {
   const patch = typeof changes === "function" ? (fresh) => changes(fresh.config) : changes;
   try {
     await configWriter.enqueue(patch, extras);
-    $("save-error").hidden = true;
+    hideToast($("save-error"));
   } catch (error) {
     console.error("could not save settings", error);
-    const banner = $("save-error");
-    banner.hidden = false;
-    banner.textContent = `Не удалось сохранить настройку: ${error}`;
+    showToast($("save-error"), `Не удалось сохранить настройку: ${error}`);
     refresh();
   }
 }
@@ -1163,8 +1742,33 @@ const configWriter = RekeyConfigWriter({
   onState: (fresh) => {
     state = fresh;
     render();
+    redrawPicker();
+    if (account?.status === "signedIn") renderCloudSets();
   },
 });
+
+/** The open picker follows the stored list, in place. */
+function redrawPicker() {
+  if (!$("app-picker").open) return;
+  const list = $("picker-list");
+  const top = list.scrollTop;
+  keepingFocus(renderPicker);
+  list.scrollTop = top;
+}
+
+/**
+ * The configuration changed outside this window (a cloud merge). Every save
+ * sends the whole config, so a stale window would undo the merge. It goes
+ * through the write queue: an edit still on its way lands first and the window
+ * ends up showing what is really stored.
+ */
+async function reloadConfig() {
+  try {
+    await configWriter.reload();
+  } catch (error) {
+    console.error("could not reload settings", error);
+  }
+}
 
 // -- startup ----------------------------------------------------------------
 
@@ -1181,8 +1785,10 @@ window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change",
 // Separate the title strip from the content once something scrolls under it.
 document.querySelector(".pages").addEventListener(
   "scroll",
-  (e) => document.querySelector(".content").classList.toggle("scrolled", e.target.scrollTop > 2),
-  { passive: true },
+  (e) => {
+    if (e.target === currentPageEl()) markScrolled();
+  },
+  { capture: true, passive: true },
 );
 
 // An overlaid title bar leaves the system nothing to grab, so the drag areas
@@ -1212,8 +1818,18 @@ if (!invoke) {
   } catch {
     // Not remembered.
   }
-  refresh().then(() => showPage(PAGE_TITLES[initial] ? initial : "general"));
+  // A failed first read still has to put a page on screen.
+  refresh()
+    .catch((error) => console.error("could not read the settings", error))
+    .finally(() => showPage(PAGE_TITLES[initial] ? initial : "general"));
   setInterval(() => {
     if (!document.hidden && state) pollLiveFields();
   }, 2000);
+  askAccount("get_account");
+  for (const [event, handler] of [
+    ["account-changed", () => askAccount("get_account")],
+    ["config-changed", reloadConfig],
+  ]) {
+    bridge.event?.listen?.(event, handler).catch((error) => console.error(`cannot listen for ${event}`, error));
+  }
 }

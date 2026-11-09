@@ -513,6 +513,20 @@ fn account_sign_out(state: State<'_, AppState>) -> account::AccountView {
     account_view(&state)
 }
 
+/// Change the settings on a copy and keep it only once it is saved, so a
+/// failed save cannot leave the app acting on something the file does not say.
+fn commit_settings(
+    current: &mut Settings,
+    change: impl FnOnce(&mut Settings),
+    save: impl FnOnce(&Settings) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut next = current.clone();
+    change(&mut next);
+    save(&next)?;
+    *current = next;
+    Ok(())
+}
+
 /// Whether the exception words go to the cloud. Switching on fetches them
 /// now; switching off leaves whatever is already there.
 #[tauri::command]
@@ -528,8 +542,11 @@ fn set_cloud_words(
     }
     {
         let mut settings = state.settings.lock().map_err(|e| e.to_string())?;
-        settings.cloud_sync_words = on;
-        settings.save().map_err(|e| e.to_string())?;
+        commit_settings(
+            &mut settings,
+            |next| next.cloud_sync_words = on,
+            |next| next.save().map_err(|e| e.to_string()),
+        )?;
     }
     if on {
         state.cloud.pull();
@@ -1455,6 +1472,35 @@ fn main() {
 mod tests {
     use super::*;
     use rekey_core::config::{Modifier, Sensitivity, Shortcut};
+
+    #[test]
+    fn a_failed_save_leaves_the_words_switch_as_it_was() {
+        let mut settings = Settings::default();
+        let result = commit_settings(
+            &mut settings,
+            |next| next.cloud_sync_words = true,
+            |_| Err("disk full".to_string()),
+        );
+        assert_eq!(result, Err("disk full".to_string()));
+        assert!(!settings.cloud_sync_words);
+    }
+
+    #[test]
+    fn a_saved_change_to_the_words_switch_takes_effect() {
+        let mut settings = Settings::default();
+        let seen = std::cell::Cell::new(false);
+        let result = commit_settings(
+            &mut settings,
+            |next| next.cloud_sync_words = true,
+            |next| {
+                seen.set(next.cloud_sync_words);
+                Ok(())
+            },
+        );
+        assert_eq!(result, Ok(()));
+        assert!(seen.get(), "the file gets the new value");
+        assert!(settings.cloud_sync_words);
+    }
 
     #[test]
     fn base64_matches_the_standard_alphabet() {

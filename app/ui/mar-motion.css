@@ -1,0 +1,69 @@
+/* mar-motion 1 — one motion system for every Mar program (docs/ecosystem.md §1a). Copied as is; a program keeps its
+   own look and takes only this. Durations 160 / 240 / 360 / 520 ms, one smooth ease-out to arrive, ease-in-out to
+   leave, no springs, no overshoot; only transform and opacity move. MarHub's own stylesheet uses the same numbers. */
+
+:root {
+  --mar-t-1: 160ms;
+  --mar-t-2: 240ms;
+  --mar-t-3: 360ms;
+  --mar-t-4: 520ms;
+  --mar-stagger: 40ms;
+  --mar-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --mar-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Hover: only background and shadow, soft in, slower out. A press sinks to .97. */
+  --mar-hover-in: 160ms;
+  --mar-hover-out: 320ms;
+  --mar-press: 100ms;
+  --mar-screen-shift: 16px;
+}
+
+/* ---------- A screen inside a program: the shell stays, only the content changes ----------
+   Put both screens in one .mar-screens stack, add the classes for the direction, remove the old screen on
+   animationend. Forward: the old one leaves 16 px to the left and fades, the new one comes from 16 px to the right,
+   overlapping (no empty frame). Back is the mirror; give the scroll position back before it starts. */
+.mar-screens { display: grid; }
+.mar-screens > * { grid-area: 1 / 1; min-width: 0; }
+.mar-screen-in-forward { animation: mar-from-right var(--mar-t-3) var(--mar-ease-out) both; }
+.mar-screen-out-forward { animation: mar-to-left var(--mar-t-2) var(--mar-ease-in-out) both; pointer-events: none; }
+.mar-screen-in-back { animation: mar-from-left var(--mar-t-3) var(--mar-ease-out) both; }
+.mar-screen-out-back { animation: mar-to-right var(--mar-t-2) var(--mar-ease-in-out) both; pointer-events: none; }
+@keyframes mar-from-right { from { opacity: 0; transform: translate3d(var(--mar-screen-shift), 0, 0); } }
+@keyframes mar-to-left { to { opacity: 0; transform: translate3d(calc(-1 * var(--mar-screen-shift)), 0, 0); } }
+@keyframes mar-from-left { from { opacity: 0; transform: translate3d(calc(-1 * var(--mar-screen-shift)), 0, 0); } }
+@keyframes mar-to-right { to { opacity: 0; transform: translate3d(var(--mar-screen-shift), 0, 0); } }
+
+/* ---------- Tabs: the highlight travels (the program's own thumb), the content is a short fade ---------- */
+.mar-tab-in { animation: mar-fade-in var(--mar-t-2) var(--mar-ease-out) both; }
+.mar-tab-out { animation: mar-fade-out var(--mar-t-1) var(--mar-ease-in-out) both; pointer-events: none; }
+@keyframes mar-fade-in { from { opacity: 0; } }
+@keyframes mar-fade-out { to { opacity: 0; } }
+
+/* ---------- Windows and sheets: rise 12 px over a dimmed background, close the same way back ----------
+   Toggle [data-open] on both; keep the element shown until the closing transition has ended. */
+.mar-scrim { opacity: 0; transition: opacity var(--mar-t-2) var(--mar-ease-out); }
+.mar-scrim[data-open] { opacity: 1; }
+.mar-sheet { opacity: 0; transform: translate3d(0, 12px, 0); transition: opacity var(--mar-t-2) var(--mar-ease-out), transform var(--mar-t-3) var(--mar-ease-out); }
+.mar-sheet[data-open] { opacity: 1; transform: none; }
+
+/* ---------- First appearance of a screen: a cascade, 40 ms apart, at most 600 ms in all ----------
+   Set --i on each item (0, 1, 2…). Not on a return to a screen: there is no cascade then. */
+.mar-cascade { animation: mar-rise-in var(--mar-t-3) var(--mar-ease-out) both; animation-delay: min(calc(var(--i, 0) * var(--mar-stagger)), 240ms); }
+@keyframes mar-rise-in { from { opacity: 0; transform: translate3d(0, 8px, 0); } }
+
+/* ---------- Pointer: background and shadow only, nothing rises or slides; a press sinks ---------- */
+.mar-hover { transition: background-color var(--mar-hover-out) var(--mar-ease-out), box-shadow var(--mar-hover-out) var(--mar-ease-out), transform var(--mar-press) var(--mar-ease-out); }
+.mar-hover:hover { transition-duration: var(--mar-hover-in), var(--mar-hover-in), var(--mar-press); }
+.mar-press:active { transform: scale(0.97); }
+
+/* ---------- A change of state in place (button, loading, done): both faces in one cell, a cross-fade, no jump ---------- */
+.mar-state { display: inline-grid; }
+.mar-state > * { grid-area: 1 / 1; opacity: 0; transition: opacity var(--mar-t-2) var(--mar-ease-out); }
+.mar-state > [data-on] { opacity: 1; }
+
+/* «Reduce motion»: only fades. */
+@media (prefers-reduced-motion: reduce) {
+  .mar-screen-in-forward, .mar-screen-in-back, .mar-cascade { animation: mar-fade-in var(--mar-t-1) linear both; animation-delay: 0ms; }
+  .mar-screen-out-forward, .mar-screen-out-back { animation: mar-fade-out var(--mar-t-1) linear both; }
+  .mar-sheet { transform: none; }
+  .mar-press:active { transform: none; }
+}

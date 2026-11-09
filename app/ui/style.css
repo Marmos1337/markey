@@ -8,11 +8,25 @@
  * variables below are the bridge: the window's own names, read from --ds-*,
  * so a component never writes a raw colour. Windows' Fluent look is a few
  * overrides of the same names.
+ *
+ * How things move comes from mar-motion.css, a copy of the file every Mar
+ * program shares (--mar-* and .mar-*). What only this window needs on top of
+ * it is below, with the mk- prefix.
  */
 
 :root {
   --sidebar-width: 214px;
   --titlebar-height: 52px;
+  --nav-item-h: 32px;
+  --nav-gap: 2px;
+  --account-h: 40px;
+  --account-set-h: 48px;
+  --account-menu-w: 360px;
+  --sidebar-meta-h: calc(var(--size-detail) * 1.38);
+  --page-width: 620px;
+  --page-inset: max(var(--gutter), calc((100% - var(--page-width)) / 2));
+  /* The kit's scrollbar width: a page gives it back from its right padding. */
+  --scrollbar-w: 0.625rem;
   --radius-group: var(--ds-radius-md);
   --radius-control: var(--ds-radius-xs);
   --row-min-height: 40px;
@@ -42,6 +56,7 @@
   --control-bg: var(--ds-surface-1);
   --control-border: var(--ds-border-strong);
   --control-hover: color-mix(in srgb, var(--ds-text) 6%, transparent);
+  --control-bg-hover: color-mix(in srgb, var(--control-bg) 94%, var(--ds-text));
   --nav-hover: color-mix(in srgb, var(--ds-text) 6%, transparent);
   --nav-active: color-mix(in srgb, var(--ds-text) 10%, transparent);
   --track-off: var(--ds-border-strong);
@@ -136,6 +151,147 @@ button {
   vertical-align: 1px;
 }
 
+/* -- motion this window adds to mar-motion.css ------------------------------ */
+
+/* Swap in place: every state in one grid cell, only .is-current changes, so an
+   interrupted swap redirects and nothing can be stranded. The outgoing layer
+   clears quickly and the incoming one is already rising: no empty frame and
+   no readable double image. */
+.mk-stack {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+
+.mk-stack > .mk-layer {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--mar-press) var(--mar-ease-out),
+    visibility 0s linear var(--mar-press);
+}
+
+/* inherit, not visible: a layer inside a hidden layer has to stay hidden. */
+.mk-stack > .mk-layer.is-current {
+  opacity: 1;
+  visibility: inherit;
+  pointer-events: auto;
+  transition:
+    opacity var(--mar-t-2) var(--mar-ease-out),
+    visibility 0s;
+}
+
+/* A menu that stays in the page: comes up from where it opens. */
+.mk-pop {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate3d(0, 12px, 0);
+  transition:
+    opacity var(--mar-t-1) var(--mar-ease-in-out),
+    transform var(--mar-t-1) var(--mar-ease-in-out),
+    visibility 0s linear var(--mar-t-1);
+}
+
+.mk-pop.is-open {
+  opacity: 1;
+  visibility: inherit;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity var(--mar-t-2) var(--mar-ease-out),
+    transform var(--mar-t-2) var(--mar-ease-out),
+    visibility 0s;
+}
+
+.mk-spinner {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: var(--ds-radius-full);
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: mk-spin 800ms linear infinite;
+}
+
+/* Waiting behind another state is not a reason to keep turning. */
+.mk-layer:not(.is-current) .mk-spinner,
+.btn-face:not([data-on]) .mk-spinner {
+  animation: none;
+}
+
+@keyframes mk-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes mk-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* mar-motion's --i, set without touching element.style (the CSP allows only
+   stylesheets): its delay stops growing at step 6. */
+[data-i="0"] { --i: 0; }
+[data-i="1"] { --i: 1; }
+[data-i="2"] { --i: 2; }
+[data-i="3"] { --i: 3; }
+[data-i="4"] { --i: 4; }
+[data-i="5"] { --i: 5; }
+[data-i="6"] { --i: 6; }
+
+/* A card around rows that cascade: same timing, no travel. */
+.mk-cascade-surface {
+  animation: mar-fade-in var(--mar-t-3) var(--mar-ease-out) both;
+  animation-delay: min(calc(var(--i, 0) * var(--mar-stagger)), 240ms);
+}
+
+.mar-press:disabled:active {
+  transform: none;
+}
+
+/* Hover also eases the border; opacity is for a button locking and unlocking. */
+.btn.mar-hover,
+.keycap.mar-hover {
+  transition:
+    background-color var(--mar-hover-out) var(--mar-ease-out),
+    box-shadow var(--mar-hover-out) var(--mar-ease-out),
+    transform var(--mar-press) var(--mar-ease-out),
+    border-color var(--mar-hover-out) var(--mar-ease-out),
+    opacity var(--mar-t-1) var(--mar-ease-out);
+}
+
+.btn.mar-hover:hover,
+.keycap.mar-hover:hover {
+  transition-duration: var(--mar-hover-in), var(--mar-hover-in), var(--mar-press), var(--mar-hover-in), var(--mar-t-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav .nav-highlight {
+    transition: none;
+  }
+
+  .mk-pop {
+    transform: none;
+  }
+
+  .mk-spinner {
+    border-right-color: currentColor;
+    animation: mk-pulse 1200ms ease-in-out infinite;
+  }
+
+  .mk-cascade-surface {
+    animation: mar-fade-in var(--mar-t-1) linear both;
+    animation-delay: 0ms;
+  }
+}
+
 /* -- layout ---------------------------------------------------------------- */
 
 .app {
@@ -203,6 +359,7 @@ button {
   border-radius: 50%;
   background: var(--text-tertiary);
   flex: none;
+  transition: background-color var(--mar-t-2) var(--mar-ease-out);
 }
 
 .brand-status[data-state="ready"] i {
@@ -216,33 +373,60 @@ button {
 }
 
 .nav {
+  --nav-index: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--nav-gap);
+}
+
+.nav[data-active="1"] { --nav-index: 1; }
+.nav[data-active="2"] { --nav-index: 2; }
+.nav[data-active="3"] { --nav-index: 3; }
+.nav[data-active="4"] { --nav-index: 4; }
+.nav[data-active="5"] { --nav-index: 5; }
+.nav[data-active="6"] { --nav-index: 6; }
+
+/* The selected row's background is one element that travels; the rows have
+   one height, so where it goes is plain arithmetic. */
+.nav-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-item-h);
+  border-radius: var(--ds-radius-sm);
+  background: var(--nav-active);
+  transform: translateY(calc(var(--nav-index) * (var(--nav-item-h) + var(--nav-gap))));
+  transition: transform var(--mar-t-3) var(--mar-ease-out);
+}
+
+/* Placed, not travelling, until the first page is on screen. */
+.nav:not([data-active]) .nav-highlight {
+  opacity: 0;
+}
+
+.nav:not(.is-live) .nav-highlight {
+  transition: none;
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
   width: 100%;
-  min-height: 32px;
+  height: var(--nav-item-h);
   border: 0;
   background: transparent;
   border-radius: var(--ds-radius-sm);
   padding: var(--ds-space-1) var(--ds-space-2);
   text-align: left;
   font-size: var(--size-body);
-  transition: background-color var(--ds-motion-micro) var(--ds-ease);
 }
 
-.nav-item:hover {
+.nav-item:hover:not(.active) {
   background: var(--nav-hover);
-}
-
-.nav-item.active {
-  background: var(--nav-active);
-  font-weight: var(--ds-weight-semibold);
 }
 
 .nav-item .ds-tile {
@@ -252,18 +436,160 @@ button {
 
 .sidebar-foot {
   margin-top: auto;
-  padding: var(--ds-space-3) var(--ds-space-2) 0;
-  font-size: var(--size-detail);
-  color: var(--text-tertiary);
+  padding-top: var(--ds-space-3);
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-1);
+  flex: none;
+}
+
+/* -- the account corner ---------------------------------------------------- */
+
+/* One reserved line. A longer message grows upwards into the free part of the
+   sidebar, so nothing under or above it moves. */
+.account-error-slot {
+  position: relative;
+  height: var(--sidebar-meta-h);
+}
+
+.account-error {
+  position: absolute;
+  left: var(--ds-space-2);
+  right: var(--ds-space-2);
+  bottom: 0;
+  margin: 0;
+  font-size: var(--size-detail);
+  line-height: 1.38;
+  color: var(--ds-danger-text);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--mar-t-1) var(--mar-ease-in-out),
+    visibility 0s linear var(--mar-t-1);
+}
+
+.account-error.is-on {
+  opacity: 1;
+  visibility: inherit;
+  transition:
+    opacity var(--mar-t-2) var(--mar-ease-out),
+    visibility 0s;
+}
+
+.account {
+  height: var(--account-h);
+  flex: none;
+}
+
+.account-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  /* A 30 px circle on the tiles' centre line, its label on theirs. */
+  gap: var(--ds-space-1);
+  width: 100%;
+  height: var(--account-h);
+  border: 0;
+  background: transparent;
+  border-radius: var(--ds-radius-sm);
+  padding: 0 var(--ds-space-1);
+  text-align: left;
+  font-size: var(--size-body);
+}
+
+.account-row-quiet {
+  color: var(--text);
+}
+
+button.account-row:hover {
+  background: var(--nav-hover);
+}
+
+button.account-row[aria-expanded="true"] {
+  background: var(--nav-active);
+}
+
+/* Drawn inside: the sidebar clips what spills out of it. */
+.account-row:focus-visible,
+.account-sign-out:focus-visible {
+  outline-offset: -2px;
+}
+
+.account-badge {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--ds-radius-full);
+  background: var(--control-hover);
+  color: var(--text-secondary);
+}
+
+.account-badge .ds-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.account-badge img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-avatar {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--ds-text-micro);
+  font-weight: var(--ds-weight-semibold);
+}
+
+.account-badge-large {
+  width: 36px;
+  height: 36px;
+  font-size: var(--size-body);
+}
+
+.account-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-btn.account-cancel {
+  width: 24px;
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.sidebar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  height: var(--sidebar-meta-h);
+  padding: 0 var(--ds-space-2);
+  font-size: var(--size-detail);
+  line-height: 1.38;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sidebar-version {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .update-dot {
   display: inline-flex;
   align-items: center;
   gap: var(--ds-space-1);
+  flex: none;
   color: var(--accent-ink);
   font-weight: var(--ds-weight-medium);
 }
@@ -277,9 +603,11 @@ button {
 }
 
 .content {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--content-bg);
 }
 
@@ -290,7 +618,7 @@ button {
   align-items: center;
   padding: 0 var(--gutter);
   border-bottom: 1px solid transparent;
-  transition: border-color var(--ds-motion-fast) var(--ds-ease);
+  transition: border-color var(--mar-t-1) var(--mar-ease-out);
 }
 
 .content.scrolled .content-header {
@@ -305,31 +633,81 @@ button {
 
 .pages {
   flex: 1;
-  overflow-y: auto;
-  padding: var(--ds-space-1) var(--gutter) var(--ds-space-8);
+  min-height: 0;
 }
 
+/* A page is its own scroller: it keeps its place while another is on screen.
+   The bar is always reserved, so the column does not shift from a short page
+   to a long one. */
 .page {
-  max-width: 620px;
-  margin: 0 auto;
-  animation: page-in var(--ds-motion-fast) var(--ds-ease-enter);
+  overflow-y: scroll;
+  /* The bottom is deep enough for the last row to scroll clear of a message. */
+  padding: var(--ds-space-1) calc(var(--page-inset) - var(--scrollbar-w)) calc(var(--ds-space-8) * 2 + var(--ds-space-2)) var(--page-inset);
 }
 
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
+/* -- toasts ---------------------------------------------------------------- */
+
+/* Over the pages, under the account menu. They let clicks through to the rows
+   below, except on their own close button. */
+.toasts {
+  position: absolute;
+  left: var(--page-inset);
+  right: var(--page-inset);
+  bottom: var(--ds-space-4);
+  z-index: var(--ds-z-sticky);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-2);
+  pointer-events: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .page,
-  .sheet[open] {
-    animation: none;
-  }
-  * {
-    transition: none !important;
-  }
+/* With the account menu open a message stands beside it, not behind it. */
+:root:has(.account-menu.is-open) .toasts {
+  left: max(var(--page-inset), calc(var(--ds-space-2) + var(--account-menu-w) + var(--ds-space-3) - var(--sidebar-width)));
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  max-width: min(440px, 100%);
+  padding: var(--ds-space-2) var(--ds-space-1) var(--ds-space-2) var(--ds-space-3);
+  background: var(--sheet-bg);
+  border: 1px solid var(--group-border);
+  border-radius: var(--radius-group);
+  box-shadow: var(--sheet-shadow);
+}
+
+.toast-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.toast-icon .ds-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.toast-error .toast-icon {
+  color: var(--danger);
+}
+
+.toast-warn .toast-icon {
+  color: var(--warn);
+}
+
+.toast-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tool-btn.toast-close {
+  width: 24px;
+  flex: none;
+  color: var(--text-secondary);
+  pointer-events: auto;
 }
 
 .page-intro {
@@ -417,7 +795,7 @@ button {
   color: var(--ds-danger-text);
   line-height: 0;
   opacity: 0;
-  transition: opacity var(--ds-motion-fast) var(--ds-ease);
+  transition: opacity var(--mar-t-1) var(--mar-ease-out);
 }
 
 .row-error:not(:empty) {
@@ -447,7 +825,29 @@ button {
   color: #ffffff;
   background: linear-gradient(160deg, #34c759, #1fa846);
   flex: none;
-  transition: background var(--ds-motion-surface) var(--ds-ease);
+  position: relative;
+  isolation: isolate;
+}
+
+/* The other two colours wait on top of the green and fade in, because a
+   gradient itself cannot be animated. */
+.hero-icon::before,
+.hero-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity var(--mar-t-2) var(--mar-ease-out);
+}
+
+.hero-icon::before {
+  background: linear-gradient(160deg, #a1a1a6, #7c7c80);
+}
+
+.hero-icon::after {
+  background: linear-gradient(160deg, #ffb340, #ff9500);
 }
 
 .hero-icon svg {
@@ -455,15 +855,12 @@ button {
   height: 26px;
 }
 
-.hero[data-state="paused"] .hero-icon {
-  background: linear-gradient(160deg, #a1a1a6, #7c7c80);
-}
-
-.hero[data-state="permission"] .hero-icon,
-.hero[data-state="secure_input"] .hero-icon,
-.hero[data-state="unstable"] .hero-icon,
-.hero[data-state="starting"] .hero-icon {
-  background: linear-gradient(160deg, #ffb340, #ff9500);
+.hero[data-state="paused"] .hero-icon::before,
+.hero[data-state="permission"] .hero-icon::after,
+.hero[data-state="secure_input"] .hero-icon::after,
+.hero[data-state="unstable"] .hero-icon::after,
+.hero[data-state="starting"] .hero-icon::after {
+  opacity: 1;
 }
 
 .hero-text {
@@ -600,7 +997,6 @@ button {
   min-height: 24px;
   box-shadow: var(--shadow-control);
   white-space: nowrap;
-  transition: background-color var(--ds-motion-micro) var(--ds-ease), filter var(--ds-motion-micro) var(--ds-ease);
 }
 
 .btn .ds-icon {
@@ -610,25 +1006,26 @@ button {
 }
 
 .btn:hover:not(:disabled) {
-  filter: brightness(0.97);
-}
-
-:root[data-theme="dark"] .btn:hover:not(:disabled) {
-  filter: brightness(1.12);
-}
-
-.btn:active:not(:disabled) {
-  filter: brightness(0.92);
+  background: var(--control-bg-hover);
 }
 
 .btn:disabled {
   opacity: 0.45;
 }
 
+/* The running action stays lit; only its neighbours are locked. */
+.btn[aria-busy="true"]:disabled {
+  opacity: 1;
+}
+
 .btn-primary {
   background: var(--accent);
   border-color: transparent;
   color: var(--accent-text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--ds-accent-hover);
 }
 
 .btn-plain {
@@ -639,8 +1036,7 @@ button {
 }
 
 .btn-plain:hover:not(:disabled) {
-  filter: none;
-  color: var(--text);
+  background: var(--control-hover);
 }
 
 .btn-small {
@@ -652,20 +1048,23 @@ button {
   cursor: progress;
 }
 
-.btn[aria-busy="true"]::before {
-  content: "";
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  animation: spin 0.8s linear infinite;
+/* The idle and the working face share a cell (.mar-state): the button is as
+   wide as the wider one from the start and never changes size. */
+.btn.mar-state {
+  display: inline-grid;
+  place-items: center;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(1turn);
-  }
+.btn-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-1);
+}
+
+.btn .mk-spinner {
+  width: 11px;
+  height: 11px;
 }
 
 .field {
@@ -678,7 +1077,9 @@ button {
   border-radius: var(--radius-control);
   padding: 6px var(--ds-space-2);
   outline: none;
-  transition: border-color var(--ds-motion-micro) var(--ds-ease), box-shadow var(--ds-motion-micro) var(--ds-ease);
+  transition:
+    border-color var(--mar-t-1) var(--mar-ease-out),
+    box-shadow var(--mar-t-1) var(--mar-ease-out);
 }
 
 .field:focus {
@@ -707,7 +1108,7 @@ button {
   background: var(--preview-bg);
   min-height: 34px;
   font-size: var(--ds-text-body);
-  transition: color var(--ds-motion-fast) var(--ds-ease);
+  transition: color var(--mar-t-1) var(--mar-ease-out);
 }
 
 .preview.unchanged {
@@ -744,7 +1145,6 @@ button {
   padding: 3px var(--ds-space-3);
   border-radius: 6px;
   font-size: var(--size-detail);
-  transition: background-color var(--ds-motion-micro) var(--ds-ease);
 }
 
 .segmented button:hover:not([aria-checked="true"]):not(:disabled) {
@@ -787,7 +1187,17 @@ button {
   border-radius: 9px;
   background: var(--track-off);
   position: relative;
-  transition: background-color var(--ds-motion-fast) var(--ds-ease);
+}
+
+/* The accent is a layer that fades in over the grey track. */
+.switch-track::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ds-accent-ui);
+  opacity: 0;
+  transition: opacity var(--mar-t-1) var(--mar-ease-out);
 }
 
 .switch-thumb {
@@ -799,11 +1209,17 @@ button {
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 1px 2px #0000004d;
-  transition: transform var(--ds-motion-fast) var(--ds-ease-spring-soft);
+  transition: transform var(--mar-t-1) var(--mar-ease-out);
 }
 
-.switch input:checked + .switch-track {
-  background: var(--ds-accent-ui);
+@media (prefers-reduced-motion: reduce) {
+  .switch-thumb {
+    transition: none;
+  }
+}
+
+.switch input:checked + .switch-track::before {
+  opacity: 1;
 }
 
 .switch input:checked + .switch-track .switch-thumb {
@@ -854,11 +1270,6 @@ button {
   gap: 2px;
   height: 100%;
   justify-content: center;
-  transition: transform 80ms var(--ds-ease), box-shadow var(--ds-motion-micro) var(--ds-ease), border-color var(--ds-motion-micro) var(--ds-ease);
-}
-
-.keycap:active {
-  transform: translateY(1px);
 }
 
 .keycap-symbol {
@@ -1083,18 +1494,19 @@ button {
 }
 
 .sheet::backdrop {
+  background: transparent;
+}
+
+.sheet:not([data-open]) {
+  pointer-events: none;
+}
+
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ds-z-sheet);
   background: var(--ds-overlay);
-}
-
-.sheet[open] {
-  animation: sheet-in var(--ds-motion-surface) var(--ds-ease-enter);
-}
-
-@keyframes sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.98);
-  }
+  pointer-events: none;
 }
 
 .sheet-inner {
@@ -1133,6 +1545,7 @@ button {
 
 .picker-list .app-item {
   cursor: default;
+  transition: background-color var(--mar-hover-out) var(--mar-ease-out);
 }
 
 .picker-list .app-item:hover {
@@ -1359,7 +1772,6 @@ button {
 
 .chips button:hover {
   background: var(--control-hover);
-  color: var(--text);
 }
 
 /* -- abbreviations ----------------------------------------------------------- */
@@ -1472,4 +1884,181 @@ button {
   width: 60px;
   height: 22px;
   display: block;
+}
+
+/* -- account menu ------------------------------------------------------------ */
+
+/* Rises from the corner. The head and «Выйти» stay put; what is between them
+   scrolls when the window is short. */
+.account-menu {
+  --menu-bottom: calc(var(--ds-space-3) + var(--sidebar-meta-h) + var(--ds-space-1) + var(--account-h) + var(--ds-space-1));
+  position: fixed;
+  left: var(--ds-space-2);
+  bottom: var(--menu-bottom);
+  z-index: var(--ds-z-sheet);
+  width: min(var(--account-menu-w), calc(100vw - var(--ds-space-4)));
+  max-height: calc(100vh - var(--menu-bottom) - var(--titlebar-height));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--sheet-bg);
+  border: 1px solid var(--group-border);
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--sheet-shadow);
+}
+
+/* A window this short brings the menu up to the logo: it clears it or covers
+   it whole, and never leaves a sliver. Windows draws the logo higher and is
+   clear at any allowed height. */
+@media (max-height: 510px) {
+  :root:not([data-platform="windows"]) .account-menu {
+    height: calc(100vh - var(--menu-bottom) - var(--titlebar-height));
+  }
+}
+
+.account-menu:focus {
+  outline: none;
+}
+
+.account-menu-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  flex: none;
+  border-bottom: 1px solid var(--separator);
+}
+
+.account-menu-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-menu-name {
+  font-weight: var(--ds-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-service {
+  font-size: var(--size-detail);
+  color: var(--text-secondary);
+}
+
+.account-menu-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--ds-space-3) var(--ds-space-3);
+}
+
+.account-sync-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  margin: var(--ds-space-3) var(--ds-space-1) var(--ds-space-2);
+}
+
+.account-sync-head .group-header {
+  margin: 0;
+  flex: none;
+}
+
+/* Three rows always fit, so the menu is the same height in every state. */
+.account-sets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: calc(var(--account-set-h) * 3 + 2px);
+}
+
+.account-set {
+  height: var(--account-set-h);
+  padding-block: var(--ds-space-1);
+}
+
+.account-set-title,
+.account-set-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sets-empty {
+  min-height: calc(var(--account-set-h) * 3);
+  display: grid;
+  place-items: center;
+  padding: var(--ds-space-3);
+  color: var(--text-secondary);
+  font-size: var(--size-detail);
+  text-align: center;
+}
+
+.account-set-skeleton {
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--ds-space-1);
+}
+
+.account-set-skeleton .ds-skeleton {
+  width: 64%;
+}
+
+.account-set-skeleton .ds-skeleton--line-sm {
+  width: 44%;
+}
+
+.account-sync {
+  min-width: 0;
+  height: var(--sidebar-meta-h);
+  margin: 0;
+  font-size: var(--size-detail);
+  line-height: 1.38;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-sync[data-state="error"] {
+  color: var(--ds-danger-text);
+}
+
+.account-sync[data-state="refused"] {
+  color: var(--warn);
+}
+
+.account-menu-foot {
+  flex: none;
+  padding: var(--ds-space-1);
+  border-top: 1px solid var(--separator);
+}
+
+.account-sign-out {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  width: 100%;
+  height: var(--nav-item-h);
+  border: 0;
+  border-radius: var(--ds-radius-xs);
+  background: transparent;
+  padding: 0 var(--ds-space-2);
+  color: var(--text);
+  text-align: left;
+}
+
+.account-sign-out .ds-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.account-sign-out:hover {
+  background: var(--control-hover);
 }

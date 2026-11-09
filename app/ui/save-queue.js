@@ -13,5 +13,12 @@ globalThis.RekeyConfigWriter = function ({ readState, writeState, toConfig, onSt
       tail = task.catch(() => {});
       return task;
     },
+    // Take a change made elsewhere. It waits its turn: read too early, it would
+    // arrive after a queued write has finished and put the old state back.
+    reload() {
+      const task = tail.then(async () => onState(await readState()));
+      tail = task.catch(() => {});
+      return task;
+    },
   };
 };
