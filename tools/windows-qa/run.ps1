@@ -14,6 +14,7 @@ New-Item -ItemType Directory -Force -Path $Out | Out-Null
 
 $Here = Join-Path $Repo 'tools\windows-qa'
 Add-Type -Path (Join-Path $Here 'QaNative.cs') -ReferencedAssemblies System.Drawing, System.Windows.Forms
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
 $InstallDir = Join-Path $env:LOCALAPPDATA 'MarKey'
 $Exe = Join-Path $InstallDir 'markey.exe'
@@ -29,10 +30,8 @@ $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $MockLog = Join-Path $Out 'mock.log'
 $StateFile = Join-Path $Out 'target.state'
 $Port = 8788
-$DebugPort = 9341
 $Desktop = Join-Path ([Environment]::GetFolderPath('Desktop')) 'MarKey.lnk'
 $Menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'MarKey.lnk'
-[Net.WebRequest]::DefaultWebProxy = $null
 
 $script:Lines = New-Object System.Collections.ArrayList
 $script:Failed = 0
@@ -92,32 +91,18 @@ function Get-MainWindow {
 function Start-MarKey {
     $env:MARKEY_LOG = 'debug'
     $env:MARKEY_IDENTITY_URL = "http://127.0.0.1:$Port"
-    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DebugPort"
     return Start-Process -FilePath $Exe -PassThru
 }
 
-# Runs an expression in the settings window, the way a person's click would reach it.
-function Invoke-Page([string]$Expression) {
-    $page = Invoke-RestMethod "http://127.0.0.1:$DebugPort/json/list" | Where-Object { $_.type -eq 'page' } | Select-Object -First 1
-    $socket = New-Object System.Net.WebSockets.ClientWebSocket
-    $none = [Threading.CancellationToken]::None
-    try {
-        $socket.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $none).Wait()
-        $request = @{ id = 1; method = 'Runtime.evaluate'; params = @{ expression = $Expression; returnByValue = $true } } | ConvertTo-Json -Compress
-        $bytes = [Text.Encoding]::UTF8.GetBytes($request)
-        $socket.SendAsync((New-Object 'ArraySegment[byte]' -ArgumentList @(, $bytes)), 'Text', $true, $none).Wait()
-        for ($try = 0; $try -lt 50; $try++) {
-            $text = ''
-            do {
-                $buffer = New-Object byte[] 65536
-                $task = $socket.ReceiveAsync((New-Object 'ArraySegment[byte]' -ArgumentList @(, $buffer)), $none)
-                $task.Wait()
-                $text += [Text.Encoding]::UTF8.GetString($buffer, 0, $task.Result.Count)
-            } while (-not $task.Result.EndOfMessage)
-            $reply = $text | ConvertFrom-Json
-            if ($reply.id -eq 1) { return $reply.result.result.value }
-        }
-    } finally { $socket.Dispose() }
+# The autostart switch in the settings window, found the way a screen reader finds it.
+function Get-LaunchSwitch {
+    $root = [Windows.Automation.AutomationElement]::FromHandle([IntPtr](Get-MainWindow).Hwnd)
+    $scope = [Windows.Automation.TreeScope]::Descendants
+    $page = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, 'Дополнительно')
+    $root.FindFirst($scope, $page).GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $id = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty, 'launch')
+    [void](Wait-Until { $script:found = $root.FindFirst($scope, $id); $null -ne $script:found } 5 100)
+    return $script:found.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
 }
 
 function Get-Autostart { return (Get-ItemProperty -Path $RunKey -ErrorAction SilentlyContinue).MarKey }
@@ -344,17 +329,18 @@ Step 'markey:// links through the system' {
 Step 'Autostart on and off' {
     if (-not (Get-MainWindow)) { [void](Start-Process 'markey://'); [void](Wait-Until { Get-MainWindow } 15) }
     Check 'The Run entry names the installed program' ("$(Get-Autostart)" -like "*$Exe*") (Get-Autostart)
-    Check 'The window shows the switch on' ((Invoke-Page "document.getElementById('launch').checked") -eq $true)
-    [void](Invoke-Page "document.getElementById('launch').click()")
+    $switch = Get-LaunchSwitch
+    Check 'The window shows the switch on' ("$($switch.Current.ToggleState)" -eq 'On') $switch.Current.ToggleState
+    $switch.Toggle()
     Check 'Turning it off removes the Run entry' (Wait-Until { -not (Get-Autostart) } 10) (Get-Autostart)
     Check 'Off is saved in the settings' (Wait-Until { ((Read-Shared $Settings) | ConvertFrom-Json).launch_at_login -eq $false } 10)
-    [void](Invoke-Page "document.getElementById('launch').click()")
+    $switch.Toggle()
     Check 'Turning it on brings the Run entry back' (Wait-Until { "$(Get-Autostart)" -like "*$Exe*" } 10) (Get-Autostart)
     Check 'On is saved in the settings' (Wait-Until { ((Read-Shared $Settings) | ConvertFrom-Json).launch_at_login -eq $true } 10)
     $command = Get-Autostart
     Get-MarKey | Stop-Process -Force
     Check 'MarKey stopped before the login check' (Wait-Until { (Get-MarKey).Count -eq 0 } 10)
-    $program = if ($command.StartsWith('"')) { $command.Split('"')[1] } else { $command.Split(' ')[0] }
+    $program = if ($command.StartsWith('"')) { $command.Split('"')[1] } else { $command.Trim() }
     [void](Start-Process -FilePath $program)
     Check 'The Run entry starts MarKey' (Wait-Until { (Get-MarKey).Count -eq 1 } 20) $command
     Start-Sleep -Seconds 3
@@ -432,6 +418,17 @@ Step 'Silent uninstall /S and what stays on disk' {
     }
     $left | Set-Content -LiteralPath (Join-Path $Out 'left-on-disk.txt') -Encoding UTF8
     Note ("Left on disk: " + (($left | Select-Object -First 24) -join '; '))
+}
+
+Step 'Install again over the settings that stayed' {
+    $run = Start-Process -FilePath $Installer -ArgumentList '/S' -Wait -PassThru
+    Check 'Installer exit code 0' ($run.ExitCode -eq 0) "exit $($run.ExitCode)"
+    [void](Start-MarKey)
+    Check 'MarKey starts' (Wait-Until { (Get-MarKey).Count -eq 1 } 20)
+    Check 'The setting was on, so the Run entry comes back' (Wait-Until { "$(Get-Autostart)" -like "*$Exe*" } 15) (Get-Autostart)
+    $run = Start-Process -FilePath (Join-Path $InstallDir 'uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+    Check 'Program files are removed again' (Wait-Until { -not (Test-Path -LiteralPath $Exe) } 60)
+    Check 'Autostart entry removed again' (Wait-Until { -not (Get-Autostart) } 10)
 }
 
 if ($script:target) { Stop-Process -Id $script:target.Id -Force -ErrorAction SilentlyContinue }
