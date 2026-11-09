@@ -578,7 +578,7 @@ struct Opener(AppHandle);
 
 impl account::LinkOpener for Opener {
     fn open_hub(&self, url: &str, silent: bool) -> bool {
-        marhub_open::open_hub(url, silent)
+        identity::hub_serves(&identity::base_url()) && marhub_open::open_hub(url, silent)
     }
 
     fn open_browser(&self, url: &str) -> bool {

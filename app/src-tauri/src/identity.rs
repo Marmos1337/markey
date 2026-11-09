@@ -120,6 +120,14 @@ pub fn same_text(a: &str, b: &str) -> bool {
             == 0
 }
 
+/// MarHub signs in against the real server only. Against any other server its
+/// code means nothing and would be handed to a server it was not issued for, so
+/// then MarHub is not asked at all: no silent sign-in, and the button goes to
+/// the browser.
+pub fn hub_serves(base: &str) -> bool {
+    base == DEFAULT_BASE
+}
+
 /// `marhub://sso/authorize?…`.
 pub fn hub_authorize_url(state: &str, challenge: &str, silent: bool) -> String {
     let mut url = Url::parse(HUB_AUTHORIZE).expect("the constant is a URL");
@@ -768,6 +776,17 @@ fn clean_data_avatar(source: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::testing::{refused_base, Reply, Server};
+
+    #[test]
+    fn marhub_is_asked_only_for_the_server_it_signs_in_to() {
+        assert!(hub_serves(DEFAULT_BASE));
+        assert!(hub_serves(
+            &clean_base("https://hub.mic.marhub.ru/").unwrap()
+        ));
+        for other in ["http://127.0.0.1:8788", "https://another.example"] {
+            assert!(!hub_serves(&clean_base(other).unwrap()), "{other}");
+        }
+    }
 
     #[test]
     fn pkce_matches_rfc_7636_appendix_b() {
