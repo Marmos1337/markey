@@ -776,6 +776,37 @@ fn ensure_run_key() {
     }
 }
 
+/// Is the setting on with no entry in the Run key? The uninstaller removes the
+/// entry and keeps the settings, so after a reinstall the switch said "on" and
+/// MarKey did not start at login. Task Manager's own off switch leaves the Run
+/// value in place, so that choice is not undone here.
+#[cfg(any(windows, test))]
+fn login_entry_lost(wanted: bool, entry_present: bool) -> bool {
+    wanted && !entry_present
+}
+
+#[cfg(windows)]
+fn run_entry_present(app: &AppHandle) -> bool {
+    use windows::core::{w, HSTRING, PCWSTR};
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let name = HSTRING::from(app.package_info().name.as_str());
+    // SAFETY: both strings outlive the call, and with no data pointer it only
+    // reports whether the value is there.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            PCWSTR(name.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            None,
+            None,
+        )
+    };
+    status == ERROR_SUCCESS
+}
+
 fn apply_launch_at_login(app: &AppHandle, enabled: bool) {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
@@ -1362,6 +1393,11 @@ fn main() {
                 settings.launch_at_login = true;
                 apply_launch_at_login(&handle, true);
             }
+            #[cfg(windows)]
+            if login_entry_lost(settings.launch_at_login, run_entry_present(&handle)) {
+                log::info!("the autostart entry is gone while the setting is on; restoring it");
+                apply_launch_at_login(&handle, true);
+            }
             if let Err(e) = settings.save() {
                 log::warn!("cannot save settings: {e}");
             }
@@ -1532,6 +1568,14 @@ fn main() {
 mod tests {
     use super::*;
     use rekey_core::config::{Modifier, Sensitivity, Shortcut};
+
+    #[test]
+    fn a_lost_autostart_entry_is_restored_only_when_the_setting_is_on() {
+        assert!(login_entry_lost(true, false), "removed by the uninstaller");
+        assert!(!login_entry_lost(true, true));
+        assert!(!login_entry_lost(false, false), "turned off on purpose");
+        assert!(!login_entry_lost(false, true));
+    }
 
     #[test]
     fn a_failed_save_leaves_the_words_switch_as_it_was() {
