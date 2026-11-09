@@ -573,17 +573,32 @@ fn set_cloud_words(
     Ok(account_view(&state))
 }
 
+/// MarHub, for the server the account talks to and no other.
+struct HubGate {
+    base: String,
+    open: fn(&str, bool) -> bool,
+}
+
+impl HubGate {
+    fn open(&self, url: &str, silent: bool) -> bool {
+        identity::hub_serves(&self.base) && (self.open)(url, silent)
+    }
+}
+
 /// The real ways out of MarKey for sign-in links.
-struct Opener(AppHandle);
+struct Opener {
+    app: AppHandle,
+    hub: HubGate,
+}
 
 impl account::LinkOpener for Opener {
     fn open_hub(&self, url: &str, silent: bool) -> bool {
-        identity::hub_serves(&identity::base_url()) && marhub_open::open_hub(url, silent)
+        self.hub.open(url, silent)
     }
 
     fn open_browser(&self, url: &str) -> bool {
         use tauri_plugin_opener::OpenerExt;
-        self.0.opener().open_url(url, None::<&str>).is_ok()
+        self.app.opener().open_url(url, None::<&str>).is_ok()
     }
 }
 
@@ -1550,7 +1565,13 @@ fn main() {
                 client: Arc::new(identity::Client::new(&identity_base)),
                 store: sealed::system(),
                 clock: Arc::new(account::SystemClock),
-                opener: Arc::new(Opener(handle.clone())),
+                opener: Arc::new(Opener {
+                    app: handle.clone(),
+                    hub: HubGate {
+                        base: identity_base.clone(),
+                        open: marhub_open::open_hub,
+                    },
+                }),
                 prefs: Arc::new(SettingsPrefs(settings.clone())),
                 events: Arc::new(AccountHost(handle.clone())),
             }));
@@ -1661,6 +1682,28 @@ fn main() {
 mod tests {
     use super::*;
     use rekey_core::config::{Modifier, Sensitivity, Shortcut};
+
+    #[test]
+    fn marhub_is_opened_only_for_the_server_the_account_talks_to() {
+        use std::sync::atomic::AtomicUsize;
+        static OPENED: AtomicUsize = AtomicUsize::new(0);
+        fn open(_: &str, _: bool) -> bool {
+            OPENED.fetch_add(1, Ordering::SeqCst);
+            true
+        }
+        let other = HubGate {
+            base: "http://127.0.0.1:8788".to_string(),
+            open,
+        };
+        assert!(!other.open("marhub://sso/authorize", true));
+        assert_eq!(OPENED.load(Ordering::SeqCst), 0, "MarHub was not started");
+        let real = HubGate {
+            base: identity::DEFAULT_BASE.to_string(),
+            open,
+        };
+        assert!(real.open("marhub://sso/authorize", true));
+        assert_eq!(OPENED.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn a_lost_autostart_entry_is_restored_only_when_the_setting_is_on() {
