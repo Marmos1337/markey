@@ -776,35 +776,112 @@ fn ensure_run_key() {
     }
 }
 
-/// Is the setting on with no entry in the Run key? The uninstaller removes the
-/// entry and keeps the settings, so after a reinstall the switch said "on" and
-/// MarKey did not start at login. Task Manager's own off switch leaves the Run
-/// value in place, so that choice is not undone here.
+/// Is the setting on with no working entry in the Run key? The uninstaller
+/// removes the entry and keeps the settings, so after a reinstall the switch
+/// said "on" and MarKey did not start at login. An entry without quotes does
+/// not work either once the profile path has a space in it.
 #[cfg(any(windows, test))]
-fn login_entry_lost(wanted: bool, entry_present: bool) -> bool {
-    wanted && !entry_present
+fn login_entry_lost(wanted: bool, entry: Option<&str>) -> bool {
+    wanted && !entry.is_some_and(|command| command.starts_with('"'))
 }
 
+/// The Run value for `exe`. MarKey registers no launch arguments.
+#[cfg(any(windows, test))]
+fn run_command(exe: &str) -> String {
+    format!("\"{exe}\"")
+}
+
+/// What the Run key holds for MarKey, when it holds anything.
 #[cfg(windows)]
-fn run_entry_present(app: &AppHandle) -> bool {
+fn run_entry(app: &AppHandle) -> Option<String> {
     use windows::core::{w, HSTRING, PCWSTR};
     use windows::Win32::Foundation::ERROR_SUCCESS;
     use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let key = w!(r"Software\Microsoft\Windows\CurrentVersion\Run");
     let name = HSTRING::from(app.package_info().name.as_str());
-    // SAFETY: both strings outlive the call, and with no data pointer it only
-    // reports whether the value is there.
+    let mut size = 0u32;
+    // SAFETY: both strings outlive the call; with no data pointer it only
+    // writes the size.
     let status = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
-            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            key,
             PCWSTR(name.as_ptr()),
             RRF_RT_REG_SZ,
             None,
             None,
-            None,
+            Some(&mut size),
         )
     };
-    status == ERROR_SUCCESS
+    if status != ERROR_SUCCESS || size == 0 {
+        return None;
+    }
+    let mut buffer = vec![0u16; (size as usize).div_ceil(2)];
+    // SAFETY: `buffer` holds at least `size` bytes, and `size` tells the call so.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key,
+            PCWSTR(name.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            Some(buffer.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
+    };
+    if status != ERROR_SUCCESS {
+        return None;
+    }
+    let length = buffer.iter().position(|c| *c == 0).unwrap_or(buffer.len());
+    Some(String::from_utf16_lossy(&buffer[..length]))
+}
+
+/// Put quotes around the path in the Run value. The autostart plugin writes it
+/// bare, and in a profile like `C:\Users\Ivan Petrov` Windows then looks for
+/// `C:\Users\Ivan` and silently starts nothing.
+#[cfg(windows)]
+fn quote_run_entry(app: &AppHandle) {
+    use windows::core::{w, HSTRING, PCWSTR};
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_SZ,
+    };
+    let exe = match std::env::current_exe() {
+        Ok(exe) => exe,
+        Err(e) => {
+            log::warn!("cannot find the program to start at login: {e}");
+            return;
+        }
+    };
+    let command = run_command(&exe.to_string_lossy());
+    let bytes: Vec<u8> = command
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let name = HSTRING::from(app.package_info().name.as_str());
+    let mut key = HKEY::default();
+    // SAFETY: the strings are static or outlive the call, and `key` outlives it.
+    let status = unsafe {
+        RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            None,
+            KEY_SET_VALUE,
+            &mut key,
+        )
+    };
+    if status.is_err() {
+        log::warn!("cannot open the autostart key: {status:?}");
+        return;
+    }
+    // SAFETY: `key` was opened just above, `name` and `bytes` outlive the call,
+    // and `bytes` is a NUL-terminated UTF-16 string, as REG_SZ wants.
+    let status = unsafe { RegSetValueExW(key, PCWSTR(name.as_ptr()), None, REG_SZ, Some(&bytes)) };
+    // SAFETY: closed once.
+    let _ = unsafe { RegCloseKey(key) };
+    if status.is_err() {
+        log::warn!("cannot quote the autostart entry: {status:?}");
+    }
 }
 
 fn apply_launch_at_login(app: &AppHandle, enabled: bool) {
@@ -813,7 +890,12 @@ fn apply_launch_at_login(app: &AppHandle, enabled: bool) {
     let result = if enabled {
         #[cfg(windows)]
         ensure_run_key();
-        manager.enable()
+        let result = manager.enable();
+        #[cfg(windows)]
+        if result.is_ok() {
+            quote_run_entry(app);
+        }
+        result
     } else {
         manager.disable()
     };
@@ -1394,9 +1476,20 @@ fn main() {
                 apply_launch_at_login(&handle, true);
             }
             #[cfg(windows)]
-            if login_entry_lost(settings.launch_at_login, run_entry_present(&handle)) {
-                log::info!("the autostart entry is gone while the setting is on; restoring it");
-                apply_launch_at_login(&handle, true);
+            {
+                let entry = run_entry(&handle);
+                if login_entry_lost(settings.launch_at_login, entry.as_deref()) {
+                    log::info!(
+                        "the autostart entry does not work while the setting is on; repairing it"
+                    );
+                    // An entry that exists only gets its quotes: enabling again
+                    // would also undo an off switch set in Task Manager.
+                    if entry.is_some() {
+                        quote_run_entry(&handle);
+                    } else {
+                        apply_launch_at_login(&handle, true);
+                    }
+                }
             }
             if let Err(e) = settings.save() {
                 log::warn!("cannot save settings: {e}");
@@ -1571,10 +1664,25 @@ mod tests {
 
     #[test]
     fn a_lost_autostart_entry_is_restored_only_when_the_setting_is_on() {
-        assert!(login_entry_lost(true, false), "removed by the uninstaller");
-        assert!(!login_entry_lost(true, true));
-        assert!(!login_entry_lost(false, false), "turned off on purpose");
-        assert!(!login_entry_lost(false, true));
+        let quoted = r#""C:\Users\Ivan Petrov\AppData\Local\MarKey\markey.exe""#;
+        assert!(login_entry_lost(true, None), "removed by the uninstaller");
+        assert!(!login_entry_lost(true, Some(quoted)));
+        assert!(!login_entry_lost(false, None), "turned off on purpose");
+        assert!(!login_entry_lost(false, Some(quoted)));
+    }
+
+    #[test]
+    fn an_autostart_entry_without_quotes_counts_as_lost() {
+        let bare = r"C:\Users\Ivan Petrov\AppData\Local\MarKey\markey.exe ";
+        assert!(login_entry_lost(true, Some(bare)));
+        assert!(!login_entry_lost(false, Some(bare)), "the setting is off");
+    }
+
+    #[test]
+    fn the_autostart_command_is_the_quoted_path() {
+        let command = run_command(r"C:\Users\Ivan Petrov\MarKey\markey.exe");
+        assert_eq!(command, r#""C:\Users\Ivan Petrov\MarKey\markey.exe""#);
+        assert!(!login_entry_lost(true, Some(&command)));
     }
 
     #[test]
