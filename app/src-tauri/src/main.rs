@@ -1268,8 +1268,6 @@ fn build_tray(app: &AppHandle, engine: SharedEngine) -> tauri::Result<()> {
 }
 
 fn main() {
-    logging::init(settings::config_dir().join("markey.log"));
-
     tauri::Builder::default()
         // Registered first, so a second launch exits before doing anything.
         // A launch carrying a link is that link arriving, which comes through
@@ -1309,6 +1307,11 @@ fn main() {
             set_cloud_words
         ])
         .setup(|app| {
+            // Here, past the single-instance plugin: a second copy only passes
+            // on its arguments and leaves, and starting the log rotates it.
+            // Each markey:// link on Windows is such a copy.
+            logging::init(settings::config_dir().join("markey.log"));
+
             // Tauri sets NSApplicationActivationPolicyRegular by default, which
             // overrides LSUIElement — so the app would appear in the Dock.
             #[cfg(target_os = "macos")]

@@ -60,8 +60,14 @@ function Wait-Until([scriptblock]$Done, [int]$Seconds = 30, [int]$StepMs = 250) 
 
 function Read-Shared([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return '' }
-    $stream = [IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite,Delete')
-    try { return (New-Object IO.StreamReader($stream, [Text.Encoding]::UTF8)).ReadToEnd() } finally { $stream.Dispose() }
+    # The file may be in the middle of being replaced.
+    for ($try = 0; $try -lt 40; $try++) {
+        try {
+            $stream = [IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite,Delete')
+            try { return (New-Object IO.StreamReader($stream, [Text.Encoding]::UTF8)).ReadToEnd() } finally { $stream.Dispose() }
+        } catch [IO.IOException] { Start-Sleep -Milliseconds 25 }
+    }
+    return ''
 }
 
 function Get-MarKey { return @(Get-Process -Name markey -ErrorAction SilentlyContinue) }
@@ -193,8 +199,7 @@ Step 'First launch: the window paints' {
     Check 'Report: no token words' (-not ((Read-Shared $Report) -match 'token|verifier|password'))
     Copy-Item -LiteralPath $Report -Destination (Join-Path $Out 'markey.json') -ErrorAction SilentlyContinue
     Note "Permissions in the report: $($json.permissions | ConvertTo-Json -Compress)"
-    $run = Get-ItemProperty -Path $RunKey -ErrorAction SilentlyContinue
-    Note "Autostart value: $($run.MarKey)"
+    Check 'A new installation starts at login' (Wait-Until { (Get-ItemProperty -Path $RunKey -ErrorAction SilentlyContinue).MarKey } 15) (Get-ItemProperty -Path $RunKey -ErrorAction SilentlyContinue).MarKey
 }
 
 Step 'The keyboard hook corrects real typing' {
@@ -252,7 +257,8 @@ Step 'The keyboard hook corrects real typing' {
     [QaNative]::Type(' ')
     Start-Sleep -Milliseconds 900
     $text = (Target-State).normal
-    Check 'A click stops tracking: nothing is rewritten' ($text -cmatch '^ ?ghjtrn ?$') "got [$text]"
+    # The space lands wherever the click put the caret; the letters must stay Latin.
+    Check 'A click stops tracking: nothing is rewritten' (($text -replace ' ', '') -ceq 'ghjtrn') "got [$text]"
 
     Set-Clipboard -Value 'QA-SENTINEL'
     Prepare 'normal' 'en'
@@ -269,6 +275,7 @@ Step 'The keyboard hook corrects real typing' {
 
 Step 'markey:// links through the system' {
     $count = (Get-MarKey).Count
+    $rotated = (Get-Item -LiteralPath "$Log.1" -ErrorAction SilentlyContinue).LastWriteTimeUtc
     $from = (Read-Shared $Log).Length
     Start-Process 'markey://auth?code=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&state=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
     $ignored = Wait-Until { (Read-Shared $Log).Substring($from) -match 'matched no waiting attempt' } 20
@@ -281,6 +288,7 @@ Step 'markey:// links through the system' {
     Start-Process 'markey://'
     Check 'A bare markey:// shows the settings' (Wait-Until { Get-MainWindow } 20)
     Check 'Still one markey.exe' (Wait-Until { (Get-MarKey).Count -eq $count } 15) "count $((Get-MarKey).Count)"
+    Check 'A link does not rotate the log of the running copy' ((Get-Item -LiteralPath "$Log.1" -ErrorAction SilentlyContinue).LastWriteTimeUtc -eq $rotated)
     Check 'The log holds no link contents' (-not ((Read-Shared $Log) -match 'AAAAAAAA|BBBBBBBB|code='))
 }
 

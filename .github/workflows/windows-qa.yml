@@ -33,6 +33,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
 
@@ -42,6 +43,9 @@ jobs:
 
       - name: Build language models
         run: cargo run --release -p modelgen -- tools/.cache crates/rekey-core/data/models
+
+      - name: Clippy
+        run: cargo clippy -p rekey-app -p rekey-hook --all-targets -- -D warnings
 
       # DPAPI, the registry check for MarHub and the rest of the Windows paths,
       # on Windows for real.
@@ -69,6 +73,49 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: markey-windows-installer
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: Mac installer (Apple Silicon)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Fetch corpora
+        run: ./tools/fetch_corpora.sh
+
+      - name: Build language models
+        run: cargo run --release -p modelgen -- tools/.cache crates/rekey-core/data/models
+
+      - name: Clippy
+        run: cargo clippy -p rekey-app -p rekey-hook --all-targets -- -D warnings
+
+      - name: Build the app and the DMG
+        working-directory: app/src-tauri
+        run: npx --yes @tauri-apps/cli@2 build --bundles app,dmg
+
+      - name: The bundle is signed as a whole and answers markey://
+        run: |
+          app=target/release/bundle/macos/MarKey.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes:0:CFBundleURLSchemes:0" "$app/Contents/Info.plist" | grep -qx markey
+          mkdir dist
+          cp target/release/bundle/dmg/*.dmg dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markey-macos-installer
           path: dist/
           if-no-files-found: error
           retention-days: 14
