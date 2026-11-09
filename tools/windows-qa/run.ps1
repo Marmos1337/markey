@@ -178,6 +178,7 @@ Step 'Silent install /S' {
 }
 
 Step 'First launch: the window paints' {
+    Note "Run key exists before the first launch: $(Test-Path $RunKey)"
     [void](Start-MarKey)
     Check 'Window appears' (Wait-Until { Get-MainWindow } 60)
     $seen = Wait-Until {
@@ -365,7 +366,9 @@ Step 'Silent uninstall /S and what stays on disk' {
 
 if ($script:target) { Stop-Process -Id $script:target.Id -Force -ErrorAction SilentlyContinue }
 if ($script:mock) { Stop-Process -Id $script:mock.Id -Force -ErrorAction SilentlyContinue }
-Copy-Item -LiteralPath $Log -Destination (Join-Path $Out 'markey.log') -ErrorAction SilentlyContinue
+foreach ($file in Get-ChildItem -LiteralPath $Data -Filter 'markey.log*' -ErrorAction SilentlyContinue) {
+    Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $Out $file.Name) -ErrorAction SilentlyContinue
+}
 
 $summary = @("## Windows QA: $($script:Passed) passed, $($script:Failed) failed", '', '| | Check | Detail |', '|---|---|---|') + $script:Lines
 $summary | Set-Content -LiteralPath (Join-Path $Out 'report.md') -Encoding UTF8

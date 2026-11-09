@@ -742,10 +742,46 @@ fn attach_assist(engine: &mut Engine, settings: &Settings) {
     }
 }
 
+/// The autostart plugin only opens the Run key, and a new Windows profile may
+/// not have one yet: on Windows Server 2025 MarKey silently did not start at
+/// login.
+#[cfg(windows)]
+fn ensure_run_key() {
+    use windows::core::{w, PCWSTR};
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegCreateKeyExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE,
+        REG_OPTION_NON_VOLATILE,
+    };
+    let mut key = HKEY::default();
+    // SAFETY: the strings are static and `key` outlives the call; a key that
+    // already exists is just opened.
+    let status = unsafe {
+        RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            None,
+            PCWSTR::null(),
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            None,
+            &mut key,
+            None,
+        )
+    };
+    if status.is_ok() {
+        // SAFETY: the key was opened just above and is closed once.
+        let _ = unsafe { RegCloseKey(key) };
+    } else {
+        log::warn!("cannot create the autostart key: {status:?}");
+    }
+}
+
 fn apply_launch_at_login(app: &AppHandle, enabled: bool) {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
     let result = if enabled {
+        #[cfg(windows)]
+        ensure_run_key();
         manager.enable()
     } else {
         manager.disable()
