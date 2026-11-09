@@ -4,9 +4,13 @@ param(
     [Parameter(Mandatory = $true)][string]$Installer,
     [Parameter(Mandatory = $true)][string]$Out,
     [Parameter(Mandatory = $true)][string]$Repo,
-    # A computer someone uses rather than a throw-away one. Nothing about the
-    # machine changes, nobody signs in, the clipboard is only read, the screen is
-    # not captured, keys reach only the test window, and the layout goes back.
+    # Somewhere other than the default, for a path with a space in it.
+    [string]$InstallDir = '',
+    # A computer someone uses rather than a throw-away one. MarKey itself is
+    # installed and removed as usual and its settings stay afterwards. The
+    # language list and browser policy are left alone, nobody signs in, the
+    # clipboard is only read, the screen is not captured, keys reach only the
+    # test window, and the layout goes back.
     [switch]$ThisPc
 )
 $ErrorActionPreference = 'Continue'
@@ -16,7 +20,7 @@ $Here = Join-Path $Repo 'tools\windows-qa'
 Add-Type -Path (Join-Path $Here 'QaNative.cs') -ReferencedAssemblies System.Drawing, System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
-$InstallDir = Join-Path $env:LOCALAPPDATA 'MarKey'
+if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA 'MarKey'; $Silent = @('/S') } else { $Silent = @('/S', "/D=$InstallDir") }
 $Exe = Join-Path $InstallDir 'markey.exe'
 $Data = Join-Path $env:APPDATA 'com.marmos.markey'
 $Log = Join-Path $Data 'markey.log'
@@ -190,7 +194,7 @@ if ($ThisPc) { Step 'Keyboard layouts as they are' {
 } }
 
 Step 'Silent install /S' {
-    $run = Start-Process -FilePath $Installer -ArgumentList '/S' -Wait -PassThru
+    $run = Start-Process -FilePath $Installer -ArgumentList $Silent -Wait -PassThru
     Check 'Installer exit code 0' ($run.ExitCode -eq 0) "exit $($run.ExitCode)"
     Check 'markey.exe installed for this user' (Test-Path -LiteralPath $Exe) $Exe
     Check 'Models installed' ((Get-ChildItem (Join-Path $InstallDir 'models') -Filter *.rkm -ErrorAction SilentlyContinue).Count -ge 10)
@@ -329,6 +333,7 @@ Step 'markey:// links through the system' {
 Step 'Autostart on and off' {
     if (-not (Get-MainWindow)) { [void](Start-Process 'markey://'); [void](Wait-Until { Get-MainWindow } 15) }
     Check 'The Run entry names the installed program' ("$(Get-Autostart)" -like "*$Exe*") (Get-Autostart)
+    Check 'The Run entry is quoted' ("$(Get-Autostart)".StartsWith('"')) (Get-Autostart)
     $switch = Get-LaunchSwitch
     Check 'The window shows the switch on' ("$($switch.Current.ToggleState)" -eq 'On') $switch.Current.ToggleState
     $switch.Toggle()
@@ -336,15 +341,21 @@ Step 'Autostart on and off' {
     Check 'Off is saved in the settings' (Wait-Until { ((Read-Shared $Settings) | ConvertFrom-Json).launch_at_login -eq $false } 10)
     $switch.Toggle()
     Check 'Turning it on brings the Run entry back' (Wait-Until { "$(Get-Autostart)" -like "*$Exe*" } 10) (Get-Autostart)
+    Check 'It comes back quoted' (Wait-Until { "$(Get-Autostart)".StartsWith('"') } 5) (Get-Autostart)
     Check 'On is saved in the settings' (Wait-Until { ((Read-Shared $Settings) | ConvertFrom-Json).launch_at_login -eq $true } 10)
     $command = Get-Autostart
     Get-MarKey | Stop-Process -Force
     Check 'MarKey stopped before the login check' (Wait-Until { (Get-MarKey).Count -eq 0 } 10)
-    $program = if ($command.StartsWith('"')) { $command.Split('"')[1] } else { $command.Trim() }
-    [void](Start-Process -FilePath $program)
+    # The whole value as one command line, which is how Windows reads it at login.
+    [void](New-Object -ComObject WScript.Shell).Run($command, 1, $false)
     Check 'The Run entry starts MarKey' (Wait-Until { (Get-MarKey).Count -eq 1 } 20) $command
     Start-Sleep -Seconds 3
     Check 'Started that way, it opens no window' (-not (Get-MainWindow))
+    Set-ItemProperty -Path $RunKey -Name MarKey -Value "$Exe "
+    Get-MarKey | Stop-Process -Force
+    [void](Wait-Until { (Get-MarKey).Count -eq 0 } 10)
+    [void](Start-MarKey)
+    Check 'A bare entry from an older build is repaired at startup' (Wait-Until { "$(Get-Autostart)".StartsWith('"') } 15) (Get-Autostart)
 }
 
 if ($ThisPc) { Note 'This computer: sign-in, DPAPI and cloud against the mock are not run (cargo test covers sealed:: on Windows)' } else { Step 'Sign-in, DPAPI and the cloud against the local mock' {
@@ -382,7 +393,7 @@ if ($ThisPc) { Note 'This computer: sign-in, DPAPI and cloud against the mock ar
 
 Step 'Update over a running copy' {
     $old = (Get-MarKey | Select-Object -First 1).Id
-    $run = Start-Process -FilePath $Installer -ArgumentList '/S' -Wait -PassThru
+    $run = Start-Process -FilePath $Installer -ArgumentList $Silent -Wait -PassThru
     Check 'Installer exit code 0 with MarKey running' ($run.ExitCode -eq 0) "exit $($run.ExitCode)"
     Check 'The running copy was closed' (-not (Get-Process -Id $old -ErrorAction SilentlyContinue))
     Check 'markey.exe still in place' (Test-Path -LiteralPath $Exe)
@@ -421,11 +432,12 @@ Step 'Silent uninstall /S and what stays on disk' {
 }
 
 Step 'Install again over the settings that stayed' {
-    $run = Start-Process -FilePath $Installer -ArgumentList '/S' -Wait -PassThru
+    $run = Start-Process -FilePath $Installer -ArgumentList $Silent -Wait -PassThru
     Check 'Installer exit code 0' ($run.ExitCode -eq 0) "exit $($run.ExitCode)"
     [void](Start-MarKey)
     Check 'MarKey starts' (Wait-Until { (Get-MarKey).Count -eq 1 } 20)
     Check 'The setting was on, so the Run entry comes back' (Wait-Until { "$(Get-Autostart)" -like "*$Exe*" } 15) (Get-Autostart)
+    Check 'It comes back quoted' ("$(Get-Autostart)".StartsWith('"')) (Get-Autostart)
     $run = Start-Process -FilePath (Join-Path $InstallDir 'uninstall.exe') -ArgumentList '/S' -Wait -PassThru
     Check 'Program files are removed again' (Wait-Until { -not (Test-Path -LiteralPath $Exe) } 60)
     Check 'Autostart entry removed again' (Wait-Until { -not (Get-Autostart) } 10)
