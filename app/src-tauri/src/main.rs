@@ -1578,6 +1578,16 @@ mod tests {
     }
 
     #[test]
+    fn the_windows_installer_speaks_russian_first() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(
+            conf["bundle"]["windows"]["nsis"]["languages"],
+            serde_json::json!(["Russian", "English"])
+        );
+    }
+
+    #[test]
     fn a_failed_save_leaves_the_words_switch_as_it_was() {
         let mut settings = Settings::default();
         let result = commit_settings(
