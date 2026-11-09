@@ -16,6 +16,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import re
 import secrets
 import threading
@@ -45,6 +46,7 @@ revoked_chains = set()
 access_tokens = {}  # token -> {app, expires}
 configs = {}  # (app, key) -> {title, count, revision, size, updatedAt, value}
 access_ttl = 900
+open_return = False
 
 
 class Refusal(Exception):
@@ -295,8 +297,14 @@ class Handler(BaseHTTPRequestHandler):
             raise Refusal(400, "VALIDATION_ERROR", "bad request")
         code = secrets.token_urlsafe(32)
         codes[code] = {"app": app, "challenge": challenge, "expires": time.time() + CODE_TTL}
-        self.send_response(302)
-        self.send_header("Location", f"{back}?" + urlencode({"code": code, "state": state}))
+        target = f"{back}?" + urlencode({"code": code, "state": state})
+        if open_return:
+            # A CI run has nobody to answer the browser's "open this app?".
+            os.startfile(target)
+            self.send_response(200)
+        else:
+            self.send_response(302)
+            self.send_header("Location", target)
         self.send_header("Content-Length", "0")
         self.send_header("Connection", "close")
         self.end_headers()
@@ -351,12 +359,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global access_ttl
+    global access_ttl, open_return
     parser = argparse.ArgumentParser(description="Mock Identity server for MarKey")
     parser.add_argument("--port", type=int, default=8788)
     parser.add_argument("--access-ttl", type=int, default=900, help="access token lifetime, seconds")
+    parser.add_argument("--open-return", action="store_true", help="Windows: open the return link here instead of redirecting")
     args = parser.parse_args()
     access_ttl = args.access_ttl
+    open_return = args.open_return
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"mock identity on http://127.0.0.1:{args.port}", flush=True)
     try:

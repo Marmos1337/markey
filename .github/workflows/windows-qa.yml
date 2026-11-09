@@ -1,0 +1,118 @@
+name: Windows QA
+
+# MarKey on throw-away Windows machines: the MSVC installer built on Windows,
+# then the real thing. Silent install, launch, a window that painted, markey://,
+# corrections typed through the keyboard hook, sign-in against a local mock with
+# the session sealed by DPAPI, an update over a running copy, uninstall, and what
+# is left on disk. Nothing here talks to the real server or publishes anything.
+on:
+  push:
+    branches: ["feat/mar-ecosystem"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Tests and MSVC installer
+    runs-on: windows-2022
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Fetch corpora
+        shell: bash
+        run: ./tools/fetch_corpora.sh
+
+      - name: Build language models
+        run: cargo run --release -p modelgen -- tools/.cache crates/rekey-core/data/models
+
+      # DPAPI, the registry check for MarHub and the rest of the Windows paths,
+      # on Windows for real.
+      - name: Tests
+        run: |
+          cargo test -p rekey-core -p rekey-hook
+          cargo test -p rekey-app -- account:: cloud:: identity:: sealed:: marhub_open:: mar_report:: private_files:: updater::
+
+      - name: Build the installer
+        working-directory: app/src-tauri
+        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target/release/bundle/nsis/*-setup.exe dist/
+          Push-Location dist
+          Get-ChildItem *-setup.exe | ForEach-Object {
+            "$((Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding ascii SHA256SUMS
+          Get-Content SHA256SUMS
+          Pop-Location
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markey-windows-installer
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  qa:
+    name: QA on ${{ matrix.os }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: markey-windows-installer
+          path: dist
+
+      - name: Run the checks
+        shell: powershell
+        run: |
+          $installer = (Get-ChildItem dist\*-setup.exe | Select-Object -First 1).FullName
+          & tools\windows-qa\run.ps1 -Installer $installer -Out "$env:RUNNER_TEMP\qa" -Repo $env:GITHUB_WORKSPACE
+          exit $LASTEXITCODE
+
+      - name: Report
+        if: always()
+        shell: pwsh
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP 'qa\report.md'
+          if (Test-Path $report) { Get-Content $report -Raw | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-${{ matrix.os }}
+          path: ${{ runner.temp }}/qa/
+          retention-days: 14
