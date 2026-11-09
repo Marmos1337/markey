@@ -42,8 +42,21 @@ public static class QaNative
     [DllImport("user32.dll")] static extern uint SendInput(uint count, INPUT[] inputs, int size);
     [DllImport("user32.dll")] static extern uint MapVirtualKeyW(uint code, uint mapType);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr LoadKeyboardLayoutW(string id, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint thread);
+    [DllImport("user32.dll")] static extern int GetKeyboardLayoutList(int count, IntPtr[] list);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT point);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
 
-    const uint KEYUP = 2, EXTENDED = 1, MOUSE_DOWN = 2, MOUSE_UP = 4, WM_CLOSE = 0x10;
+    const uint KEYUP = 2, EXTENDED = 1, MOUSE_DOWN = 2, MOUSE_UP = 4, WM_CLOSE = 0x10, WM_INPUTLANGCHANGEREQUEST = 0x50, GA_ROOT = 2;
+
+    /// <summary>On a computer someone uses: the one window input may go to. Zero means anywhere.</summary>
+    public static long Guard;
+
+    static void RequireGuard()
+    {
+        if (Guard != 0 && GetForegroundWindow().ToInt64() != Guard)
+            throw new InvalidOperationException("The test window lost the foreground; the key was not sent.");
+    }
 
     public static List<Win> Windows(int pid)
     {
@@ -79,6 +92,27 @@ public static class QaNative
     }
 
     public static bool LoadRussian() { return LoadKeyboardLayoutW("00000419", 0) != IntPtr.Zero; }
+
+    public static long ForegroundLayout()
+    {
+        uint pid;
+        return GetKeyboardLayout(GetWindowThreadProcessId(GetForegroundWindow(), out pid)).ToInt64();
+    }
+
+    public static bool SetForegroundLayout(long hkl)
+    {
+        IntPtr hwnd = GetForegroundWindow();
+        return hwnd != IntPtr.Zero && PostMessageW(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, new IntPtr(hkl));
+    }
+
+    public static long[] Layouts()
+    {
+        var list = new IntPtr[32];
+        int count = GetKeyboardLayoutList(list.Length, list);
+        var result = new long[count];
+        for (int i = 0; i < count; i++) result[i] = list[i].ToInt64();
+        return result;
+    }
 
     static Paint Measure(Bitmap bmp)
     {
@@ -137,7 +171,18 @@ public static class QaNative
 
     static uint Send(params INPUT[] inputs) { return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT))); }
 
-    public static uint Key(int vk, bool down, bool extended) { return Send(KeyInput((ushort)vk, down, extended)); }
+    public static uint Key(int vk, bool down, bool extended)
+    {
+        if (down) RequireGuard();
+        return Send(KeyInput((ushort)vk, down, extended));
+    }
+
+    /// <summary>Lets go of Shift, Ctrl and Alt, so a stopped test leaves no key held.</summary>
+    public static void ReleaseModifiers()
+    {
+        foreach (int vk in new[] { 0xA0, 0xA1, 0xA2, 0xA4, 0xA5 }) Send(KeyInput((ushort)vk, false, false));
+        Send(KeyInput(0xA3, false, true));
+    }
 
     public static void Tap(int vk, bool extended)
     {
@@ -162,6 +207,12 @@ public static class QaNative
 
     public static void Click(int x, int y)
     {
+        if (Guard != 0)
+        {
+            var point = new POINT { X = x, Y = y };
+            if (GetAncestor(WindowFromPoint(point), GA_ROOT).ToInt64() != Guard)
+                throw new InvalidOperationException("Another window covers the test window; the click was not sent.");
+        }
         SetCursorPos(x, y);
         Thread.Sleep(60);
         var down = new INPUT { type = 0 };

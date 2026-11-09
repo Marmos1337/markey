@@ -3,7 +3,11 @@
 param(
     [Parameter(Mandatory = $true)][string]$Installer,
     [Parameter(Mandatory = $true)][string]$Out,
-    [Parameter(Mandatory = $true)][string]$Repo
+    [Parameter(Mandatory = $true)][string]$Repo,
+    # A computer someone uses rather than a throw-away one. Nothing about the
+    # machine changes, nobody signs in, the clipboard is only read, the screen is
+    # not captured, keys reach only the test window, and the layout goes back.
+    [switch]$ThisPc
 )
 $ErrorActionPreference = 'Continue'
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
@@ -25,6 +29,10 @@ $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $MockLog = Join-Path $Out 'mock.log'
 $StateFile = Join-Path $Out 'target.state'
 $Port = 8788
+$DebugPort = 9341
+$Desktop = Join-Path ([Environment]::GetFolderPath('Desktop')) 'MarKey.lnk'
+$Menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'MarKey.lnk'
+[Net.WebRequest]::DefaultWebProxy = $null
 
 $script:Lines = New-Object System.Collections.ArrayList
 $script:Failed = 0
@@ -46,7 +54,10 @@ function Note([string]$Text) {
 function Step([string]$Title, [scriptblock]$Body) {
     Write-Host "=== $Title"
     [void]$script:Lines.Add("| | **$Title** | |")
-    try { & $Body } catch { Check "$Title stopped with an error" $false ($_ | Out-String) }
+    try { & $Body } catch {
+        [QaNative]::ReleaseModifiers()
+        Check "$Title stopped with an error" $false ($_ | Out-String)
+    }
 }
 
 function Wait-Until([scriptblock]$Done, [int]$Seconds = 30, [int]$StepMs = 250) {
@@ -81,14 +92,41 @@ function Get-MainWindow {
 function Start-MarKey {
     $env:MARKEY_LOG = 'debug'
     $env:MARKEY_IDENTITY_URL = "http://127.0.0.1:$Port"
+    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DebugPort"
     return Start-Process -FilePath $Exe -PassThru
 }
+
+# Runs an expression in the settings window, the way a person's click would reach it.
+function Invoke-Page([string]$Expression) {
+    $page = Invoke-RestMethod "http://127.0.0.1:$DebugPort/json/list" | Where-Object { $_.type -eq 'page' } | Select-Object -First 1
+    $socket = New-Object System.Net.WebSockets.ClientWebSocket
+    $none = [Threading.CancellationToken]::None
+    try {
+        $socket.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $none).Wait()
+        $request = @{ id = 1; method = 'Runtime.evaluate'; params = @{ expression = $Expression; returnByValue = $true } } | ConvertTo-Json -Compress
+        $bytes = [Text.Encoding]::UTF8.GetBytes($request)
+        $socket.SendAsync((New-Object 'ArraySegment[byte]' -ArgumentList @(, $bytes)), 'Text', $true, $none).Wait()
+        for ($try = 0; $try -lt 50; $try++) {
+            $text = ''
+            do {
+                $buffer = New-Object byte[] 65536
+                $task = $socket.ReceiveAsync((New-Object 'ArraySegment[byte]' -ArgumentList @(, $buffer)), $none)
+                $task.Wait()
+                $text += [Text.Encoding]::UTF8.GetString($buffer, 0, $task.Result.Count)
+            } while (-not $task.Result.EndOfMessage)
+            $reply = $text | ConvertFrom-Json
+            if ($reply.id -eq 1) { return $reply.result.result.value }
+        }
+    } finally { $socket.Dispose() }
+}
+
+function Get-Autostart { return (Get-ItemProperty -Path $RunKey -ErrorAction SilentlyContinue).MarKey }
 
 function Read-Report { return (Read-Shared $Report | ConvertFrom-Json) }
 
 function Save-Shot([string]$Name) {
     $window = Get-MainWindow
-    $screen = [QaNative]::ShotScreen((Join-Path $Out "$Name-screen.png"))
+    $screen = if ($ThisPc) { $null } else { [QaNative]::ShotScreen((Join-Path $Out "$Name-screen.png")) }
     if ($window) {
         $painted = [QaNative]::ShotWindow($window.Hwnd, (Join-Path $Out "$Name-window.png"))
         return [pscustomobject]@{ Window = $painted; Screen = $screen }
@@ -141,14 +179,21 @@ Step 'The machine' {
     Add-Type -AssemblyName System.Windows.Forms
     Note "Screen $([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Size)"
     Note ("Installer " + (Split-Path $Installer -Leaf) + ", sha256 " + (Get-FileHash $Installer -Algorithm SHA256).Hash.ToLower())
+    $script:startLayout = [QaNative]::ForegroundLayout()
+    Note ('Keyboard layout at the start: {0:X}' -f $script:startLayout)
 }
 
-Step 'The mock server' {
+if ($ThisPc) {
+    Note 'This computer: no mock server, nobody signs in'
+} else { Step 'The mock server' {
     $script:mock = Start-Process python -ArgumentList @('-u', 'tools\mock_identity.py', '--port', "$Port", '--open-return') -WorkingDirectory $Repo -RedirectStandardOutput $MockLog -RedirectStandardError (Join-Path $Out 'mock.err') -PassThru -WindowStyle Hidden
     Check 'Mock server listening' (Wait-Until { (Read-Shared $MockLog) -match 'mock identity on' } 15)
-}
+} }
 
-Step 'Keyboard layouts and browser' {
+if ($ThisPc) { Step 'Keyboard layouts as they are' {
+    $found = [QaNative]::Layouts() | ForEach-Object { $_ -band 0xFFFF }
+    Check 'Russian and English are installed' (($found -contains 0x0419) -and ($found -contains 0x0409)) (($found | ForEach-Object { '{0:X4}' -f $_ }) -join ', ')
+} } else { Step 'Keyboard layouts and browser' {
     # The two layouts a person who needs MarKey has.
     $languages = Get-WinUserLanguageList
     $languages.Add('ru-RU')
@@ -157,7 +202,7 @@ Step 'Keyboard layouts and browser' {
     # No question from the browser's first run in front of the sign-in test.
     New-Item -Path 'HKCU:\Software\Policies\Microsoft\Edge' -Force | Out-Null
     Set-ItemProperty -Path 'HKCU:\Software\Policies\Microsoft\Edge' -Name HideFirstRunExperience -Value 1 -Type DWord
-}
+} }
 
 Step 'Silent install /S' {
     $run = Start-Process -FilePath $Installer -ArgumentList '/S' -Wait -PassThru
@@ -175,6 +220,7 @@ Step 'Silent install /S' {
     $command = (Get-ItemProperty -Path "$SchemeKey\shell\open\command" -ErrorAction SilentlyContinue).'(default)'
     Check 'markey:// points at the installed program' ("$command" -like "*$Exe*%1*") $command
     Check 'markey:// is a URL protocol' ($null -ne (Get-ItemProperty -Path $SchemeKey -Name 'URL Protocol' -ErrorAction SilentlyContinue))
+    Note "Shortcuts: desktop $(Test-Path -LiteralPath $Desktop), Start menu $(Test-Path -LiteralPath $Menu)"
 }
 
 Step 'First launch: the window paints' {
@@ -183,7 +229,7 @@ Step 'First launch: the window paints' {
     Check 'Window appears' (Wait-Until { Get-MainWindow } 60)
     $seen = Wait-Until {
         $script:shot = Save-Shot '01-first-launch'
-        $script:shot.Screen.Distinct -ge 64 -and $script:shot.Window -and $script:shot.Window.Distinct -ge 64
+        ($ThisPc -or $script:shot.Screen.Distinct -ge 64) -and $script:shot.Window -and $script:shot.Window.Distinct -ge 64
     } 45 1500
     $window = $script:shot.Window
     Check 'Settings window painted (PrintWindow)' $seen "distinct colours $($window.Distinct), variance $([math]::Round($window.Variance, 1)), size $($window.Width)x$($window.Height)"
@@ -213,6 +259,7 @@ Step 'The keyboard hook corrects real typing' {
     Check 'Test window built' (Test-Path -LiteralPath $exe)
     $script:target = Start-Process -FilePath $exe -ArgumentList "`"$StateFile`"" -PassThru
     Check 'Test window running' (Wait-Until { (Target-State).hwnd } 15)
+    if ($ThisPc) { [QaNative]::Guard = [long](Target-State).hwnd }
 
     Prepare 'normal' 'en'
     [QaNative]::Type('ghbdtn ')
@@ -261,7 +308,7 @@ Step 'The keyboard hook corrects real typing' {
     # The space lands wherever the click put the caret; the letters must stay Latin.
     Check 'A click stops tracking: nothing is rewritten' (($text -replace ' ', '') -ceq 'ghjtrn') "got [$text]"
 
-    Set-Clipboard -Value 'QA-SENTINEL'
+    if ($ThisPc) { $held = Get-Clipboard -Raw } else { Set-Clipboard -Value 'QA-SENTINEL'; $held = 'QA-SENTINEL' }
     Prepare 'normal' 'en'
     [QaNative]::Type('hello')
     Start-Sleep -Milliseconds 200
@@ -271,7 +318,8 @@ Step 'The keyboard hook corrects real typing' {
     Start-Sleep -Milliseconds 300
     [QaNative]::Tap(0xA3, $true)
     Expect-Text 'Right Ctrl converts the selection' 'normal' 'руддщ'
-    Check 'The clipboard comes back' (Wait-Until { (Get-Clipboard) -eq 'QA-SENTINEL' } 5 200) "clipboard [$(Get-Clipboard)]"
+    Check 'The clipboard comes back' (Wait-Until { (Get-Clipboard -Raw) -ceq $held } 5 200) "$("$(Get-Clipboard -Raw)".Length) chars"
+    [QaNative]::Guard = 0
 }
 
 Step 'markey:// links through the system' {
@@ -293,7 +341,27 @@ Step 'markey:// links through the system' {
     Check 'The log holds no link contents' (-not ((Read-Shared $Log) -match 'AAAAAAAA|BBBBBBBB|code='))
 }
 
-Step 'Sign-in, DPAPI and the cloud against the local mock' {
+Step 'Autostart on and off' {
+    if (-not (Get-MainWindow)) { [void](Start-Process 'markey://'); [void](Wait-Until { Get-MainWindow } 15) }
+    Check 'The Run entry names the installed program' ("$(Get-Autostart)" -like "*$Exe*") (Get-Autostart)
+    Check 'The window shows the switch on' ((Invoke-Page "document.getElementById('launch').checked") -eq $true)
+    [void](Invoke-Page "document.getElementById('launch').click()")
+    Check 'Turning it off removes the Run entry' (Wait-Until { -not (Get-Autostart) } 10) (Get-Autostart)
+    Check 'Off is saved in the settings' (Wait-Until { ((Read-Shared $Settings) | ConvertFrom-Json).launch_at_login -eq $false } 10)
+    [void](Invoke-Page "document.getElementById('launch').click()")
+    Check 'Turning it on brings the Run entry back' (Wait-Until { "$(Get-Autostart)" -like "*$Exe*" } 10) (Get-Autostart)
+    Check 'On is saved in the settings' (Wait-Until { ((Read-Shared $Settings) | ConvertFrom-Json).launch_at_login -eq $true } 10)
+    $command = Get-Autostart
+    Get-MarKey | Stop-Process -Force
+    Check 'MarKey stopped before the login check' (Wait-Until { (Get-MarKey).Count -eq 0 } 10)
+    $program = if ($command.StartsWith('"')) { $command.Split('"')[1] } else { $command.Split(' ')[0] }
+    [void](Start-Process -FilePath $program)
+    Check 'The Run entry starts MarKey' (Wait-Until { (Get-MarKey).Count -eq 1 } 20) $command
+    Start-Sleep -Seconds 3
+    Check 'Started that way, it opens no window' (-not (Get-MainWindow))
+}
+
+if ($ThisPc) { Note 'This computer: sign-in, DPAPI and cloud against the mock are not run (cargo test covers sealed:: on Windows)' } else { Step 'Sign-in, DPAPI and the cloud against the local mock' {
     $window = Get-MainWindow
     if (-not $window) { [void](Start-Process 'markey://'); [void](Wait-Until { Get-MainWindow } 15); $window = Get-MainWindow }
     [void](Save-Shot '03-before-sign-in')
@@ -324,7 +392,7 @@ Step 'Sign-in, DPAPI and the cloud against the local mock' {
     Check 'After the kill the session comes back from DPAPI' $restored
     Check 'No complaint about the stored session' (-not ((Read-Shared $Log) -match 'stored account session cannot be read'))
     Copy-Item -LiteralPath $MockLog -Destination (Join-Path $Out 'mock-after-sign-in.log') -ErrorAction SilentlyContinue
-}
+} }
 
 Step 'Update over a running copy' {
     $old = (Get-MarKey | Select-Object -First 1).Id
@@ -335,7 +403,7 @@ Step 'Update over a running copy' {
     [void](Wait-Until { (Get-MarKey).Count -eq 0 } 10)
     [void](Start-MarKey)
     Check 'Starts again after the update' (Wait-Until { (Get-MarKey).Count -eq 1 } 20)
-    Check 'Still signed in after the update' (Wait-Until { (Read-Report).account.signedIn -eq $true } 30)
+    if (-not $ThisPc) { Check 'Still signed in after the update' (Wait-Until { (Read-Report).account.signedIn -eq $true } 30) }
 }
 
 Step 'Silent uninstall /S and what stays on disk' {
@@ -350,8 +418,10 @@ Step 'Silent uninstall /S and what stays on disk' {
     Check 'markey:// registration removed' (-not (Test-Path $SchemeKey))
     $autostart = (Get-ItemProperty -Path $RunKey -ErrorAction SilentlyContinue).MarKey
     Check 'Autostart entry removed' (-not $autostart) $autostart
+    Check 'Desktop shortcut removed' (-not (Test-Path -LiteralPath $Desktop))
+    Check 'Start menu shortcut removed' (-not (Test-Path -LiteralPath $Menu))
     Check 'Settings stay' (Test-Path -LiteralPath $Settings)
-    Check 'The sealed session stays' (Test-Path -LiteralPath $Sealed)
+    if (-not $ThisPc) { Check 'The sealed session stays' (Test-Path -LiteralPath $Sealed) }
     Check 'The report stays' (Test-Path -LiteralPath $Report)
     $left = @()
     foreach ($root in $InstallDir, $Data, $Mar) {
@@ -368,6 +438,15 @@ if ($script:target) { Stop-Process -Id $script:target.Id -Force -ErrorAction Sil
 if ($script:mock) { Stop-Process -Id $script:mock.Id -Force -ErrorAction SilentlyContinue }
 foreach ($file in Get-ChildItem -LiteralPath $Data -Filter 'markey.log*' -ErrorAction SilentlyContinue) {
     Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $Out $file.Name) -ErrorAction SilentlyContinue
+}
+
+if ($ThisPc) {
+    [QaNative]::Guard = 0
+    [QaNative]::ReleaseModifiers()
+    if ([Console]::CapsLock) { [QaNative]::Tap(0x14, $false) }
+    [void][QaNative]::SetForegroundLayout($script:startLayout)
+    Check 'The keyboard layout is put back' (Wait-Until { [QaNative]::ForegroundLayout() -eq $script:startLayout } 5) ('{0:X}' -f [QaNative]::ForegroundLayout())
+    Check 'Caps Lock is off' (-not [Console]::CapsLock)
 }
 
 $summary = @("## Windows QA: $($script:Passed) passed, $($script:Failed) failed", '', '| | Check | Detail |', '|---|---|---|') + $script:Lines
