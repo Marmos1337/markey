@@ -27,7 +27,7 @@ use rekey_core::model::{ExtendedWords, Models};
 use service::{Runtime, SharedEngine};
 use settings::Settings;
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
@@ -57,6 +57,9 @@ struct AppState {
     /// never writes back a merge of settings the user has just changed. Never
     /// held across a network call.
     config_gate: Mutex<()>,
+    /// Moves with every change of the configuration, so a window that read an
+    /// older copy cannot write it back over the change.
+    config_revision: AtomicU64,
     account: Arc<account::Account>,
     cloud: Arc<cloud::Cloud>,
     reporter: mar_report::Reporter,
@@ -135,6 +138,8 @@ struct UiState {
     /// The detection settings, verbatim; the window sends the whole thing
     /// back when anything changes.
     config: Config,
+    /// Which change of the configuration this copy reflects.
+    config_revision: u64,
     /// One-word summary of whether corrections can happen right now.
     status: &'static str,
     has_api_key: bool,
@@ -188,6 +193,9 @@ fn layout_catalog() -> Vec<LayoutInfo> {
 
 #[tauri::command]
 fn get_state(state: State<'_, AppState>) -> UiState {
+    // Before the configuration: a change in between then only makes a save
+    // start over, instead of letting it overwrite that change.
+    let config_revision = state.config_revision.load(Ordering::SeqCst);
     // Never hold engine and settings locks together in opposite orders.
     let (config, stats, assist_active, assist_learned, models_loaded) = {
         let engine = state.engine.lock().expect("engine lock");
@@ -225,6 +233,7 @@ fn get_state(state: State<'_, AppState>) -> UiState {
         "ready"
     };
     UiState {
+        config_revision,
         status,
         has_api_key: !settings.api_key.trim().is_empty(),
         launch_at_login: settings.launch_at_login,
@@ -388,14 +397,23 @@ fn set_config(
     api_key: Option<String>,
     launch_at_login: Option<bool>,
     ai_consent: Option<bool>,
+    base_revision: Option<u64>,
 ) -> Result<(), String> {
     {
         let _gate = state.config_gate.lock().map_err(|e| e.to_string())?;
+        if base_revision.is_some_and(|b| b != state.config_revision.load(Ordering::SeqCst)) {
+            return Err(STALE_CONFIG.to_string());
+        }
         apply_config(&app, &state, config, api_key, launch_at_login, ai_consent)?;
+        state.config_revision.fetch_add(1, Ordering::SeqCst);
     }
     state.cloud.changed();
     Ok(())
 }
+
+/// What `set_config` answers when the window read an older configuration; the
+/// window reads again and repeats its change (save-queue.js).
+const STALE_CONFIG: &str = "stale-config";
 
 /// Validate a whole configuration and put it into effect: settings file,
 /// engine, models and tray. The caller holds `config_gate`.
@@ -637,6 +655,7 @@ impl cloud::ConfigHost for CloudHost {
             return Ok(false);
         }
         apply_config(&self.0, &state, config, None, None, None)?;
+        state.config_revision.fetch_add(1, Ordering::SeqCst);
         let _ = self.0.emit("config-changed", ());
         Ok(true)
     }
@@ -806,7 +825,7 @@ fn remove_exception(
         .config()
         .clone();
     config.exceptions.retain(|w| !w.eq_ignore_ascii_case(&word));
-    set_config(app, state, config, None, None, None)
+    set_config(app, state, config, None, None, None, None)
 }
 
 /// Look for a newer version. `manual` (the button) also shows a version the
@@ -1033,6 +1052,7 @@ fn save_config(app: &AppHandle, settings: &Arc<Mutex<Settings>>, config: Config)
         }
     }
     if let Some(state) = app.try_state::<AppState>() {
+        state.config_revision.fetch_add(1, Ordering::SeqCst);
         state.cloud.changed();
     }
     let handle = app.clone();
@@ -1387,6 +1407,7 @@ fn main() {
                 extended_dir,
                 update: Mutex::new(None),
                 config_gate: Mutex::new(()),
+                config_revision: AtomicU64::new(0),
                 account: account.clone(),
                 cloud: cloud.clone(),
                 reporter,

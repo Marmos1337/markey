@@ -187,11 +187,13 @@ impl Reporter {
     /// One last write as MarKey quits, on the calling thread: the worker is
     /// not going to get another turn.
     pub fn write_final(&self, snapshot: Snapshot) {
+        // Only a real change: a fresh `updatedAt` from a program that is quitting
+        // would look like a live one for minutes to MarHub.
         if let Some(writer) = &self.writer {
-            writer
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .write(snapshot, crate::account::unix_now());
+            let mut writer = writer.lock().unwrap_or_else(|e| e.into_inner());
+            if writer.last != Some(snapshot) {
+                writer.write(snapshot, crate::account::unix_now());
+            }
         }
     }
 }

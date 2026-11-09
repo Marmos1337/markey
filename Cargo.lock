@@ -1112,7 +1112,7 @@ dependencies = [
 
 [[package]]
 name = "eval"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "rekey-core",
 ]
@@ -2295,7 +2295,7 @@ dependencies = [
 
 [[package]]
 name = "modelgen"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "rekey-core",
 ]
@@ -3097,7 +3097,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rekey-ai"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "log",
  "rekey-core",
@@ -3108,7 +3108,7 @@ dependencies = [
 
 [[package]]
 name = "rekey-app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3137,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "rekey-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "log",
  "serde",
@@ -3147,7 +3147,7 @@ dependencies = [
 
 [[package]]
 name = "rekey-hook"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "core-foundation",
  "core-graphics",

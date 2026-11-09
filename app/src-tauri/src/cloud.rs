@@ -924,8 +924,19 @@ impl Cloud {
 
     /// Run a request with a token, renewing it once if the server turns it
     /// down early.
-    fn authorized<T>(&self, call: impl Fn(&str) -> Result<T, ApiError>) -> Result<T, SyncError> {
+    ///
+    /// A round belongs to the account it started with. Someone who signed in
+    /// meanwhile must not receive the previous account's settings.
+    fn authorized<T>(
+        &self,
+        account: &str,
+        call: impl Fn(&str) -> Result<T, ApiError>,
+    ) -> Result<T, SyncError> {
         let token = self.tokens.access_token().map_err(token_failure)?;
+        // After taking the token, so that a token of the new account is seen.
+        if self.tokens.account_id().as_deref() != Some(account) {
+            return Err(SyncError::SignedOut);
+        }
         let result = match call(&token) {
             Err(ApiError::Unauthorized) => {
                 let token = self
@@ -970,7 +981,8 @@ impl Cloud {
                 .ok_or_else(|| SyncError::Failed("not ready".to_string()))?;
             let local = kind.extract(&config);
             let base = self.base(kind);
-            let remote = self.authorized(|token| get_set(&self.http, token, kind.key()))?;
+            let remote =
+                self.authorized(account, |token| get_set(&self.http, token, kind.key()))?;
             // Before anything is applied, sent or remembered.
             let clean = remote
                 .as_ref()
@@ -1044,8 +1056,9 @@ impl Cloud {
             if !self.active_sets().contains(&kind) {
                 return Ok(SetDone::Settled);
             }
-            let outcome =
-                self.authorized(|token| put_set(&self.http, token, kind, &merged, revision))?;
+            let outcome = self.authorized(account, |token| {
+                put_set(&self.http, token, kind, &merged, revision)
+            })?;
             match outcome {
                 PutOutcome::Stored {
                     revision,
@@ -2113,6 +2126,28 @@ mod tests {
         assert_eq!(cloud.sync_now(true), Outcome::Done);
         assert!(!host.sync_words());
         assert_eq!(server.count("/word-exceptions"), seen);
+    }
+
+    #[test]
+    fn a_round_never_reaches_the_server_under_another_account() {
+        let store: Arc<Mutex<Store>> = Arc::default();
+        let shared = store.clone();
+        let server = Server::start(move |r| serve(shared.clone(), r));
+        let dir = temp_dir("cloud-round-account");
+        let _clean = Cleanup(dir.clone());
+        std::fs::create_dir_all(&dir).unwrap();
+        let tokens = Arc::new(SwitchableTokens(Mutex::new(Some("second".into()))));
+        let cloud = Cloud::new(
+            &server.base,
+            dir.join("cloud-sync.json"),
+            tokens,
+            words_host(with_words(&["a"])),
+        );
+        let result = cloud.authorized("first", |_token| -> Result<(), ApiError> {
+            panic!("the request must not be sent");
+        });
+        assert!(matches!(result, Err(SyncError::SignedOut)));
+        assert!(server.requests().is_empty());
     }
 
     #[test]

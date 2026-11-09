@@ -1445,7 +1445,10 @@ async function askAccount(command, args) {
     renderAccount();
   } catch (error) {
     console.error(`account: ${command} failed`, error);
-    if (ACCOUNT_ACTIONS[command]) showToast($("save-error"), `${ACCOUNT_ACTIONS[command]}: ${error}`);
+    if (ACCOUNT_ACTIONS[command]) {
+      const reason = error === "signed out" ? "сначала войдите" : error;
+      showToast($("save-error"), `${ACCOUNT_ACTIONS[command]}: ${reason}`);
+    }
     if (command !== "get_account") askAccount("get_account");
   }
 }
@@ -1737,7 +1740,8 @@ async function save(changes = {}, extras = {}) {
 
 const configWriter = RekeyConfigWriter({
   readState: () => invoke("get_state"),
-  writeState: (config, extras) => invoke("set_config", { config, ...extras }),
+  writeState: (config, extras, fresh) =>
+    invoke("set_config", { config, ...extras, baseRevision: fresh.config_revision }),
   toConfig: (fresh) => fresh.config,
   onState: (fresh) => {
     state = fresh;

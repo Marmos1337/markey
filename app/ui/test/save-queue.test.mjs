@@ -22,4 +22,13 @@ const later=context.RekeyConfigWriter({readState:async()=>structuredClone(store)
 const edit=later.enqueue({sensitivity:'eager'});store.exceptions=['a','from-cloud'];const reload=later.reload();
 await new Promise(resolve=>setImmediate(resolve));hold();await Promise.all([edit,reload]);
 assert.deepEqual(seen,{exceptions:['a','from-cloud'],sensitivity:'eager'});
+// A cloud merge lands between the read and the write: Rust refuses, the change is made again on the merged settings.
+let shared={exceptions:['a'],sensitivity:'balanced'},refused=0,sent=null;
+const racing=context.RekeyConfigWriter({readState:async()=>structuredClone(shared),toConfig:s=>s,onState:()=>{},
+ writeState:async config=>{if(refused++===0){shared.exceptions=['a','from-cloud'];throw 'stale-config';}sent=structuredClone(config);shared=structuredClone(config);}});
+await racing.enqueue({sensitivity:'eager'});
+assert.deepEqual(sent,{exceptions:['a','from-cloud'],sensitivity:'eager'});
+// It gives up after a few tries and reports the failure instead of spinning.
+const stuck=context.RekeyConfigWriter({readState:async()=>({}),toConfig:s=>s,onState:()=>{},writeState:async()=>{throw 'stale-config';}});
+await assert.rejects(stuck.enqueue({}),e=>e==='stale-config');
 console.log('PASS: delayed saves preserve OFF, exclusion additions/removals, and subsequent settings');

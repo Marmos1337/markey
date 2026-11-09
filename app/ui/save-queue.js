@@ -5,10 +5,21 @@ globalThis.RekeyConfigWriter = function ({ readState, writeState, toConfig, onSt
   return {
     enqueue(changes = {}, extras = {}) {
       const task = tail.then(async () => {
-        const fresh = await readState();
-        const patch = typeof changes === "function" ? changes(fresh) : changes;
-        await writeState({ ...toConfig(fresh), ...patch }, extras);
-        onState(await readState());
+        // Something else can change the settings between the read and the
+        // write. Rust refuses such a write, and the change is made again on
+        // what is there now.
+        for (let attempt = 0; ; attempt++) {
+          const fresh = await readState();
+          const patch = typeof changes === "function" ? changes(fresh) : changes;
+          try {
+            await writeState({ ...toConfig(fresh), ...patch }, extras, fresh);
+          } catch (error) {
+            if (error === "stale-config" && attempt < 2) continue;
+            throw error;
+          }
+          onState(await readState());
+          return;
+        }
       });
       tail = task.catch(() => {});
       return task;
