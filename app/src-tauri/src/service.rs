@@ -29,6 +29,14 @@ pub type SharedEngine = Arc<Mutex<Engine>>;
 /// when the user undid a correction and the word became an exception.
 pub type ConfigSink = Arc<dyn Fn(Config) + Send + Sync>;
 
+#[cfg(all(windows, feature = "native-input-smoke"))]
+static PROBE_WINDOW: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+#[cfg(all(windows, feature = "native-input-smoke"))]
+pub fn restrict_probe_to_window(window: isize) {
+    PROBE_WINDOW.store(window, Ordering::Relaxed);
+}
+
 /// How often the frontmost app, active layout and secure-input state are
 /// sampled. Text Input Services is main-thread-only, so this cannot happen in
 /// the hook; a short interval keeps the sample current within a keystroke or
@@ -114,7 +122,7 @@ impl Runtime {
         }
         let (lock, wake) = &*self.queue;
         if let Ok(mut q) = lock.lock() {
-            q.jobs.push_back(Job::Act(action, None));
+            q.jobs.push_back(PendingJob::new(Job::Act(action, None)));
             if !q.writing {
                 q.writing = true;
                 q.since = Some(Instant::now());
@@ -133,9 +141,25 @@ enum Job {
     CapsLockOff,
 }
 
+struct PendingJob {
+    job: Job,
+    #[cfg(target_os = "windows")]
+    target: isize,
+}
+
+impl PendingJob {
+    fn new(job: Job) -> Self {
+        Self {
+            job,
+            #[cfg(target_os = "windows")]
+            target: platform::foreground_window(),
+        }
+    }
+}
+
 #[derive(Default)]
 struct Queue {
-    jobs: VecDeque<Job>,
+    jobs: VecDeque<PendingJob>,
     /// The injector is busy; keys pressed now must wait their turn.
     writing: bool,
     since: Option<Instant>,
@@ -160,6 +184,7 @@ pub fn spawn(
         context.clone(),
         runtime.last_app.clone(),
         runtime.layout.clone(),
+        engine.clone(),
     );
     refresh_system_layouts(app);
 
@@ -233,6 +258,8 @@ pub struct KeyRouter {
     /// A keystroke went by without the engine; its idea of the word under
     /// the caret is stale.
     missed: bool,
+    #[cfg(target_os = "windows")]
+    last_window: isize,
 }
 
 impl KeyRouter {
@@ -251,6 +278,8 @@ impl KeyRouter {
             health,
             last_context: Context::default(),
             missed: false,
+            #[cfg(target_os = "windows")]
+            last_window: 0,
         }
     }
 
@@ -258,6 +287,24 @@ impl KeyRouter {
         // Our own typing passes untouched and unexamined.
         if event.synthetic {
             return Disposition::Pass;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let window = platform::foreground_window();
+            #[cfg(feature = "native-input-smoke")]
+            {
+                let probe = PROBE_WINDOW.load(Ordering::Relaxed);
+                if probe != 0 && window != probe {
+                    self.missed = true;
+                    return Disposition::Pass;
+                }
+            }
+            if window != self.last_window {
+                // Two windows of one executable have different documents,
+                // even when the sampled app name and layout did not change.
+                self.missed = true;
+                self.last_window = window;
+            }
         }
         match self.context.try_lock() {
             Ok(current) => self.last_context = current.clone(),
@@ -270,23 +317,40 @@ impl KeyRouter {
         }
         // MarKey's own windows are never corrected.
         if self.last_context.app.as_deref().is_some_and(is_own_app) {
+            self.missed = true;
             return Disposition::Pass;
         }
 
         let engine = self.engine.clone();
-        let (action, tapped, caps_lock) = match engine.try_lock() {
-            Ok(mut engine) => self.decide(&mut engine, &event),
-            Err(TryLockError::Poisoned(poisoned)) => {
-                // A panic in the engine must not silently stop corrections
-                // for the rest of the session.
-                log::error!("engine mutex was poisoned; recovering");
-                self.decide(&mut poisoned.into_inner(), &event)
-            }
-            Err(TryLockError::WouldBlock) => {
+        let (action, tapped, caps_lock) = {
+            let mut engine = match engine.try_lock() {
+                Ok(engine) => engine,
+                Err(TryLockError::Poisoned(poisoned)) => {
+                    log::error!("engine mutex was poisoned; recovering");
+                    poisoned.into_inner()
+                }
+                Err(TryLockError::WouldBlock) => {
+                    self.missed = true;
+                    self.health.record_skipped();
+                    // Fail open even if an earlier correction still has work
+                    // queued. The hook must never wait for an engine lock.
+                    return Disposition::Pass;
+                }
+            };
+            if !engine.config().enabled
+                || self.last_context.secure_input
+                || self
+                    .last_context
+                    .app
+                    .as_deref()
+                    .is_some_and(|app| engine.config().is_excluded_app(app))
+            {
+                engine.invalidate_caret();
                 self.missed = true;
-                self.health.record_skipped();
-                (Action::None, false, false)
+                // An older correction must not hold gameplay/password input.
+                return Disposition::Pass;
             }
+            self.decide(&mut engine, &event)
         };
 
         let hold = self.can_hold.load(Ordering::Relaxed);
@@ -306,7 +370,7 @@ impl KeyRouter {
             hold && q.writing && q.since.is_some_and(|t| t.elapsed() < MAX_HOLD) && raw.is_some();
         if busy && !swallow {
             if let Some(raw) = raw.clone() {
-                q.jobs.push_back(Job::Replay(raw));
+                q.jobs.push_back(self.pending_job(Job::Replay(raw)));
                 disposition = Disposition::Drop;
             }
         }
@@ -319,10 +383,10 @@ impl KeyRouter {
             } else {
                 None
             };
-            q.jobs.push_back(Job::Act(action, held));
+            q.jobs.push_back(self.pending_job(Job::Act(action, held)));
         }
         if caps_lock {
-            q.jobs.push_back(Job::CapsLockOff);
+            q.jobs.push_back(self.pending_job(Job::CapsLockOff));
         }
         if !q.jobs.is_empty() && !q.writing {
             q.writing = true;
@@ -340,6 +404,14 @@ impl KeyRouter {
         let action = engine.on_key(event, &self.last_context);
         let caps = engine.take_caps_lock();
         (action, engine.take_tap(), caps)
+    }
+
+    fn pending_job(&self, job: Job) -> PendingJob {
+        PendingJob {
+            job,
+            #[cfg(target_os = "windows")]
+            target: self.last_window,
+        }
     }
 }
 
@@ -417,7 +489,10 @@ fn spawn_context_sampler(
     context: Arc<Mutex<Context>>,
     last_app: Arc<Mutex<Option<String>>>,
     layout: Arc<Mutex<Option<String>>>,
+    engine: SharedEngine,
 ) {
+    #[cfg(not(target_os = "windows"))]
+    let _ = &engine;
     let handle = app.clone();
     std::thread::Builder::new()
         .name("markey-context".into())
@@ -426,8 +501,21 @@ fn spawn_context_sampler(
             let last = last_app.clone();
             let current_layout = layout.clone();
             let tray = handle.clone();
+            #[cfg(target_os = "windows")]
+            let engine = engine.clone();
             let posted = handle.run_on_main_thread(move || {
                 let sampled = platform::current_context();
+                #[cfg(target_os = "windows")]
+                if let Ok(mut engine) = engine.try_lock() {
+                    let suspended = !engine.config().enabled
+                        || sampled.app.as_deref().is_some_and(|app| {
+                            is_own_app(app) || engine.config().is_excluded_app(app)
+                        });
+                    platform::set_input_suspended(suspended);
+                    if suspended {
+                        engine.invalidate_caret();
+                    }
+                }
                 // The menu bar badge follows the layout.
                 let changed = current_layout
                     .lock()
@@ -528,7 +616,17 @@ fn spawn_injector(
             // Browsers and web chats drop keys sent too close together.
             let app = context.lock().ok().and_then(|c| c.app.clone());
             injector.set_keystroke_gap(rekey_core::apps::keystroke_gap(app.as_deref()));
-            match job {
+            #[cfg(target_os = "windows")]
+            {
+                platform::set_injection_target(job.target);
+                if job.target == 0 || !platform::injection_target_active() {
+                    if let Ok(mut engine) = engine.lock() {
+                        engine.invalidate_caret();
+                    }
+                    continue;
+                }
+            }
+            match job.job {
                 Job::Replay(raw) => replay(&injector, &raw),
                 Job::CapsLockOff => platform::caps_lock_off(),
                 Job::Act(action @ Action::Replace { .. }, held) => {
@@ -537,6 +635,10 @@ fn spawn_injector(
                     } else {
                         LATE_REPLACE_DELAY
                     });
+                    #[cfg(target_os = "windows")]
+                    if !platform::injection_target_active() {
+                        continue;
+                    }
                     apply(&handle, &injector, &action, held.as_ref(), &config);
                     runtime.applied.fetch_add(1, Ordering::Relaxed);
                 }
@@ -792,12 +894,18 @@ where
     F: FnOnce() -> T + Send + 'static,
 {
     let (tx, rx) = mpsc::channel();
+    #[cfg(target_os = "windows")]
+    let target = platform::injection_target();
     handle
         .run_on_main_thread(move || {
-            let _ = tx.send(f());
+            #[cfg(target_os = "windows")]
+            let value = platform::with_injection_target(target, f);
+            #[cfg(not(target_os = "windows"))]
+            let value = Some(f());
+            let _ = tx.send(value);
         })
         .ok()?;
-    rx.recv_timeout(MAIN_THREAD_TIMEOUT).ok()
+    rx.recv_timeout(MAIN_THREAD_TIMEOUT).ok().flatten()
 }
 
 #[cfg(target_os = "macos")]
@@ -827,6 +935,73 @@ mod tests {
     use super::*;
     use rekey_core::input::{Key, Modifiers};
     use rekey_core::model::Models;
+
+    #[test]
+    fn an_inflight_correction_never_captures_excluded_game_keys() {
+        let engine = Arc::new(Mutex::new(Engine::new(Models::new(), Config::default())));
+        let (mut router, _) = router(engine);
+        router.context.lock().unwrap().app = Some("CS2.EXE".into());
+        {
+            let mut queue = router.queue.0.lock().unwrap();
+            queue.writing = true;
+            queue.since = Some(Instant::now());
+        }
+        for letter in ['w', 'a', 's', 'd', ' '] {
+            assert_eq!(router.route(key(letter), raw(letter)), Disposition::Pass);
+        }
+        assert!(router.queue.0.lock().unwrap().jobs.is_empty());
+        assert!(router.missed);
+    }
+
+    #[test]
+    fn a_busy_or_poisoned_engine_cannot_hold_excluded_game_input() {
+        for poisoned in [false, true] {
+            let engine = Arc::new(Mutex::new(Engine::new(Models::new(), Config::default())));
+            let (mut router, _) = router(engine.clone());
+            router.context.lock().unwrap().app = Some("cs2.exe".into());
+            {
+                let mut queue = router.queue.0.lock().unwrap();
+                queue.writing = true;
+                queue.since = Some(Instant::now());
+            }
+            if poisoned {
+                let held = engine.clone();
+                let _ = std::thread::spawn(move || {
+                    let _locked = held.lock().unwrap();
+                    panic!("test engine failure");
+                })
+                .join();
+            }
+            let _locked = if poisoned {
+                None
+            } else {
+                Some(engine.lock().unwrap())
+            };
+            assert_eq!(router.route(key('d'), raw('d')), Disposition::Pass);
+            assert!(router.queue.0.lock().unwrap().jobs.is_empty());
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_new_window_of_the_same_app_discards_the_previous_word() {
+        let models = Models::load_dir(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../crates/rekey-core/data/models"),
+        )
+        .unwrap();
+        assert!(!models.is_empty());
+        let engine = Arc::new(Mutex::new(Engine::new(models, Config::default())));
+        let (mut router, _) = router(engine.clone());
+        let context = router.context.lock().unwrap().clone();
+        for letter in "ghbdtn".chars() {
+            engine.lock().unwrap().on_key(&key(letter), &context);
+        }
+        // Simulate the old HWND while keeping the exact same app/layout.
+        router.last_window = -1;
+        assert_eq!(router.route(key(' '), raw(' ')), Disposition::Pass);
+        assert!(router.queue.0.lock().unwrap().jobs.is_empty());
+    }
 
     fn router(engine: SharedEngine) -> (KeyRouter, Arc<TapHealth>) {
         let health = Arc::new(TapHealth::new());

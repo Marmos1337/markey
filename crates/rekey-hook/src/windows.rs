@@ -3,8 +3,9 @@
 //!
 //! The shape mirrors the macOS implementation. `WH_KEYBOARD_LL` sees every
 //! keystroke and can hold one back — so the space that ends a mistyped word
-//! is sent only after the correction — and `WH_MOUSE_LL` reports clicks and
-//! drags, because after a click nothing behind the caret is known any more.
+//! is sent only after the correction. Mouse clicks and drags arrive through
+//! asynchronous Raw Input, so a high-polling-rate gaming mouse never waits for
+//! this process before delivering movement to the foreground application.
 //!
 //! Low-level hooks run on the thread that installed them, inside its message
 //! loop, and the system only waits a few hundred milliseconds for them. All
@@ -18,10 +19,10 @@ use crate::{
     Capabilities, Context, Disposition, HookError, Injector, Key, KeyEvent, Modifiers, RawKey,
 };
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::time::Duration;
 use windows::core::PWSTR;
-use windows::Win32::Foundation::{HANDLE, HGLOBAL, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HANDLE, HGLOBAL, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
     GetClipboardSequenceNumber, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
@@ -34,23 +35,28 @@ use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetDoubleClickTime, GetKeyState, GetKeyboardLayout, GetKeyboardLayoutList, MapVirtualKeyExW,
-    MapVirtualKeyW, SendInput, ToUnicodeEx, HKL, INPUT, INPUT_KEYBOARD, KEYBDINPUT,
-    KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC,
-    MAPVK_VSC_TO_VK, VIRTUAL_KEY, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE,
-    VK_HOME, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_NEXT, VK_PRIOR,
-    VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_SPACE, VK_TAB,
-    VK_UP,
+    GetAsyncKeyState, GetDoubleClickTime, GetKeyState, GetKeyboardLayout, GetKeyboardLayoutList,
+    MapVirtualKeyExW, MapVirtualKeyW, SendInput, ToUnicodeEx, HKL, INPUT, INPUT_KEYBOARD,
+    KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
+    MAPVK_VK_TO_VSC, MAPVK_VSC_TO_VK, VIRTUAL_KEY, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DOWN,
+    VK_END, VK_ESCAPE, VK_HOME, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU,
+    VK_NEXT, VK_PRIOR, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT,
+    VK_SPACE, VK_TAB, VK_UP,
+};
+use windows::Win32::UI::Input::{
+    GetRawInputData, GetRegisteredRawInputDevices, RegisterRawInputDevices, HRAWINPUT, RAWINPUT,
+    RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_INPUTSINK, RIDEV_REMOVE, RID_INPUT, RIM_TYPEMOUSE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, CreateWindowExW, DispatchMessageW, EnumWindows, GetForegroundWindow,
-    GetMessageW, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowThreadProcessId,
-    IsWindowVisible, PostMessageW, SendMessageTimeoutW, SetWindowsHookExW, TranslateMessage,
-    UnhookWindowsHookEx, GWL_EXSTYLE, GW_OWNER, HHOOK, HWND_MESSAGE, KBDLLHOOKSTRUCT,
-    LLKHF_EXTENDED, MSG, MSLLHOOKSTRUCT, SMTO_ABORTIFHUNG, WH_KEYBOARD_LL, WH_MOUSE_LL,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_INPUTLANGCHANGEREQUEST, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MOUSEMOVE, WM_NULL, WM_RBUTTONDOWN, WM_SYSKEYDOWN,
-    WM_SYSKEYUP, WS_EX_TOOLWINDOW,
+    CallNextHookEx, CreateWindowExW, DestroyWindow, DispatchMessageW, EnumWindows, GetCursorPos,
+    GetForegroundWindow, GetMessageW, GetWindow, GetWindowLongW, GetWindowTextLengthW,
+    GetWindowThreadProcessId, IsWindowVisible, PostMessageW, SendMessageTimeoutW,
+    SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, GWL_EXSTYLE, GW_OWNER, HHOOK,
+    HWND_MESSAGE, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, MSG, RI_MOUSE_LEFT_BUTTON_DOWN,
+    RI_MOUSE_LEFT_BUTTON_UP, RI_MOUSE_MIDDLE_BUTTON_DOWN, RI_MOUSE_RIGHT_BUTTON_DOWN,
+    SMTO_ABORTIFHUNG, WH_KEYBOARD_LL, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_INPUT,
+    WM_INPUTLANGCHANGEREQUEST, WM_KEYDOWN, WM_KEYUP, WM_NULL, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    WS_EX_TOOLWINDOW,
 };
 
 /// Marker stamped into the `dwExtraInfo` of every synthetic event MarKey
@@ -80,6 +86,21 @@ struct ModState {
 }
 
 impl ModState {
+    fn sample() -> Self {
+        let held = |vk: VIRTUAL_KEY| unsafe { GetAsyncKeyState(vk.0 as i32) < 0 };
+        Self {
+            lshift: held(VK_LSHIFT),
+            rshift: held(VK_RSHIFT),
+            lctrl: held(VK_LCONTROL),
+            rctrl: held(VK_RCONTROL),
+            lalt: held(VK_LMENU),
+            ralt: held(VK_RMENU),
+            lwin: held(VK_LWIN),
+            rwin: held(VK_RWIN),
+            caps: unsafe { GetKeyState(VK_CAPITAL.0 as i32) } & 1 != 0,
+        }
+    }
+
     fn modifiers(&self) -> Modifiers {
         Modifiers {
             shift: self.lshift || self.rshift,
@@ -153,7 +174,15 @@ struct HookState {
     handler: Handler,
     health: std::sync::Arc<crate::TapHealth>,
     mods: ModState,
-    mouse: MouseState,
+    suspended: bool,
+}
+
+/// The service publishes its enabled/exclusion state off the input path.
+/// Even modifier taps pass untouched in an excluded application.
+static INPUT_SUSPENDED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_input_suspended(suspended: bool) {
+    INPUT_SUSPENDED.store(suspended, Ordering::Relaxed);
 }
 
 thread_local! {
@@ -161,6 +190,38 @@ thread_local! {
     /// so their state is reached through thread-local storage. The hooks and
     /// their callbacks always run on the thread that installed them.
     static STATE: RefCell<Option<HookState>> = const { RefCell::new(None) };
+    static INJECTION_TARGET: std::cell::Cell<isize> = const { std::cell::Cell::new(0) };
+}
+
+pub fn foreground_window() -> isize {
+    unsafe { GetForegroundWindow().0 as isize }
+}
+
+/// Bind a worker's pending correction to the window that requested it.
+pub fn set_injection_target(window: isize) {
+    INJECTION_TARGET.with(|target| target.set(window));
+}
+
+pub fn injection_target() -> isize {
+    INJECTION_TARGET.with(|target| target.get())
+}
+
+/// Carry a worker's target across dispatch to another thread (notably Tauri's
+/// main-thread layout operations), restoring that thread's previous scope.
+pub fn with_injection_target<T>(window: isize, action: impl FnOnce() -> T) -> Option<T> {
+    struct Restore(isize);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            set_injection_target(self.0);
+        }
+    }
+    let _restore = Restore(injection_target());
+    set_injection_target(window);
+    injection_target_active().then(action)
+}
+
+pub fn injection_target_active() -> bool {
+    INJECTION_TARGET.with(|target| target.get() == 0 || target.get() == foreground_window())
 }
 
 /// A message-only window on the hook thread, which owns the clipboard while
@@ -244,6 +305,9 @@ fn installed_layouts() -> Vec<HKL> {
 /// window that has focus — exactly what the language bar does. Only layouts
 /// the user has installed are considered.
 pub fn select_layout(layout_id: &str) -> bool {
+    if !injection_target_active() {
+        return false;
+    }
     let Some(hkl) = installed_layouts()
         .into_iter()
         .find(|h| layout_from_langid(langid(*h)) == Some(layout_id))
@@ -473,6 +537,11 @@ fn watch_password_fields() {
         }
     };
     loop {
+        if INPUT_SUSPENDED.load(Ordering::Relaxed) {
+            PASSWORD_FOCUSED.store(false, Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(150));
+            continue;
+        }
         let password = unsafe {
             automation
                 .GetFocusedElement()
@@ -698,8 +767,14 @@ impl WindowsInjector {
     }
 
     fn send(inputs: &[INPUT]) {
+        if !injection_target_active() {
+            return;
+        }
         unsafe {
-            SendInput(inputs, std::mem::size_of::<INPUT>() as i32);
+            let sent = SendInput(inputs, std::mem::size_of::<INPUT>() as i32);
+            if sent != inputs.len() as u32 {
+                log::warn!("Windows accepted {sent}/{} injected input events; the target may run at a higher integrity level", inputs.len());
+            }
         }
     }
 
@@ -763,17 +838,30 @@ impl WindowsInjector {
         }
     }
 
-    /// Press `key` with `modifiers` held, then release everything.
-    fn chord(modifiers: &[VIRTUAL_KEY], key: VIRTUAL_KEY) {
+    /// Only release modifiers that this chord pressed. Releasing a physical
+    /// Ctrl/Shift here would leave the foreground app's state out of sync.
+    fn chord_inputs(
+        modifiers: &[VIRTUAL_KEY],
+        key: VIRTUAL_KEY,
+        held: impl Fn(VIRTUAL_KEY) -> bool,
+    ) -> Vec<INPUT> {
+        let pressed: Vec<_> = modifiers.iter().copied().filter(|m| !held(*m)).collect();
         let mut inputs = Vec::new();
-        for m in modifiers {
+        for m in &pressed {
             inputs.push(Self::key_input(*m, false));
         }
         inputs.push(Self::key_input(key, false));
         inputs.push(Self::key_input(key, true));
-        for m in modifiers.iter().rev() {
+        for m in pressed.iter().rev() {
             inputs.push(Self::key_input(*m, true));
         }
+        inputs
+    }
+
+    fn chord(modifiers: &[VIRTUAL_KEY], key: VIRTUAL_KEY) {
+        let inputs = Self::chord_inputs(modifiers, key, |vk| unsafe {
+            GetAsyncKeyState(vk.0 as i32) < 0
+        });
         Self::send(&inputs);
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -976,6 +1064,19 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     }
     let vk = VIRTUAL_KEY(info.vkCode as u16);
 
+    let suspended = INPUT_SUSPENDED.load(Ordering::Relaxed);
+    STATE.with(|s| {
+        if let Some(st) = s.borrow_mut().as_mut() {
+            if st.suspended && !suspended {
+                st.mods = ModState::sample();
+            }
+            st.suspended = suspended;
+        }
+    });
+    if suspended {
+        return unsafe { CallNextHookEx(None, code, wparam, lparam) };
+    }
+
     // Caps Lock is tracked whoever presses it — MarKey switches it off itself
     // after a word typed with it left on.
     if vk == VK_CAPITAL {
@@ -1043,51 +1144,199 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
-unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if code >= 0 {
-        let info = unsafe { &*(lparam.0 as *const MSLLHOOKSTRUCT) };
-        let pt = (info.pt.x, info.pt.y);
-        let near =
-            |a: (i32, i32), b: (i32, i32), d: i32| (a.0 - b.0).abs() <= d && (a.1 - b.1).abs() <= d;
-        let key = STATE.with(|s| {
-            let mut s = s.borrow_mut();
-            let st = s.as_mut()?;
-            let m = &mut st.mouse;
-            match wparam.0 as u32 {
-                WM_LBUTTONDOWN => {
-                    let double = info.time.wrapping_sub(m.last_click_time)
-                        <= unsafe { GetDoubleClickTime() }
-                        && near(pt, m.last_click_at, 4);
-                    m.left_down = true;
-                    m.drag_reported = false;
-                    m.down_at = pt;
-                    m.last_click_time = info.time;
-                    m.last_click_at = pt;
-                    Some(if double { Key::Selection } else { Key::Click })
-                }
-                WM_LBUTTONUP => {
-                    m.left_down = false;
-                    None
-                }
-                WM_MOUSEMOVE if m.left_down && !m.drag_reported && !near(pt, m.down_at, 4) => {
-                    m.drag_reported = true;
-                    Some(Key::Selection)
-                }
-                WM_RBUTTONDOWN | WM_MBUTTONDOWN => Some(Key::Click),
-                _ => None,
-            }
+const WM_MOUSE_OBSERVED: u32 = WM_APP + 17;
+const WM_STOP_MOUSE: u32 = WM_APP + 18;
+
+fn registered_mouse() -> windows::core::Result<Option<RAWINPUTDEVICE>> {
+    unsafe {
+        let mut count = 0;
+        let size = std::mem::size_of::<RAWINPUTDEVICE>() as u32;
+        if GetRegisteredRawInputDevices(None, &mut count, size) == u32::MAX {
+            return Err(windows::core::Error::from_thread());
+        }
+        if count == 0 {
+            return Ok(None);
+        }
+        let mut devices = vec![RAWINPUTDEVICE::default(); count as usize];
+        let read = GetRegisteredRawInputDevices(Some(devices.as_mut_ptr()), &mut count, size);
+        if read == u32::MAX {
+            return Err(windows::core::Error::from_thread());
+        }
+        Ok(devices
+            .into_iter()
+            .take(read as usize)
+            .find(|device| device.usUsagePage == 1 && device.usUsage == 2))
+    }
+}
+
+fn restore_mouse_registration(ours: HWND, previous: Option<RAWINPUTDEVICE>) {
+    // Raw Input registration belongs to the whole process. Tao may already
+    // own the mouse, and another component can replace us later.
+    if registered_mouse()
+        .ok()
+        .flatten()
+        .is_some_and(|current| current.hwndTarget == ours)
+    {
+        let restore = previous.unwrap_or(RAWINPUTDEVICE {
+            usUsagePage: 1,
+            usUsage: 2,
+            dwFlags: RIDEV_REMOVE,
+            hwndTarget: HWND::default(),
         });
-        if let Some(key) = key {
-            let event = KeyEvent {
-                character: None,
-                key,
-                modifiers: current_mods().modifiers(),
-                synthetic: false,
-            };
-            let _ = dispatch(event, None);
+        unsafe {
+            let _ =
+                RegisterRawInputDevices(&[restore], std::mem::size_of::<RAWINPUTDEVICE>() as u32);
         }
     }
-    unsafe { CallNextHookEx(None, code, wparam, lparam) }
+}
+
+impl MouseState {
+    fn observe(
+        &mut self,
+        buttons: u32,
+        pt: (i32, i32),
+        time: u32,
+        double_time: u32,
+    ) -> Option<Key> {
+        let near = |a: (i32, i32), b: (i32, i32)| {
+            (a.0 as i64 - b.0 as i64).abs() <= 4 && (a.1 as i64 - b.1 as i64).abs() <= 4
+        };
+        let mut key = None;
+        if buttons & RI_MOUSE_LEFT_BUTTON_DOWN != 0 {
+            let double = self.last_click_time != 0
+                && time.wrapping_sub(self.last_click_time) <= double_time
+                && near(pt, self.last_click_at);
+            self.left_down = true;
+            self.drag_reported = false;
+            self.down_at = pt;
+            self.last_click_time = time;
+            self.last_click_at = pt;
+            key = Some(if double { Key::Selection } else { Key::Click });
+        } else if self.left_down && !self.drag_reported && !near(pt, self.down_at) {
+            self.drag_reported = true;
+            key = Some(Key::Selection);
+        }
+        if buttons & RI_MOUSE_LEFT_BUTTON_UP != 0 {
+            self.left_down = false;
+        }
+        if buttons & (RI_MOUSE_RIGHT_BUTTON_DOWN | RI_MOUSE_MIDDLE_BUTTON_DOWN) != 0 {
+            key = Some(Key::Click);
+        }
+        key
+    }
+}
+
+/// Receive mouse packets on a separate message loop. Only clicks/selections
+/// are posted to the keyboard thread; mouse movement can neither stall a game
+/// waiting for a low-level hook nor flood the keyboard thread's message queue.
+fn spawn_mouse_observer(target: HWND) -> Result<(isize, std::thread::JoinHandle<()>), HookError> {
+    let target = target.0 as isize;
+    let (ready, receiver) = std::sync::mpsc::sync_channel(1);
+    let thread = std::thread::Builder::new()
+        .name("markey-mouse".into())
+        .spawn(move || unsafe {
+            let window = CreateWindowExW(
+                WINDOW_EX_STYLE(0),
+                windows::core::w!("STATIC"),
+                windows::core::w!(""),
+                WINDOW_STYLE(0),
+                0,
+                0,
+                0,
+                0,
+                Some(HWND_MESSAGE),
+                None,
+                None,
+                None,
+            );
+            let hwnd = match window {
+                Ok(hwnd) => hwnd,
+                Err(error) => {
+                    let _ = ready.send(Err(error.to_string()));
+                    return;
+                }
+            };
+            let device = RAWINPUTDEVICE {
+                usUsagePage: 1,
+                usUsage: 2,
+                dwFlags: RIDEV_INPUTSINK,
+                hwndTarget: hwnd,
+            };
+            let previous = match registered_mouse() {
+                Ok(previous) => previous,
+                Err(error) => {
+                    let _ = ready.send(Err(error.to_string()));
+                    let _ = DestroyWindow(hwnd);
+                    return;
+                }
+            };
+            if let Err(error) =
+                RegisterRawInputDevices(&[device], std::mem::size_of::<RAWINPUTDEVICE>() as u32)
+            {
+                let _ = ready.send(Err(error.to_string()));
+                let _ = DestroyWindow(hwnd);
+                return;
+            }
+            let _ = ready.send(Ok(hwnd.0 as isize));
+            let mut mouse = MouseState::default();
+            let mut msg = MSG::default();
+            while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+                if msg.message == WM_STOP_MOUSE {
+                    break;
+                }
+                if msg.message == WM_INPUT {
+                    let mut input = RAWINPUT::default();
+                    let mut size = std::mem::size_of::<RAWINPUT>() as u32;
+                    let read = GetRawInputData(
+                        HRAWINPUT(msg.lParam.0 as *mut _),
+                        RID_INPUT,
+                        Some((&mut input as *mut RAWINPUT).cast()),
+                        &mut size,
+                        std::mem::size_of::<RAWINPUTHEADER>() as u32,
+                    );
+                    if INPUT_SUSPENDED.load(Ordering::Relaxed) {
+                        mouse = MouseState::default();
+                    } else if read != u32::MAX && input.header.dwType == RIM_TYPEMOUSE.0 {
+                        let buttons = input.data.mouse.Anonymous.Anonymous.usButtonFlags as u32;
+                        // Idle movement needs no cursor lookup or engine callback.
+                        if buttons != 0 || (mouse.left_down && !mouse.drag_reported) {
+                            let mut point = POINT::default();
+                            if GetCursorPos(&mut point).is_ok() {
+                                if let Some(key) = mouse.observe(
+                                    buttons,
+                                    (point.x, point.y),
+                                    msg.time,
+                                    GetDoubleClickTime(),
+                                ) {
+                                    let _ = PostMessageW(
+                                        Some(HWND(target as *mut _)),
+                                        WM_MOUSE_OBSERVED,
+                                        WPARAM(usize::from(key == Key::Selection)),
+                                        LPARAM(0),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                // The default procedure releases foreground Raw Input packets.
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            restore_mouse_registration(hwnd, previous);
+            let _ = DestroyWindow(hwnd);
+        })
+        .map_err(|e| HookError::Os(e.to_string()))?;
+    match receiver.recv() {
+        Ok(Ok(hwnd)) => Ok((hwnd, thread)),
+        result => {
+            let _ = thread.join();
+            Err(HookError::Os(match result {
+                Ok(Err(error)) => error,
+                _ => "mouse observer stopped before startup".into(),
+            }))
+        }
+    }
 }
 
 /// Install the hooks and pump messages on the calling thread.
@@ -1103,29 +1352,25 @@ where
     F: FnMut(KeyEvent, Option<RawKey>) -> Disposition + Send + 'static,
     R: FnOnce(Capabilities),
 {
-    let mods = ModState {
-        caps: unsafe { GetKeyState(VK_CAPITAL.0 as i32) } & 1 != 0,
-        ..ModState::default()
-    };
+    let mods = ModState::sample();
     STATE.with(|s| {
         *s.borrow_mut() = Some(HookState {
             handler: Box::new(on_key),
             health,
             mods,
-            mouse: MouseState::default(),
+            suspended: INPUT_SUSPENDED.load(Ordering::Relaxed),
         })
     });
 
-    let (keyboard, mouse) = unsafe {
+    let keyboard = unsafe {
         let module = GetModuleHandleW(None).map_err(|e| HookError::Os(e.to_string()))?;
         let keyboard =
             SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), Some(module.into()), 0)
                 .map_err(|_| HookError::PermissionDenied)?;
-        let mouse = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), Some(module.into()), 0).ok();
 
         // The clipboard owner window lives here, where messages are pumped.
         let class: Vec<u16> = "STATIC".encode_utf16().chain(std::iter::once(0)).collect();
-        if let Ok(hwnd) = CreateWindowExW(
+        let hwnd = CreateWindowExW(
             WINDOW_EX_STYLE(0),
             windows::core::PCWSTR(class.as_ptr()),
             windows::core::PCWSTR::null(),
@@ -1138,22 +1383,56 @@ where
             None,
             Some(module.into()),
             None,
-        ) {
-            CLIPBOARD_WINDOW.store(hwnd.0 as isize, Ordering::SeqCst);
-        }
-        (keyboard, mouse)
+        )
+        .map_err(|error| {
+            let _ = UnhookWindowsHookEx(keyboard);
+            HookError::Os(error.to_string())
+        })?;
+        CLIPBOARD_WINDOW.store(hwnd.0 as isize, Ordering::SeqCst);
+        keyboard
     };
+    let mouse = spawn_mouse_observer(HWND(CLIPBOARD_WINDOW.load(Ordering::SeqCst) as *mut _))
+        .inspect_err(|_| unsafe {
+            let _ = UnhookWindowsHookEx(keyboard);
+            let hwnd = CLIPBOARD_WINDOW.swap(0, Ordering::SeqCst);
+            if hwnd != 0 {
+                let _ = DestroyWindow(HWND(hwnd as *mut _));
+            }
+        })?;
     on_ready(Capabilities { can_hold: true });
 
     unsafe {
         let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+        while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+            if msg.message == WM_MOUSE_OBSERVED && !INPUT_SUSPENDED.load(Ordering::Relaxed) {
+                let _ = dispatch(
+                    KeyEvent {
+                        character: None,
+                        key: if msg.wParam.0 == 1 {
+                            Key::Selection
+                        } else {
+                            Key::Click
+                        },
+                        modifiers: current_mods().modifiers(),
+                        synthetic: false,
+                    },
+                    None,
+                );
+            }
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
         let _ = UnhookWindowsHookEx(keyboard);
-        if let Some(mouse) = mouse {
-            let _ = UnhookWindowsHookEx(mouse);
+        let _ = PostMessageW(
+            Some(HWND(mouse.0 as *mut _)),
+            WM_STOP_MOUSE,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        let _ = mouse.1.join();
+        let hwnd = CLIPBOARD_WINDOW.swap(0, Ordering::SeqCst);
+        if hwnd != 0 {
+            let _ = DestroyWindow(HWND(hwnd as *mut _));
         }
     }
     STATE.with(|s| *s.borrow_mut() = None);
@@ -1164,6 +1443,373 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    static MOUSE_REGISTRATION_TEST: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn correction_chords_balance_only_the_modifiers_they_press() {
+        for held_ctrl in [false, true] {
+            let inputs = WindowsInjector::chord_inputs(&[VK_LCONTROL, VK_LSHIFT], VK_LEFT, |key| {
+                held_ctrl && key == VK_LCONTROL
+            });
+            let mut down = std::collections::HashSet::new();
+            for input in inputs {
+                let key = unsafe { input.Anonymous.ki };
+                assert_eq!(key.dwExtraInfo, REKEY_SIGNATURE);
+                assert!(
+                    !held_ctrl || key.wVk != VK_LCONTROL,
+                    "physical Ctrl must stay held"
+                );
+                if key.dwFlags.contains(KEYEVENTF_KEYUP) {
+                    assert!(down.remove(&key.wVk.0), "release without an injected press");
+                } else {
+                    assert!(down.insert(key.wVk.0), "duplicate press");
+                }
+            }
+            assert!(down.is_empty(), "no injected key may stay down");
+        }
+    }
+
+    #[test]
+    fn a_dispatched_layout_action_keeps_its_originating_window_guard() {
+        set_injection_target(-1);
+        let target = injection_target();
+        let ran = std::sync::Arc::new(AtomicBool::new(false));
+        let called = ran.clone();
+        std::thread::spawn(move || {
+            assert_eq!(injection_target(), 0, "dispatch thread starts unbound");
+            assert!(
+                with_injection_target(target, || called.store(true, Ordering::Relaxed)).is_none()
+            );
+            assert_eq!(injection_target(), 0, "temporary scope must be restored");
+        })
+        .join()
+        .unwrap();
+        assert!(!ran.load(Ordering::Relaxed));
+        set_injection_target(0);
+    }
+
+    #[test]
+    fn mouse_move_load_does_not_generate_keyboard_thread_work() {
+        let mut mouse = MouseState::default();
+        let start = std::time::Instant::now();
+        for time in 1..80_001 {
+            assert_eq!(mouse.observe(0, (time, time / 2), time as u32, 500), None);
+        }
+        eprintln!(
+            "80,000 idle mouse packets: {:?}, 0 engine notifications",
+            start.elapsed()
+        );
+        assert_eq!(
+            mouse.observe(RI_MOUSE_LEFT_BUTTON_DOWN, (10, 10), 90_000, 500),
+            Some(Key::Click)
+        );
+        assert_eq!(mouse.observe(0, (11, 11), 90_001, 500), None);
+        assert_eq!(
+            mouse.observe(0, (20, 20), 90_002, 500),
+            Some(Key::Selection)
+        );
+        for time in 90_003..100_000 {
+            assert_eq!(mouse.observe(0, (time, time), time as u32, 500), None);
+        }
+        assert_eq!(
+            mouse.observe(RI_MOUSE_LEFT_BUTTON_UP, (20, 20), 100_000, 500),
+            None
+        );
+        assert!(!mouse.left_down);
+    }
+
+    #[test]
+    fn a_combined_mouse_press_release_never_leaves_a_drag_armed() {
+        let mut mouse = MouseState::default();
+        assert_eq!(
+            mouse.observe(
+                RI_MOUSE_LEFT_BUTTON_DOWN | RI_MOUSE_LEFT_BUTTON_UP,
+                (10, 10),
+                1000,
+                500
+            ),
+            Some(Key::Click)
+        );
+        assert!(!mouse.left_down);
+        assert_eq!(mouse.observe(0, (100, 100), 1001, 500), None);
+    }
+
+    #[test]
+    fn double_click_still_selects_a_word() {
+        let mut mouse = MouseState::default();
+        assert_eq!(
+            mouse.observe(RI_MOUSE_LEFT_BUTTON_DOWN, (10, 10), 1000, 500),
+            Some(Key::Click)
+        );
+        mouse.observe(RI_MOUSE_LEFT_BUTTON_UP, (10, 10), 1001, 500);
+        assert_eq!(
+            mouse.observe(RI_MOUSE_LEFT_BUTTON_DOWN, (11, 10), 1100, 500),
+            Some(Key::Selection)
+        );
+    }
+
+    #[test]
+    fn native_mouse_observer_starts_and_stops_without_a_global_mouse_hook() {
+        let _guard = MOUSE_REGISTRATION_TEST.lock().unwrap();
+        // No keyboard observer, no generated input, no owner settings.
+        let (hwnd, thread) = spawn_mouse_observer(HWND::default()).unwrap();
+        unsafe {
+            PostMessageW(
+                Some(HWND(hwnd as *mut _)),
+                WM_STOP_MOUSE,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .unwrap();
+        }
+        thread.join().unwrap();
+    }
+
+    #[test]
+    fn native_mouse_registration_restores_previous_and_respects_a_new_owner() {
+        let _guard = MOUSE_REGISTRATION_TEST.lock().unwrap();
+        unsafe {
+            let previous = registered_mouse().unwrap();
+            let make_window = || {
+                CreateWindowExW(
+                    WINDOW_EX_STYLE(0),
+                    windows::core::w!("STATIC"),
+                    windows::core::w!(""),
+                    WINDOW_STYLE(0),
+                    0,
+                    0,
+                    0,
+                    0,
+                    Some(HWND_MESSAGE),
+                    None,
+                    None,
+                    None,
+                )
+                .unwrap()
+            };
+            let first = make_window();
+            let later = make_window();
+            let register = |hwnd| {
+                RegisterRawInputDevices(
+                    &[RAWINPUTDEVICE {
+                        usUsagePage: 1,
+                        usUsage: 2,
+                        dwFlags: RIDEV_INPUTSINK,
+                        hwndTarget: hwnd,
+                    }],
+                    std::mem::size_of::<RAWINPUTDEVICE>() as u32,
+                )
+                .unwrap()
+            };
+            let stop = |observer: (isize, std::thread::JoinHandle<()>)| {
+                PostMessageW(
+                    Some(HWND(observer.0 as *mut _)),
+                    WM_STOP_MOUSE,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .unwrap();
+                observer.1.join().unwrap();
+            };
+            register(first);
+            let observer = spawn_mouse_observer(HWND::default()).unwrap();
+            assert_eq!(
+                registered_mouse().unwrap().unwrap().hwndTarget.0 as isize,
+                observer.0
+            );
+            stop(observer);
+            assert_eq!(registered_mouse().unwrap().unwrap().hwndTarget, first);
+            let observer = spawn_mouse_observer(HWND::default()).unwrap();
+            register(later);
+            stop(observer);
+            assert_eq!(registered_mouse().unwrap().unwrap().hwndTarget, later);
+            restore_mouse_registration(later, previous);
+            let _ = DestroyWindow(first);
+            let _ = DestroyWindow(later);
+        }
+    }
+
+    /// Opt-in desktop smoke test. Input is confined to this test's own edit
+    /// window; every SendInput batch aborts if it stops being foreground.
+    #[test]
+    #[ignore = "opens an owned edit window; run with MARKEY_NATIVE_INPUT_TEST=1"]
+    fn native_correction_in_owned_edit_window() {
+        use rekey_core::{
+            config::Config,
+            engine::{Action, Engine},
+            model::Models,
+        };
+        use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowTextW, PeekMessageW, SetForegroundWindow, PM_REMOVE, WS_OVERLAPPEDWINDOW,
+            WS_VISIBLE,
+        };
+        assert_eq!(
+            std::env::var("MARKEY_NATIVE_INPUT_TEST").as_deref(),
+            Ok("1")
+        );
+        let previous = unsafe { GetForegroundWindow() };
+        let hwnd = unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE(0),
+                windows::core::w!("EDIT"),
+                windows::core::w!(""),
+                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                60,
+                60,
+                500,
+                160,
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap()
+        };
+        struct Cleanup(HWND, HWND);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                unsafe {
+                    set_injection_target(0);
+                    if GetForegroundWindow() == self.0 {
+                        let _ = SetForegroundWindow(self.1);
+                    }
+                    let _ = DestroyWindow(self.0);
+                }
+            }
+        }
+        let _cleanup = Cleanup(hwnd, previous);
+        unsafe {
+            let _ = SetForegroundWindow(hwnd);
+            let _ = SetFocus(Some(hwnd));
+        }
+        set_injection_target(hwnd.0 as isize);
+        let pump = || unsafe {
+            let deadline = std::time::Instant::now() + Duration::from_millis(100);
+            while std::time::Instant::now() < deadline {
+                let mut msg = MSG::default();
+                while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        };
+        pump();
+        assert!(
+            injection_target_active(),
+            "test window could not acquire focus; no input sent"
+        );
+        assert!(
+            !ModState::sample().modifiers().is_shortcut(),
+            "release Ctrl/Win before the native test"
+        );
+        let read = || unsafe {
+            let mut text = [0u16; 128];
+            let n = GetWindowTextW(hwnd, &mut text);
+            String::from_utf16_lossy(&text[..n as usize])
+        };
+        let models = Models::load_dir(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../rekey-core/data/models"),
+        )
+        .unwrap();
+        assert!(
+            !models.is_empty(),
+            "native test requires real language models"
+        );
+        let mut engine = Engine::new(models, Config::default());
+        engine.set_hold_boundaries(true);
+        let target = hwnd.0 as isize;
+        let (actions, pending) = std::sync::mpsc::channel();
+        let (ready, installed) = std::sync::mpsc::sync_channel(1);
+        let hook = std::thread::spawn(move || {
+            run(
+                move |_| {
+                    let _ = ready
+                        .send(unsafe { windows::Win32::System::Threading::GetCurrentThreadId() });
+                },
+                move |event, _raw| {
+                    if foreground_window() != target {
+                        return Disposition::Pass;
+                    }
+                    let action = engine.on_key(&event, &current_context());
+                    let disposition = if action.swallows_key() {
+                        Disposition::Drop
+                    } else {
+                        Disposition::Pass
+                    };
+                    if !matches!(action, Action::None) {
+                        let _ = actions.send(action);
+                    }
+                    disposition
+                },
+                std::sync::Arc::new(crate::TapHealth::new()),
+            )
+        });
+        let hook_id = installed
+            .recv_timeout(Duration::from_secs(3))
+            .expect("native hook did not start");
+        struct HookCleanup(u32, Option<std::thread::JoinHandle<Result<(), HookError>>>);
+        impl Drop for HookCleanup {
+            fn drop(&mut self) {
+                unsafe {
+                    let _ = windows::Win32::UI::WindowsAndMessaging::PostThreadMessageW(
+                        self.0,
+                        windows::Win32::UI::WindowsAndMessaging::WM_QUIT,
+                        WPARAM(0),
+                        LPARAM(0),
+                    );
+                }
+                if let Some(thread) = self.1.take() {
+                    let _ = thread.join();
+                }
+            }
+        }
+        let _hook_cleanup = HookCleanup(hook_id, Some(hook));
+        let us = installed_layouts()
+            .into_iter()
+            .find(|hkl| layout_from_langid(langid(*hkl)) == Some("us"))
+            .expect("native smoke requires an installed US layout");
+        unsafe {
+            windows::Win32::UI::Input::KeyboardAndMouse::ActivateKeyboardLayout(
+                us,
+                windows::Win32::UI::Input::KeyboardAndMouse::ACTIVATE_KEYBOARD_LAYOUT_FLAGS(0),
+            )
+            .unwrap();
+        }
+        let mut inputs = Vec::new();
+        for vk in b"GHBDTN " {
+            for up in [false, true] {
+                let mut input = WindowsInjector::key_input(VIRTUAL_KEY(*vk as u16), up);
+                // Distinct from MarKey's own output: exercise the real hook's
+                // VK/scan-code translation, modifier tracking and boundary hold.
+                input.Anonymous.ki.dwExtraInfo = 0x5052_4F42;
+                inputs.push(input);
+            }
+        }
+        WindowsInjector::send(&inputs);
+        pump();
+        assert!(
+            read() == "ghbdtn",
+            "scripted key events or held boundary did not reach the owned window correctly"
+        );
+        let correction = pending
+            .recv_timeout(Duration::from_secs(1))
+            .expect("native hook produced no correction");
+        assert!(matches!(correction, Action::Replace { .. }));
+        let injector = WindowsInjector::new().unwrap();
+        correction.apply(&injector);
+        pump();
+        assert!(
+            read() == "привет ",
+            "native correction did not replace the scripted word"
+        );
+        // A queued action for a different window must send nothing.
+        set_injection_target(-1);
+        injector.type_text("SHOULD_NOT_APPEAR");
+        pump();
+        assert!(read() == "привет ", "foreground guard allowed stale input");
+    }
 
     #[test]
     fn maps_windows_langids_to_layouts() {

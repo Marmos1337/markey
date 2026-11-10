@@ -14,6 +14,11 @@ default-run = "markey"
 name = "markey"
 path = "src/main.rs"
 
+[[bin]]
+name = "markey-input-smoke"
+path = "src/input_smoke.rs"
+required-features = ["native-input-smoke"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -67,5 +72,6 @@ windows = { version = "0.62", features = [
 ] }
 
 [features]
+native-input-smoke = []
 # Tauri's default production behaviour; kept explicit for the release build.
 custom-protocol = ["tauri/custom-protocol"]

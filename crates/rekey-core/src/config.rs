@@ -330,8 +330,25 @@ impl Default for Config {
     }
 }
 
-/// Password managers and terminals, where silently rewriting keystrokes ranges
-/// from annoying to genuinely destructive.
+/// Common games where movement and interaction keys must remain unchanged.
+pub const GAME_EXCLUSIONS: &[&str] = &[
+    "cs2.exe",
+    "csgo.exe",
+    "dota2.exe",
+    "VALORANT-Win64-Shipping.exe",
+    "FortniteClient-Win64-Shipping.exe",
+    "r5apex.exe",
+    "Overwatch.exe",
+    "League of Legends.exe",
+    "RainbowSix.exe",
+    "RainbowSix_Vulkan.exe",
+    "RustClient.exe",
+    "TslGame.exe",
+    "GTA5.exe",
+    "GTA5_Enhanced.exe",
+];
+
+/// Password managers, terminals and games must not receive text corrections.
 fn default_excluded_apps() -> Vec<String> {
     [
         "com.apple.keychainaccess",
@@ -356,6 +373,7 @@ fn default_excluded_apps() -> Vec<String> {
         "putty.exe",
     ]
     .iter()
+    .chain(GAME_EXCLUSIONS.iter())
     .map(|s| s.to_string())
     .collect()
 }

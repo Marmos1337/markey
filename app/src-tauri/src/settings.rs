@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Bumped whenever loading needs to adjust settings written by an older build.
-const SETTINGS_VERSION: u32 = 4;
+const SETTINGS_VERSION: u32 = 5;
 
 /// The bundle identifier, which names the settings folder.
 const APP_ID: &str = "com.marmos.markey";
@@ -163,6 +163,15 @@ impl Settings {
 
     /// Bring settings written by an older build up to date.
     fn migrate(&mut self) {
+        if self.version < 5 {
+            // Movement keys and jump/interaction keys are not words. Add the
+            // game defaults once; later edits to the list remain user choices.
+            for id in rekey_core::config::GAME_EXCLUSIONS {
+                if !self.config.is_excluded_app(id) {
+                    self.config.excluded_apps.push((*id).into());
+                }
+            }
+        }
         if self.version < 2 {
             // Older builds defaulted to tapping Option, which collides with
             // ⌥⌫ and ⌥←. A tap of right Command is the new default; anyone who
@@ -573,5 +582,31 @@ mod migration_tests {
                 modifier: Modifier::Option
             }
         );
+    }
+
+    #[test]
+    fn game_exclusions_migrate_once_and_preserve_later_user_changes() {
+        let mut settings: Settings = serde_json::from_str(
+            r#"{"version":4,"config":{"excluded_apps":["custom.exe","CS2.EXE"]}}"#,
+        )
+        .unwrap();
+        settings.migrate();
+        assert!(settings.config.is_excluded_app("custom.exe"));
+        assert_eq!(
+            settings
+                .config
+                .excluded_apps
+                .iter()
+                .filter(|id| id.eq_ignore_ascii_case("cs2.exe"))
+                .count(),
+            1
+        );
+        assert!(settings.config.is_excluded_app("dota2.exe"));
+        settings
+            .config
+            .excluded_apps
+            .retain(|id| !id.eq_ignore_ascii_case("cs2.exe"));
+        settings.migrate();
+        assert!(!settings.config.is_excluded_app("cs2.exe"));
     }
 }
