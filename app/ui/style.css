@@ -616,7 +616,9 @@ button.account-row[aria-expanded="true"] {
   flex: none;
   display: flex;
   align-items: center;
-  padding: 0 var(--gutter);
+  /* The title starts on the column's left edge: in a window wider than the
+     column the pages are centred, and the title stayed at the window's edge. */
+  padding: 0 var(--page-inset);
   border-bottom: 1px solid transparent;
   transition: border-color var(--mar-t-1) var(--mar-ease-out);
 }
@@ -1095,10 +1097,35 @@ button.account-row[aria-expanded="true"] {
   font-family: var(--font-mono);
 }
 
+/* The system's own list, in the window's look: without this the closed
+   control was the platform's light-grey box in the middle of a dark page. */
 .select {
+  appearance: none;
   font: inherit;
   color: var(--text);
   min-width: 170px;
+  padding: 5px calc(var(--ds-space-2) + 18px) 5px var(--ds-space-2);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background-color: var(--field-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 16px;
+  outline: none;
+  text-overflow: ellipsis;
+  transition:
+    border-color var(--mar-t-1) var(--mar-ease-out),
+    box-shadow var(--mar-t-1) var(--mar-ease-out);
+}
+
+.select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.select:disabled {
+  color: var(--text-secondary);
 }
 
 .preview {
@@ -1287,11 +1314,16 @@ button.account-row[aria-expanded="true"] {
    symbol and label positions as every other key. */
 .keycap-tag {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  /* On the tile's top edge, not inside it: in the four-column Windows grid a
+     word symbol («Ctrl») ran under a badge in the corner. Opaque, since it
+     now lies over the tile's border. */
+  top: -6px;
+  right: 8px;
   padding: 1px 6px;
   border-radius: var(--ds-radius-full);
-  background: var(--accent-soft);
+  background:
+    linear-gradient(var(--accent-soft), var(--accent-soft)),
+    var(--group-bg);
   color: var(--accent-ink);
   font-size: 10px;
   line-height: 14px;
@@ -1312,6 +1344,12 @@ button.account-row[aria-expanded="true"] {
   height: 19px;
   display: grid;
   place-items: center;
+}
+
+.keycap-symbol.is-word {
+  font-size: var(--ds-text-body);
+  font-weight: var(--ds-weight-semibold);
+  letter-spacing: -0.01em;
 }
 
 .nowrap {

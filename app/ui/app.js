@@ -490,6 +490,9 @@ function buildKeycaps(caps, keys) {
         '<svg class="ds-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg>';
     } else {
       symbol.textContent = names.symbol;
+      // A word («Ctrl», «Alt» on Windows) is set smaller than a one-glyph
+      // symbol, so it stays clear of the «лучший» badge in the corner.
+      if ([...names.symbol].length > 1) symbol.classList.add("is-word");
     }
     const label = document.createElement("span");
     label.className = "keycap-label";
