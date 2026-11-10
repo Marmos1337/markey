@@ -20,7 +20,9 @@ $Here = Join-Path $Repo 'tools\windows-qa'
 Add-Type -Path (Join-Path $Here 'QaNative.cs') -ReferencedAssemblies System.Drawing, System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
-if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA 'MarKey'; $Silent = @('/S') } else { $Silent = @('/S', "/D=$InstallDir") }
+if (-not $InstallDir) { $InstallDir = Join-Path $env:LOCALAPPDATA 'MarKey' }
+# Always named: the installer otherwise reuses the folder of the last install.
+$Silent = @('/S', "/D=$InstallDir")
 $Exe = Join-Path $InstallDir 'markey.exe'
 $Data = Join-Path $env:APPDATA 'com.marmos.markey'
 $Log = Join-Path $Data 'markey.log'
@@ -308,6 +310,19 @@ Step 'The keyboard hook corrects real typing' {
     [QaNative]::Tap(0xA3, $true)
     Expect-Text 'Right Ctrl converts the selection' 'normal' 'руддщ'
     Check 'The clipboard comes back' (Wait-Until { (Get-Clipboard -Raw) -ceq $held } 5 200) "$("$(Get-Clipboard -Raw)".Length) chars"
+
+    Prepare 'normal' 'en'
+    Target-Cmd 'slow:on'
+    [QaNative]::Type('hello')
+    Start-Sleep -Milliseconds 200
+    [QaNative]::Key(0xA2, $true, $false) | Out-Null
+    [QaNative]::Tap(0x41, $false)
+    [QaNative]::Key(0xA2, $false, $false) | Out-Null
+    Start-Sleep -Milliseconds 300
+    [QaNative]::Tap(0xA3, $true)
+    Expect-Text 'A busy application still gets the converted selection' 'normal' 'руддщ'
+    Target-Cmd 'slow:off'
+    Check 'The clipboard comes back after it too' (Wait-Until { (Get-Clipboard -Raw) -ceq $held } 5 200) "$("$(Get-Clipboard -Raw)".Length) chars"
     [QaNative]::Guard = 0
 }
 

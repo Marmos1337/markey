@@ -20,6 +20,7 @@ static class Program
 
 sealed class TargetForm : Form
 {
+    static bool slowPaste;
     readonly string state;
     readonly TextBox normal = new TextBox();
     readonly TextBox password = new TextBox();
@@ -48,6 +49,8 @@ sealed class TargetForm : Form
     // A single-line TextBox does not take Ctrl+A by itself.
     static void SelectAll(object sender, KeyEventArgs e)
     {
+        // An application too busy to read the clipboard straight away.
+        if (slowPaste && e.Control && e.KeyCode == Keys.V) System.Threading.Thread.Sleep(700);
         if (e.Control && e.KeyCode == Keys.A)
         {
             ((TextBox)sender).SelectAll();
@@ -70,6 +73,8 @@ sealed class TargetForm : Form
             else if (c == "focus:password") { Activate(); password.Focus(); }
             else if (c == "layout:en") SwitchLayout("en-US");
             else if (c == "layout:ru") SwitchLayout("ru-RU");
+            else if (c == "slow:on") slowPaste = true;
+            else if (c == "slow:off") slowPaste = false;
         }
     }
 
