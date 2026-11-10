@@ -45,11 +45,12 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, CreateWindowExW, DispatchMessageW, EnumWindows, GetForegroundWindow,
     GetMessageW, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowThreadProcessId,
-    IsWindowVisible, PostMessageW, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
-    GWL_EXSTYLE, GW_OWNER, HHOOK, HWND_MESSAGE, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, MSG,
-    MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WINDOW_EX_STYLE, WINDOW_STYLE,
-    WM_INPUTLANGCHANGEREQUEST, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
-    WM_MOUSEMOVE, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_SYSKEYUP, WS_EX_TOOLWINDOW,
+    IsWindowVisible, PostMessageW, SendMessageTimeoutW, SetWindowsHookExW, TranslateMessage,
+    UnhookWindowsHookEx, GWL_EXSTYLE, GW_OWNER, HHOOK, HWND_MESSAGE, KBDLLHOOKSTRUCT,
+    LLKHF_EXTENDED, MSG, MSLLHOOKSTRUCT, SMTO_ABORTIFHUNG, WH_KEYBOARD_LL, WH_MOUSE_LL,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_INPUTLANGCHANGEREQUEST, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
+    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MOUSEMOVE, WM_NULL, WM_RBUTTONDOWN, WM_SYSKEYDOWN,
+    WM_SYSKEYUP, WS_EX_TOOLWINDOW,
 };
 
 /// Marker stamped into the `dwExtraInfo` of every synthetic event MarKey
@@ -400,6 +401,41 @@ pub fn running_applications() -> Vec<(String, String)> {
     out.sort_by_key(|(n, _)| n.to_lowercase());
     out.dedup_by(|a, b| a.1.eq_ignore_ascii_case(&b.1));
     out
+}
+
+/// Wait, for at most `limit`, until the foreground application has worked
+/// through its input. A pasted keypress is only read from the clipboard when
+/// the application gets to it.
+///
+/// A message that is sent, unlike a keypress, returns only once the window's
+/// thread is pumping messages again. It overtakes keys still in the queue, so
+/// one round proves little: each further round lets one more of them through.
+pub fn wait_for_foreground_input(limit: Duration) {
+    const ROUNDS: u32 = 5;
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return;
+    }
+    let started = std::time::Instant::now();
+    for _ in 0..ROUNDS {
+        let left = limit.saturating_sub(started.elapsed());
+        if left.is_zero() {
+            return;
+        }
+        // SAFETY: WM_NULL carries nothing, and the result pointer is optional.
+        unsafe {
+            SendMessageTimeoutW(
+                hwnd,
+                WM_NULL,
+                WPARAM(0),
+                LPARAM(0),
+                SMTO_ABORTIFHUNG,
+                left.as_millis() as u32,
+                None,
+            );
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
 }
 
 /// Whether a password field has focus.

@@ -62,6 +62,9 @@ const COPY_TIMEOUT: Duration = Duration::from_millis(450);
 /// How long the converted text stays on the clipboard before the user's own
 /// clipboard is put back. The paste is handled asynchronously by the app.
 const PASTE_SETTLE: Duration = Duration::from_millis(250);
+/// The longest a busy application is waited for before the clipboard goes back.
+#[cfg(target_os = "windows")]
+const PASTE_IDLE_LIMIT: Duration = Duration::from_secs(2);
 
 /// How often the tap's health counters are read and logged.
 const HEALTH_INTERVAL: Duration = Duration::from_secs(2);
@@ -731,6 +734,10 @@ fn convert_selection(
     let ours = platform::pasteboard_change_count();
     injector.paste();
     std::thread::sleep(PASTE_SETTLE);
+    // Putting the clipboard back before a busy application reads it would paste
+    // the user's old content over the selection, or wipe the selection.
+    #[cfg(target_os = "windows")]
+    platform::wait_for_foreground_input(PASTE_IDLE_LIMIT);
     // Put the user's clipboard back — unless something else wrote to it in
     // the meantime (the user copied again, or a clipboard manager did): then
     // that newer content is what they expect to find.
