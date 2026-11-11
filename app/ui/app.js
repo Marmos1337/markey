@@ -1377,22 +1377,40 @@ $("grant").addEventListener("click", async () => {
 $("open-settings").addEventListener("click", () => invoke("open_accessibility_settings"));
 
 let previewTimer = null;
+let previewRevision = 0;
+
+function showPreview(result) {
+  const output = $("try-output");
+  output.textContent = result.output;
+  output.classList.toggle("unchanged", !result.changed);
+  $("try-help").textContent = result.exception
+    ? "Слово есть в исключениях и не заменяется. Его можно убрать на вкладке «Слова»."
+    : !state?.config.enabled
+      ? "Исправление приостановлено. Включите MarKey, чтобы проверить замену."
+      : "Наберите слово и нажмите пробел — исправление появится прямо здесь. Ctrl+Z отменяет его.";
+}
 
 function updatePreview() {
   clearTimeout(previewTimer);
+  const revision = ++previewRevision;
   previewTimer = setTimeout(async () => {
     const text = $("try-input").value || $("try-input").placeholder;
     const layout = $("try-layout").value;
     if (!layout) return;
-    const result = await invoke("preview", { text, layout });
-    const output = $("try-output");
-    output.textContent = result.output;
-    output.classList.toggle("unchanged", !result.changed);
+    try {
+      const result = await invoke("preview", { text, layout });
+      if (revision === previewRevision) showPreview(result);
+    } catch { /* Keep the field editable while the bridge is unavailable. */ }
   }, 90);
 }
 
 $("try-input").addEventListener("input", updatePreview);
 $("try-layout").addEventListener("change", updatePreview);
+RekeyTryField({ input: $("try-input"), layout: $("try-layout"),
+  convert: (args) => invoke("preview", args),
+  configVersion: () => state?.config_revision,
+  onResult: (result) => { clearTimeout(previewTimer); previewRevision++; showPreview(result); },
+});
 
 // -- account ----------------------------------------------------------------
 

@@ -45,10 +45,25 @@ fn main() {
     context.config_mut().identifier = "com.marmos.markey.input-probe".into();
     context.config_mut().app.windows.clear();
     let app = tauri::Builder::default().setup(move |app| {
-        let models = Models::load_dir(&std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../crates/rekey-core/data/models"))?;
+        let model_dir = std::env::var_os("MARKEY_PROBE_MODELS").map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../crates/rekey-core/data/models"));
+        let models = Models::load_dir(&model_dir)?;
         if models.is_empty() { return Err("real language models required".into()); }
-        let engine = Arc::new(Mutex::new(Engine::new(models, Config::default())));
+        // Read only the detection config; never load accounts, persist learned
+        // words, or alter the owner's settings during this diagnostic.
+        let config = if let Some(path) = std::env::var_os("MARKEY_PROBE_SETTINGS") {
+            let value: serde_json::Value = serde_json::from_slice(&std::fs::read(path)?)?;
+            serde_json::from_value::<Config>(value.get("config").ok_or("missing config")?.clone())?
+        } else { Config::default() };
+        let (keys, expected) = match std::env::var("MARKEY_PROBE_SCENARIO").as_deref() {
+            Ok("how") => ("RFR ", "как "),
+            Ok("learned-exception") => ("GHBDTN ", "ghbdtn "),
+            Ok("hello") | Err(_) => ("GHBDTN ", "привет "),
+            _ => return Err("unknown fixed probe scenario".into()),
+        };
+        let expected_applied = u64::from(expected != "ghbdtn ");
+        let engine = Arc::new(Mutex::new(Engine::new(models, config)));
         let previous = unsafe { GetForegroundWindow().0 as isize };
         let mut child = std::process::Command::new(std::env::current_exe()?)
             .arg("--edit-target").creation_flags(0x08000000)
@@ -103,7 +118,7 @@ fn main() {
                 finish(75, "SKIP: physical modifier held; no input sent"); return;
             }
             let mut inputs = Vec::new();
-            for vk in b"GHBDTN " {
+            for vk in keys.as_bytes() {
                 for up in [false, true] {
                     inputs.push(INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT {
                         wVk: VIRTUAL_KEY(*vk as u16), wScan: unsafe { MapVirtualKeyW(*vk as u32, MAPVK_VK_TO_VSC) as u16 },
@@ -123,7 +138,7 @@ fn main() {
                 let mut length = 0usize;
                 let read = unsafe { SendMessageTimeoutW(HWND(target as *mut _), WM_GETTEXT,
                     WPARAM(text.len()), LPARAM(text.as_mut_ptr() as isize), SMTO_ABORTIFHUNG, 200, Some(&mut length)) };
-                corrected = read.0 != 0 && length < text.len() && String::from_utf16_lossy(&text[..length]) == "привет ";
+                corrected = read.0 != 0 && length < text.len() && String::from_utf16_lossy(&text[..length]) == expected;
                 if corrected { break; }
                 std::thread::sleep(Duration::from_millis(20));
             }
@@ -133,8 +148,8 @@ fn main() {
                 health.events, health.skipped_busy, engine.lock().map(|engine| engine.stats().corrections).unwrap_or(0),
                 runtime.applied.load(Ordering::Relaxed), current.secure_input, current.layout.as_deref() == Some("us"), corrected);
             // Report only generated-scenario result, never captured text.
-            if corrected && runtime.applied.load(Ordering::Relaxed) == 1 {
-                finish(0, "PASS: real Tauri context sampler + KeyRouter + hook + injection corrected the owned window");
+            if corrected && runtime.applied.load(Ordering::Relaxed) == expected_applied {
+                finish(0, "PASS: real service produced the expected result in the owned editor");
             } else {
                 finish(1, "FAIL: full service did not correct the scripted word");
             }

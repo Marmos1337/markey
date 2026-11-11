@@ -292,15 +292,21 @@ if (!window.__TAURI__ && isLocalDevServer()) {
     },
     preview: ({ text }) => {
       let changed = false;
+      let exception = false;
       const output = text
-        .split(/\s+/)
+        .split(/(\s+)/)
         .map((word) => {
+          if (!state.config.enabled) return word;
+          if (state.config.exceptions.includes(word.toLowerCase())) {
+            exception = true;
+            return word;
+          }
           const fixed = SAMPLES[word.toLowerCase()];
           if (fixed) changed = true;
           return fixed ?? word;
         })
-        .join(" ");
-      return { output, changed };
+        .join("");
+      return { output, changed, exception };
     },
   };
 

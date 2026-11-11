@@ -946,26 +946,44 @@ fn preview(state: State<'_, AppState>, text: String, layout: String) -> PreviewR
         .lock()
         .expect("engine lock")
         .detector_snapshot();
-    let mut out = Vec::new();
+    preview_text(&engine, &text, &layout)
+}
+
+fn preview_text(engine: &rekey_core::detect::Detector, text: &str, layout: &str) -> PreviewResult {
+    let mut out = String::new();
     let mut changed = false;
+    let mut exception = false;
     let mut previous_lang: Option<&'static str> = None;
-    for token in text.split_whitespace() {
+    for part in text.split_inclusive(char::is_whitespace) {
+        let token = part.trim_end_matches(char::is_whitespace);
+        let whitespace = &part[token.len()..];
+        if token.is_empty() {
+            out.push_str(whitespace);
+            continue;
+        }
         let hint = rekey_core::detect::Hint { previous_lang };
-        match engine.evaluate_with(token, &layout, hint) {
+        match engine.evaluate_with(token, layout, hint) {
             rekey_core::detect::Verdict::Switch(c) => {
                 previous_lang = rekey_core::layout::layout(c.to_layout).map(|l| l.def.lang);
-                out.push(c.converted.clone());
+                out.push_str(&c.converted);
                 changed = true;
+            }
+            rekey_core::detect::Verdict::Keep(rekey_core::detect::Skip::UserException) => {
+                exception = true;
+                previous_lang = None;
+                out.push_str(token);
             }
             _ => {
                 previous_lang = None;
-                out.push(token.to_string());
+                out.push_str(token);
             }
         }
+        out.push_str(whitespace);
     }
     PreviewResult {
-        output: out.join(" "),
+        output: out,
         changed,
+        exception,
     }
 }
 
@@ -973,6 +991,47 @@ fn preview(state: State<'_, AppState>, text: String, layout: String) -> PreviewR
 struct PreviewResult {
     output: String,
     changed: bool,
+    exception: bool,
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+    use rekey_core::{detect::Detector, model::Model};
+
+    fn detector(config: Config) -> Detector {
+        let mut models = Models::new();
+        for (lang, words) in [("en", [("hello", 1000), ("world", 900)]),
+            ("ru", [("привет", 1000), ("мир", 900)])] {
+            models.insert(Model::train(lang, &words.into_iter().map(|(w,n)| (w.to_owned(),n)).collect()));
+        }
+        Detector::new(models, config)
+    }
+
+    #[test]
+    fn practice_correction_preserves_boundaries_and_spacing() {
+        let result = preview_text(&detector(Config::default()), "  ghbdtn\t\nhello  ", "us");
+        assert_eq!(result.output, "  привет\t\nhello  ");
+        assert!(result.changed);
+        assert!(!result.exception);
+    }
+
+    #[test]
+    fn practice_reports_learned_exceptions_without_overriding_them() {
+        let config = Config { exceptions: vec!["ghbdtn".into()], ..Config::default() };
+        let result = preview_text(&detector(config), "ghbdtn ", "us");
+        assert_eq!(result.output, "ghbdtn ");
+        assert!(!result.changed);
+        assert!(result.exception);
+    }
+
+    #[test]
+    fn practice_respects_paused_corrections() {
+        let config = Config { enabled: false, ..Config::default() };
+        let result = preview_text(&detector(config), "ghbdtn ", "us");
+        assert_eq!(result.output, "ghbdtn ");
+        assert!(!result.changed);
+    }
 }
 
 /// Forget a word on the exception list.

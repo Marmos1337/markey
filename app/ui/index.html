@@ -167,8 +167,9 @@
           <h2 class="group-header">Попробуйте</h2>
           <section class="group">
             <div class="row row-column">
-              <input id="try-input" type="text" class="field" spellcheck="false" autocomplete="off" placeholder="ghbdtn, rfr ltkf? z nen" />
+              <input id="try-input" type="text" class="field" spellcheck="false" autocomplete="off" placeholder="rfr ltkf" aria-describedby="try-help" />
               <output id="try-output" class="preview">привет, как дела? я тут</output>
+              <span id="try-help" class="row-detail" role="status">Наберите слово и нажмите пробел — исправление появится прямо здесь. Ctrl+Z отменяет его.</span>
             </div>
             <div class="row">
               <span class="row-title">Набрано в раскладке</span>
@@ -585,6 +586,7 @@
   <!-- Inert when running inside Tauri; see dev-mock.js. -->
   <script src="dev-mock.js"></script>
   <script src="save-queue.js"></script>
+  <script src="try-field.js"></script>
   <script src="app.js"></script>
   <script type="module" src="ui.js"></script>
 </body>
